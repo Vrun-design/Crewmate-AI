@@ -1,0 +1,197 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 12px);
+}
+
+@layer base {
+  :root {
+    --background: #f8fafc; /* slate-50 */
+    --foreground: #0f172a; /* slate-900 */
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #0f172a;
+    --primary-foreground: #f8fafc;
+    --secondary: #f1f5f9; /* slate-100 */
+    --secondary-foreground: #0f172a;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b; /* slate-500 */
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --destructive: #ef4444; /* red-500 */
+    --destructive-foreground: #f8fafc;
+    --border: #e2e8f0; /* slate-200 */
+    --input: #e2e8f0;
+    --ring: #94a3b8; /* slate-400 */
+    --radius: 0.75rem; /* 12px */
+  }
+
+  .dark {
+    --background: #000000;
+    --foreground: #ededed;
+    --card: #0a0a0a;
+    --card-foreground: #ededed;
+    --popover: #0a0a0a;
+    --popover-foreground: #ededed;
+    --primary: #ededed;
+    --primary-foreground: #000000;
+    --secondary: #171717;
+    --secondary-foreground: #ededed;
+    --muted: #171717;
+    --muted-foreground: #a3a3a3;
+    --accent: #171717;
+    --accent-foreground: #ededed;
+    --destructive: #7f1d1d;
+    --destructive-foreground: #ef4444;
+    --border: #262626;
+    --input: #262626;
+    --ring: #404040;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground transition-colors duration-200;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.glass-panel {
+  @apply bg-card/80 backdrop-blur-xl border border-border shadow-xl;
+}
+
+.subtle-border {
+  @apply border border-border;
+}
+
+.subtle-bg {
+  @apply bg-card;
+}
+
+.hover-bg {
+  @apply hover:bg-accent hover:text-accent-foreground;
+}
+
+.text-muted {
+  @apply text-muted-foreground;
+}
+
+/* Bevel Button Styles */
+.btn-bevel {
+  @apply relative overflow-hidden transition-all active:scale-95 shadow-sm;
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.6), 
+              0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.dark .btn-bevel {
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.1), 
+              0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.btn-bevel-primary {
+  @apply bg-primary text-primary-foreground border border-transparent hover:opacity-90;
+}
+.dark .btn-bevel-primary {
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.5), 
+              0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.btn-bevel-danger {
+  @apply bg-red-500 text-white border border-red-600 hover:bg-red-600;
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.3), 0 1px 2px rgba(239, 68, 68, 0.2);
+}
+.dark .btn-bevel-danger {
+  @apply bg-red-500/20 text-red-500 border border-red-500/30 hover:bg-red-500/30;
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.btn-bevel-secondary {
+  @apply bg-secondary text-secondary-foreground border border-border hover:bg-secondary/80;
+}
+.dark .btn-bevel-secondary {
+  box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Audio visualizer animation */
+@keyframes pulse-bar {
+  0%, 100% { height: 4px; }
+  50% { height: 20px; }
+}
+
+.audio-bar {
+  width: 3px;
+  @apply bg-foreground;
+  border-radius: 2px;
+  animation: pulse-bar 1s ease-in-out infinite;
+}
+
+.audio-bar:nth-child(1) { animation-delay: 0.0s; }
+.audio-bar:nth-child(2) { animation-delay: 0.2s; }
+.audio-bar:nth-child(3) { animation-delay: 0.4s; }
+.audio-bar:nth-child(4) { animation-delay: 0.1s; }
+.audio-bar:nth-child(5) { animation-delay: 0.3s; }
+.audio-bar:nth-child(6) { animation-delay: 0.5s; }
+.audio-bar:nth-child(7) { animation-delay: 0.2s; }
+
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}

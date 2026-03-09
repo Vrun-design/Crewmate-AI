@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Remix: Crewmate Dashboard",
+  "description": "A persistent, screen-sharing AI Product Manager that watches you work, talks to you in real-time about what it sees, and executes background tasks.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
