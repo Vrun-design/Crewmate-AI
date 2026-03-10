@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -15,35 +15,42 @@ interface SelectProps {
   className?: string;
 }
 
-export function Select({ value, onChange, options, placeholder = "Select an option", className = "" }: SelectProps) {
+export function Select({
+  value,
+  onChange,
+  options,
+  placeholder = 'Select an option',
+  className = '',
+}: SelectProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = options.find((option) => option.value === value);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
-    };
+    }
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      <div 
+      <button
+        type="button"
         className="flex items-center justify-between w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm cursor-pointer hover:border-ring transition-colors text-foreground"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setIsOpen((current) => !current)}
       >
-        <span className="truncate mr-2">{selectedOption ? selectedOption.label : placeholder}</span>
+        <span className="mr-2 truncate">{selectedOption ? selectedOption.label : placeholder}</span>
         <ChevronDown size={16} className={`text-muted-foreground transition-transform shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
-      </div>
+      </button>
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -52,9 +59,10 @@ export function Select({ value, onChange, options, placeholder = "Select an opti
           >
             <div className="max-h-60 overflow-y-auto p-1">
               {options.map((option) => (
-                <div 
+                <button
+                  type="button"
                   key={option.value}
-                  className={`flex items-center justify-between px-3 py-2 text-sm rounded-md cursor-pointer transition-colors ${value === option.value ? 'bg-blue-500/10 text-blue-500' : 'text-foreground hover:bg-secondary'}`}
+                  className={`flex items-center justify-between px-3 py-2 text-sm rounded-md cursor-pointer transition-colors ${value === option.value ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-secondary'}`}
                   onClick={() => {
                     onChange(option.value);
                     setIsOpen(false);
@@ -62,7 +70,7 @@ export function Select({ value, onChange, options, placeholder = "Select an opti
                 >
                   <span className="truncate">{option.label}</span>
                   {value === option.value && <Check size={14} className="shrink-0 ml-2" />}
-                </div>
+                </button>
               ))}
             </div>
           </motion.div>

@@ -1,17 +1,61 @@
-import React, { useState, useEffect } from 'react';
-import { Search, LayoutDashboard, MonitorUp, CheckSquare, X, BrainCircuit, PlugZap, User, Bell, Cpu, Wand2, Bot } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, LayoutDashboard, MonitorUp, CheckSquare, X, BrainCircuit, PlugZap, User, Bell, Cpu, Bot, Workflow } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
+interface CommandLink {
+  path: string;
+  label: string;
+  desc: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  color: string;
+  bg: string;
+}
+
+const BASE_LINKS: CommandLink[] = [
+  { path: '/dashboard', label: 'Dashboard', desc: 'Go to main dashboard', icon: LayoutDashboard, color: 'text-primary', bg: 'bg-primary/10' },
+  { path: '/tasks', label: 'Tasks', desc: 'View all tasks', icon: CheckSquare, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  { path: '/sessions', label: 'Sessions', desc: 'Review past sessions', icon: MonitorUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+  { path: '/off-shift', label: 'Off-Shift', desc: 'Queue async work for background execution', icon: Bot, color: 'text-lime-500', bg: 'bg-lime-500/10' },
+  { path: '/memory', label: 'Memory Base', desc: 'Manage agent context', icon: BrainCircuit, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  { path: '/skills', label: 'Capabilities', desc: 'Inspect live agent capabilities', icon: Cpu, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+  { path: '/integrations', label: 'Integrations', desc: 'Connect your tools', icon: PlugZap, color: 'text-pink-500', bg: 'bg-pink-500/10' },
+  { path: '/account', label: 'Account & Settings', desc: 'Manage profile and preferences', icon: User, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
+  { path: '/notifications', label: 'Notifications', desc: 'View all alerts', icon: Bell, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+];
+
+const OFFSHIFT_INBOX_LINK: CommandLink = {
+  path: '/offshift',
+  label: 'Off-Shift Inbox',
+  desc: 'Track async work from origin to delivery',
+  icon: Workflow,
+  color: 'text-fuchsia-500',
+  bg: 'bg-fuchsia-500/10',
+};
+
+function filterLinks(links: CommandLink[], query: string): CommandLink[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return links;
+  }
+
+  return links.filter((link) => (
+    link.label.toLowerCase().includes(normalizedQuery) ||
+    link.desc.toLowerCase().includes(normalizedQuery)
+  ));
+}
+
+export function CommandPalette({ isOpen, onClose }: CommandPaletteProps): React.JSX.Element | null {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
+  const { flags } = useFeatureFlags();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,23 +77,10 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     };
   }, [isOpen]);
 
-  const links = [
-    { path: '/dashboard', label: 'Dashboard', desc: 'Go to main dashboard', icon: LayoutDashboard, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { path: '/tasks', label: 'Tasks', desc: 'View all tasks', icon: CheckSquare, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { path: '/sessions', label: 'Sessions', desc: 'Review past sessions', icon: MonitorUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { path: '/delegations', label: 'Delegations', desc: 'Queue off-shift work', icon: Bot, color: 'text-lime-500', bg: 'bg-lime-500/10' },
-    { path: '/studio', label: 'Creative Studio', desc: 'Generate mixed-media artifacts', icon: Wand2, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    { path: '/memory', label: 'Memory Base', desc: 'Manage agent context', icon: BrainCircuit, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { path: '/skills', label: 'Capabilities', desc: 'Inspect live agent capabilities', icon: Cpu, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
-    { path: '/integrations', label: 'Integrations', desc: 'Connect your tools', icon: PlugZap, color: 'text-pink-500', bg: 'bg-pink-500/10' },
-    { path: '/account', label: 'Account & Settings', desc: 'Manage profile and preferences', icon: User, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-    { path: '/notifications', label: 'Notifications', desc: 'View all alerts', icon: Bell, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-  ];
-
-  const filteredLinks = links.filter(link => 
-    link.label.toLowerCase().includes(query.toLowerCase()) || 
-    link.desc.toLowerCase().includes(query.toLowerCase())
-  );
+  const links = flags.offshiftInbox
+    ? [...BASE_LINKS.slice(0, 4), OFFSHIFT_INBOX_LINK, ...BASE_LINKS.slice(4)]
+    : BASE_LINKS;
+  const filteredLinks = filterLinks(links, query);
 
   const content = (
     <AnimatePresence>
@@ -94,7 +125,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                   onClick={() => { navigate(link.path); onClose(); }}
                   className="flex w-full items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors text-left"
                 >
-                  <div className={`w-8 h-8 rounded-lg ${link.bg} ${link.color} flex items-center justify-center`}>
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${link.bg} ${link.color}`}>
                     <link.icon size={16} />
                   </div>
                   <div>

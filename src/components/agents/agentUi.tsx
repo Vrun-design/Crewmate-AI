@@ -1,0 +1,89 @@
+import React from 'react';
+import {
+  BarChart2,
+  Bot,
+  Brain,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Code2,
+  FlaskConical,
+  Mail,
+  MessageSquare,
+  PenTool,
+  Wrench,
+  XCircle,
+  Zap,
+  LineChart,
+  Scale,
+  Users,
+  Package,
+} from 'lucide-react';
+import type { AgentStepType } from './types';
+
+export function StepIcon({ type }: { type: AgentStepType }): React.JSX.Element {
+  const props = { size: 13 };
+
+  switch (type) {
+    case 'routing':
+      return <Zap {...props} className="text-violet-400" />;
+    case 'thinking':
+      return <Brain {...props} className="text-blue-400" />;
+    case 'skill_call':
+      return <Wrench {...props} className="text-amber-400" />;
+    case 'skill_result':
+      return <CheckCircle2 {...props} className="text-emerald-400" />;
+    case 'generating':
+      return <FlaskConical {...props} className="text-indigo-400" />;
+    case 'saving':
+      return <BarChart2 {...props} className="text-teal-400" />;
+    case 'done':
+      return <CheckCircle2 {...props} className="text-emerald-500" />;
+    case 'error':
+      return <XCircle {...props} className="text-red-400" />;
+    default:
+      return <Bot {...props} className="text-muted-foreground" />;
+  }
+}
+
+export const STEP_TYPE_LABELS: Record<AgentStepType, string> = {
+  routing: 'Routing',
+  thinking: 'Thinking',
+  skill_call: 'Skill',
+  skill_result: 'Result',
+  generating: 'Generating',
+  saving: 'Saving',
+  done: 'Done',
+  error: 'Error',
+};
+
+export const STEP_COLORS: Record<AgentStepType, string> = {
+  routing: 'border-violet-500/30 bg-violet-500/5',
+  thinking: 'border-blue-500/30 bg-blue-500/5',
+  skill_call: 'border-amber-500/30 bg-amber-500/5',
+  skill_result: 'border-emerald-500/30 bg-emerald-500/5',
+  generating: 'border-indigo-500/30 bg-indigo-500/5',
+  saving: 'border-teal-500/30 bg-teal-500/5',
+  done: 'border-emerald-500/30 bg-emerald-500/5',
+  error: 'border-red-500/30 bg-red-500/5',
+};
+
+export const AGENT_DEPT_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  Intelligence: Brain,
+  Marketing: PenTool,
+  Engineering: Code2,
+  Comms: Mail,
+  Ops: Calendar,
+  Sales: BarChart2,
+  Support: MessageSquare,
+  Analytics: BarChart2,
+  Finance: LineChart,
+  Legal: Scale,
+  People: Users,
+  Product: Package,
+  Default: Bot,
+};
+
+export const TASK_STATUS_ICONS = {
+  running: { icon: Bot, fallback: Clock },
+};

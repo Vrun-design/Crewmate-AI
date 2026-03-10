@@ -56,6 +56,16 @@ vi.mock('../hooks/useLiveSession', () => ({
   }),
 }));
 
+vi.mock('../hooks/useGmailInbox', () => ({
+  useGmailInbox: () => ({
+    messages: [],
+    isConnected: false,
+    isLoading: false,
+    error: null,
+    refresh: vi.fn(),
+  }),
+}));
+
 describe('Dashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -71,7 +81,7 @@ describe('Dashboard', () => {
 
     expect(screen.getByText('Hi Varun')).toBeInTheDocument();
     expect(screen.getByText('Fix checkout bug')).toBeInTheDocument();
-    expect(screen.getByText('GitHub issue created')).toBeInTheDocument();
+    expect(screen.getAllByText('GitHub issue created')[0]).toBeInTheDocument();
     expect(screen.getAllByText('GitHub')[0]).toBeInTheDocument();
   });
 

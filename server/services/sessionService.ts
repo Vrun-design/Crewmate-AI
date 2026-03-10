@@ -35,13 +35,13 @@ function createLocalTranscript(sessionId: string): TranscriptMessage[] {
     {
       id: randomUUID(),
       role: 'agent',
-      text: 'Crewmate is live. Screen and voice channels are ready. I loaded your local product context and the latest memory summary.',
+      text: 'Crewmate local preview is live. You can open the overlay, test screen-share permissions, and toggle the microphone controls.',
       status: 'complete',
     },
     {
       id: randomUUID(),
       role: 'agent',
-      text: 'Show me a screen, ask for an action, or delegate a background task. I can route work to Slack, Notion, GitHub, ClickUp, and the local memory brain.',
+      text: 'Configure a Gemini API key to enable real-time multimodal reasoning over live screen and voice input.',
       status: 'complete',
     },
   ];
@@ -50,17 +50,17 @@ function createLocalTranscript(sessionId: string): TranscriptMessage[] {
 }
 
 export function startSession(userId?: string, options: StartSessionOptions = {}): SessionRecord {
-  closeOpenSessions();
+  closeOpenSessions(userId);
 
-  const sessionId = `SES-${Math.floor(Math.random() * 900 + 100)}`;
+  const sessionId = `SES-${randomUUID()}`;
   const startedAt = new Date().toISOString();
   const provider = options.provider ?? 'local';
   const shouldSeedTranscript = options.seedTranscript ?? provider === 'local';
 
   if (userId) {
-    createUserSessionRecord(sessionId, userId, 'live');
+    createUserSessionRecord(sessionId, userId, 'live', provider);
   } else {
-    createSessionRecord(sessionId, 'live');
+    createSessionRecord(sessionId, 'live', provider);
   }
 
   const transcript = shouldSeedTranscript ? createLocalTranscript(sessionId) : [];
@@ -69,6 +69,7 @@ export function startSession(userId?: string, options: StartSessionOptions = {})
     'Live session started',
     'Crewmate is now listening locally and routing session state through the local backend.',
     'observation',
+    userId,
   );
 
   return {
@@ -78,6 +79,35 @@ export function startSession(userId?: string, options: StartSessionOptions = {})
     endedAt: null,
     transcript,
     provider,
+  };
+}
+
+export function sendLocalSessionMessage(sessionId: string, text: string): SessionRecord {
+  const session = getSession(sessionId);
+  if (!session) {
+    throw new Error('Session not found.');
+  }
+
+  insertTranscriptMessage({
+    id: randomUUID(),
+    sessionId,
+    role: 'user',
+    text,
+    status: 'complete',
+  });
+
+  insertTranscriptMessage({
+    id: randomUUID(),
+    sessionId,
+    role: 'agent',
+    text: 'Local preview received your message. Add a Gemini API key to enable live reasoning, audio responses, and multimodal analysis.',
+    status: 'complete',
+  });
+
+  return {
+    ...session,
+    transcript: listTranscript(sessionId),
+    provider: session.provider ?? 'local',
   };
 }
 

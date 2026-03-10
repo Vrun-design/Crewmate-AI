@@ -10,6 +10,7 @@
 import { db } from '../db';
 import type { Skill, SkillRunContext, SkillRunRecord } from './types';
 import { executeWebhookSkill, executeLLMRecipeSkill } from '../services/customSkillRunner';
+import { decryptJson, encryptJson } from '../services/secretVault';
 
 // ── Custom skill DB record ────────────────────────────────────────────────────
 
@@ -60,20 +61,24 @@ db.exec(`
   )
 `);
 
+try {
+    db.exec(`ALTER TABLE custom_skills ADD COLUMN auth_header_encrypted TEXT`);
+} catch { }
+
 // ── Custom skill CRUD ─────────────────────────────────────────────────────────
 
 export function createCustomSkill(rec: Omit<CustomSkillRecord, 'createdAt' | 'updatedAt'>): CustomSkillRecord {
     const now = new Date().toISOString();
+    const encryptedAuthHeader = rec.authHeader ? encryptJson({ authHeader: rec.authHeader }) : null;
     db.prepare(`
-        INSERT INTO custom_skills (id, user_id, name, description, trigger_phrases, mode, webhook_url, auth_header, recipe, input_schema, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO custom_skills (id, user_id, name, description, trigger_phrases, mode, webhook_url, auth_header, auth_header_encrypted, recipe, input_schema, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         rec.id, rec.userId, rec.name, rec.description,
         JSON.stringify(rec.triggerPhrases),
-        rec.mode, rec.webhookUrl ?? null, rec.authHeader ?? null, rec.recipe ?? null,
+        rec.mode, rec.webhookUrl ?? null, null, encryptedAuthHeader, rec.recipe ?? null,
         rec.inputSchema, now, now,
     );
-    loadCustomSkills(); // re-register immediately
     return { ...rec, createdAt: now, updatedAt: now };
 }
 
@@ -84,11 +89,22 @@ export function listCustomSkills(userId: string): CustomSkillRecord[] {
 
 export function deleteCustomSkill(id: string, userId: string): boolean {
     const result = db.prepare('DELETE FROM custom_skills WHERE id = ? AND user_id = ?').run(id, userId);
-    if (result.changes > 0) loadCustomSkills();
     return result.changes > 0;
 }
 
 function rowToCustomSkill(row: Record<string, unknown>): CustomSkillRecord {
+    let authHeader: string | undefined;
+    const encryptedAuthHeader = row.auth_header_encrypted ? String(row.auth_header_encrypted) : '';
+    if (encryptedAuthHeader) {
+        try {
+            authHeader = decryptJson(encryptedAuthHeader).authHeader;
+        } catch {
+            authHeader = undefined;
+        }
+    } else if (row.auth_header) {
+        authHeader = String(row.auth_header);
+    }
+
     return {
         id: String(row.id),
         userId: String(row.user_id),
@@ -97,7 +113,7 @@ function rowToCustomSkill(row: Record<string, unknown>): CustomSkillRecord {
         triggerPhrases: JSON.parse(String(row.trigger_phrases ?? '[]')) as string[],
         mode: String(row.mode) as 'webhook' | 'recipe',
         webhookUrl: row.webhook_url ? String(row.webhook_url) : undefined,
-        authHeader: row.auth_header ? String(row.auth_header) : undefined,
+        authHeader,
         recipe: row.recipe ? String(row.recipe) : undefined,
         inputSchema: String(row.input_schema ?? '{}'),
         createdAt: String(row.created_at),
@@ -105,40 +121,62 @@ function rowToCustomSkill(row: Record<string, unknown>): CustomSkillRecord {
     };
 }
 
-/** Load all custom skills from DB and register them in the skill map */
-export function loadCustomSkills(): void {
-    const rows = db.prepare('SELECT * FROM custom_skills').all() as Record<string, unknown>[];
-    for (const row of rows) {
-        const rec = rowToCustomSkill(row);
-        const customSkillId = `custom.${rec.id}`;
+function customSkillRecordToSkill(rec: CustomSkillRecord): Skill {
+    return {
+        id: `custom.${rec.id}`,
+        name: rec.name,
+        description: rec.description,
+        version: '1.0.0',
+        category: 'productivity',
+        personas: [],
+        requiresIntegration: [],
+        triggerPhrases: rec.triggerPhrases,
+        inputSchema: {
+            type: 'object',
+            properties: JSON.parse(rec.inputSchema) as Record<string, { type: 'string' | 'number' | 'boolean' | 'array'; description: string }>,
+        },
+        handler: async (ctx: SkillRunContext, args: Record<string, unknown>) => {
+            if (rec.mode === 'webhook' && rec.webhookUrl) {
+                const r = await executeWebhookSkill(rec.webhookUrl, args, rec.authHeader);
+                return { success: r.success, output: r.output, message: r.message };
+            }
+            if (rec.mode === 'recipe' && rec.recipe) {
+                const r = await executeLLMRecipeSkill(rec.recipe, args, ctx);
+                return { success: r.success, output: r.output, message: r.message };
+            }
+            return { success: false, message: 'Custom skill misconfigured' };
+        },
+    };
+}
 
-        const skill: Skill = {
-            id: customSkillId,
-            name: rec.name,
-            description: rec.description,
-            version: '1.0.0',
-            category: 'productivity',
-            personas: [],
-            requiresIntegration: [],
-            triggerPhrases: rec.triggerPhrases,
-            inputSchema: {
-                type: 'object',
-                properties: JSON.parse(rec.inputSchema) as Record<string, { type: 'string' | 'number' | 'boolean' | 'array'; description: string }>,
-            },
-            handler: async (ctx: SkillRunContext, args: Record<string, unknown>) => {
-                if (rec.mode === 'webhook' && rec.webhookUrl) {
-                    const r = await executeWebhookSkill(rec.webhookUrl, args, rec.authHeader);
-                    return { success: r.success, output: r.output, message: r.message };
-                } else if (rec.mode === 'recipe' && rec.recipe) {
-                    const r = await executeLLMRecipeSkill(rec.recipe, args, ctx);
-                    return { success: r.success, output: r.output, message: r.message };
-                }
-                return { success: false, message: 'Custom skill misconfigured' };
-            },
-        };
-
-        skills.set(customSkillId, skill);
+export function getCustomSkill(id: string, userId: string): CustomSkillRecord | null {
+    const row = db.prepare('SELECT * FROM custom_skills WHERE id = ? AND user_id = ? LIMIT 1').get(id, userId) as Record<string, unknown> | undefined;
+    if (!row) {
+        return null;
     }
+    return rowToCustomSkill(row);
+}
+
+export function getSkillForUser(id: string, userId: string): Skill | undefined {
+    const builtInSkill = skills.get(id);
+    if (builtInSkill) {
+        return builtInSkill;
+    }
+
+    if (!id.startsWith('custom.')) {
+        return undefined;
+    }
+
+    const customSkill = getCustomSkill(id.replace(/^custom\./, ''), userId);
+    return customSkill ? customSkillRecordToSkill(customSkill) : undefined;
+}
+
+export function listSkillsForUser(userId: string): Skill[] {
+    const customRows = listCustomSkills(userId);
+    return [
+        ...Array.from(skills.values()),
+        ...customRows.map(customSkillRecordToSkill),
+    ];
 }
 
 export function registerSkill(skill: Skill): void {
@@ -156,6 +194,17 @@ export function listSkills(): Skill[] {
 export function listSkillsForPersona(personaId: string): Skill[] {
     return listSkills().filter(
         (s) => s.personas.length === 0 || s.personas.includes(personaId) || s.personas.includes('all')
+    );
+}
+
+export function listSkillsForUserPersona(userId: string, personaId?: string): Skill[] {
+    const availableSkills = listSkillsForUser(userId);
+    if (!personaId) {
+        return availableSkills;
+    }
+
+    return availableSkills.filter(
+        (skill) => skill.personas.length === 0 || skill.personas.includes(personaId) || skill.personas.includes('all')
     );
 }
 
@@ -177,7 +226,7 @@ export async function runSkill(
     ctx: SkillRunContext,
     args: Record<string, unknown>
 ): Promise<SkillRunRecord> {
-    const skill = getSkill(skillId);
+    const skill = getSkillForUser(skillId, ctx.userId);
     if (!skill) {
         throw new Error(`Skill not found: ${skillId}`);
     }

@@ -25,6 +25,36 @@ const integrationFieldDefinitions: Record<string, IntegrationConfigFieldDefiniti
     { key: 'token', label: 'API token', placeholder: 'pk_...', secret: true },
     { key: 'listId', label: 'List ID', placeholder: '901234567890', secret: false },
   ],
+  zapier: [
+    {
+      key: 'webhookUrl',
+      label: 'Default Zap webhook URL',
+      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
+      secret: true,
+      helpText: 'Create a "Catch Hook" Zap at zapier.com and paste the webhook URL here.',
+    },
+    {
+      key: 'save-lead-url',
+      label: 'Save lead automation URL (optional)',
+      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
+      secret: true,
+      helpText: 'A named Zap for saving leads to your CRM or spreadsheet.',
+    },
+    {
+      key: 'notify-team-url',
+      label: 'Notify team automation URL (optional)',
+      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
+      secret: true,
+      helpText: 'A named Zap for sending team notifications (Slack, WhatsApp, email).',
+    },
+    {
+      key: 'custom-1-url',
+      label: 'Custom automation URL (optional)',
+      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
+      secret: true,
+      helpText: 'Any additional named Zap you want to trigger from Crewmate.',
+    },
+  ],
 };
 
 const envValueMap: Record<string, Record<string, string>> = {
@@ -45,6 +75,7 @@ const envValueMap: Record<string, Record<string, string>> = {
     token: serverConfig.clickupToken,
     listId: serverConfig.clickupListId,
   },
+  zapier: {},
 };
 
 function getStoredConfig(workspaceId: string, integrationId: string): Record<string, string> {

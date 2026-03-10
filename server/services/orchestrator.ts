@@ -14,7 +14,7 @@
 import { createGeminiClient } from './geminiClient';
 import { serverConfig } from '../config';
 import type { SkillRunContext } from '../skills/types';
-import { listSkills, runSkill } from '../skills/registry';
+import { listSkillsForUser, runSkill } from '../skills/registry';
 import { db } from '../db';
 import type { AgentStepEvent, AgentStepType, EmitStep } from '../types/agentEvents';
 import { runResearchAgent, RESEARCH_AGENT_MANIFEST } from './agents/researchAgent';
@@ -40,6 +40,8 @@ export type AgentTaskStatus = 'queued' | 'running' | 'completed' | 'failed';
 export interface AgentTask {
     id: string;
     agentId: string;
+    userId: string;
+    workspaceId: string;
     intent: string;
     status: AgentTaskStatus;
     result?: unknown;
@@ -55,6 +57,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS agent_tasks (
     id TEXT PRIMARY KEY,
     agent_id TEXT NOT NULL,
+    user_id TEXT,
+    workspace_id TEXT,
     intent TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'queued',
     result_json TEXT,
@@ -87,29 +91,40 @@ function emitTaskEvent(taskId: string, event: object): void {
 
 // ── Task persistence ──────────────────────────────────────────────────────────
 
-export function createTask(agentId: string, intent: string): AgentTask {
+export function createTask(agentId: string, intent: string, ctx: Pick<SkillRunContext, 'userId' | 'workspaceId'>): AgentTask {
     const task: AgentTask = {
         id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         agentId,
+        userId: ctx.userId,
+        workspaceId: ctx.workspaceId,
         intent,
         status: 'queued',
         steps: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
     };
-    db.prepare(`INSERT INTO agent_tasks (id, agent_id, intent, status, steps_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(task.id, task.agentId, task.intent, task.status, '[]', task.createdAt, task.updatedAt);
+    db.prepare(`
+      INSERT INTO agent_tasks (id, agent_id, user_id, workspace_id, intent, status, steps_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(task.id, task.agentId, task.userId, task.workspaceId, task.intent, task.status, '[]', task.createdAt, task.updatedAt);
     return task;
 }
 
-export function getTask(id: string): AgentTask | null {
-    const row = db.prepare('SELECT * FROM agent_tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+export function getTask(id: string, userId?: string): AgentTask | null {
+    const row = userId
+        ? db.prepare('SELECT * FROM agent_tasks WHERE id = ? AND user_id = ?').get(id, userId) as Record<string, unknown> | undefined
+        : db.prepare('SELECT * FROM agent_tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     if (!row) return null;
     return rowToTask(row);
 }
 
-export function listTasks(limit = 20): AgentTask[] {
-    const rows = db.prepare('SELECT * FROM agent_tasks ORDER BY created_at DESC LIMIT ?').all(limit) as Record<string, unknown>[];
+export function listTasks(userId: string, limit = 20): AgentTask[] {
+    const rows = db.prepare(`
+      SELECT * FROM agent_tasks
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).all(userId, limit) as Record<string, unknown>[];
     return rows.map(rowToTask);
 }
 
@@ -117,6 +132,8 @@ function rowToTask(row: Record<string, unknown>): AgentTask {
     return {
         id: String(row.id),
         agentId: String(row.agent_id),
+        userId: String(row.user_id ?? ''),
+        workspaceId: String(row.workspace_id ?? ''),
         intent: String(row.intent),
         status: String(row.status) as AgentTaskStatus,
         result: row.result_json ? JSON.parse(String(row.result_json)) as unknown : undefined,
@@ -182,9 +199,9 @@ interface RoutingDecision {
     reasoning: string;
 }
 
-async function routeIntent(intent: string): Promise<RoutingDecision> {
+async function routeIntent(intent: string, userId: string): Promise<RoutingDecision> {
     const ai = createGeminiClient();
-    const skills = listSkills().map((s) => `${s.id}: ${s.description}`).join('\n');
+    const skills = listSkillsForUser(userId).map((s) => `${s.id}: ${s.description}`).join('\n');
 
     const response = await ai.models.generateContent({
         model: serverConfig.geminiOrchestrationModel,
@@ -231,12 +248,12 @@ export async function orchestrate(
     ctx: SkillRunContext,
 ): Promise<{ taskId: string; result?: unknown }> {
     // Classify intent
-    const routing = await routeIntent(intent);
+    const routing = await routeIntent(intent, ctx.userId);
     const agentId = routing.agent === 'skill'
         ? 'skill-registry'
         : `crewmate-${routing.agent}-agent`;
 
-    const task = createTask(agentId, intent);
+    const task = createTask(agentId, intent, ctx);
     const steps: AgentStepEvent[] = [];
     let stepIndex = 0;
 
@@ -319,18 +336,17 @@ export async function orchestrate(
                 result = await runResearchAgent(intent, ctx, emitStep);
             }
 
-            const doneTask = getTask(task.id);
+            const doneTask = getTask(task.id, ctx.userId);
             updateTask(task.id, { status: 'completed', result, completedAt: new Date().toISOString() }, steps);
             emitTaskEvent(task.id, { type: 'completed', result, steps, totalSteps: steps.length });
-            // Fire notification (non-blocking)
-            if (doneTask) void notifyTaskComplete(ctx.userId, { ...doneTask, status: 'completed', result, steps, completedAt: new Date().toISOString() });
+            if (doneTask) notifyTaskComplete(ctx.userId, { ...doneTask, status: 'completed', result, steps, completedAt: new Date().toISOString() }).catch(e => console.error('[agentNotifier] success notification failed:', e));
 
         } catch (err) {
             emitStep('error', `Failed: ${String(err)}`, { success: false });
             updateTask(task.id, { status: 'failed', error: String(err), completedAt: new Date().toISOString() }, steps);
             emitTaskEvent(task.id, { type: 'failed', error: String(err), steps });
-            // Fire notification (non-blocking)
-            void notifyTaskComplete(ctx.userId, { ...task, status: 'failed', error: String(err), steps, completedAt: new Date().toISOString() });
+            notifyTaskComplete(ctx.userId, { ...task, status: 'failed', error: String(err), steps, completedAt: new Date().toISOString() }).catch(e => console.error('[agentNotifier] failure notification failed:', e));
+
         }
     })();
 

@@ -1,12 +1,12 @@
 /**
  * Real MCP Protocol Server — Phase 4
  *
- * This implements the Model Context Protocol (MCP) so Claude Desktop, Cursor,
- * and any other MCP client can connect to Crewmate and use all 15 skills.
+ * This implements the Model Context Protocol (MCP) so any compatible client
+ * can connect to Crewmate and use the registered skills.
  *
  * Transport: HTTP+SSE Streamable HTTP (MCP spec 2024-11-05)
  *
- * Claude Desktop config (~/.claude/claude_desktop_config.json):
+ * Example MCP client config:
  * {
  *   "mcpServers": {
  *     "crewmate": {
@@ -45,7 +45,7 @@ export function attachMcpServer(app: Express): void {
             currentSkill.inputSchema as unknown as any,
             async (args) => {
                 const ctx: SkillRunContext = {
-                    userId: 'mcp-client',
+                    userId: 'external-mcp-client',
                     workspaceId: 'default',
                 };
 
@@ -110,7 +110,7 @@ export function attachMcpServer(app: Express): void {
                 personas: s.personas,
                 requiresIntegration: s.requiresIntegration,
             })),
-            clauDeDesktopConfig: {
+            exampleClientConfig: {
                 mcpServers: {
                     crewmate: {
                         url: 'http://localhost:8787/mcp',

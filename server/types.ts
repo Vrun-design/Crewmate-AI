@@ -131,15 +131,49 @@ export interface UserPreferencesRecord {
   blurSensitiveFields: boolean;
 }
 
+export type JobType = 'research_brief' | 'daily_digest' | 'workflow_run';
+export type JobStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type WorkOriginType = 'delegation' | 'live_session' | 'slack' | 'email' | 'system';
+export type WorkApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
+export type DeliveryChannelType = 'in_app' | 'slack' | 'email' | 'notion' | 'github' | 'clickup';
+
+export interface WorkDeliveryRecord {
+  channel: DeliveryChannelType;
+  destinationLabel: string;
+  deliveredAt?: string | null;
+  status: 'pending' | 'delivered' | 'failed';
+}
+
+export interface WorkArtifactRecord {
+  kind: 'brief' | 'summary' | 'notion_page' | 'slack_message' | 'email' | 'issue' | 'doc' | 'digest';
+  label: string;
+  url?: string | null;
+}
+
+export interface WorkHandoffRecord {
+  at: string;
+  type: 'created' | 'started' | 'delivered' | 'approval_requested' | 'approved' | 'failed';
+  actor: string;
+  summary: string;
+}
+
 export interface JobRecord {
   id: string;
-  type: 'research_brief';
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  type: JobType;
+  status: JobStatus;
   title: string;
   summary: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string | null;
+  originType: WorkOriginType;
+  originRef?: string | null;
+  deliveryChannels: WorkDeliveryRecord[];
+  artifactRefs: WorkArtifactRecord[];
+  approvalStatus: WorkApprovalStatus;
+  approvalRequestedAt?: string | null;
+  approvedAt?: string | null;
+  handoffLog: WorkHandoffRecord[];
 }
 
 export interface CreativeArtifactRecord {
@@ -147,4 +181,23 @@ export interface CreativeArtifactRecord {
   narrative: string;
   imageData?: string;
   imageMimeType?: string;
+}
+
+export interface OffshiftWorkItemRecord {
+  id: string;
+  title: string;
+  type: JobType;
+  status: JobStatus;
+  startedFrom: WorkOriginType;
+  startedFromLabel: string;
+  summary: string;
+  deliveryChannels: WorkDeliveryRecord[];
+  artifactRefs: WorkArtifactRecord[];
+  approvalStatus: WorkApprovalStatus;
+  approvalRequestedAt?: string | null;
+  approvedAt?: string | null;
+  handoffLog: WorkHandoffRecord[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
 }

@@ -131,7 +131,7 @@ export function LiveSessionOverlay({
             >
               <AlignLeft size={20} />
               {!isMuted && (
-                <span className="absolute top-0 right-0 w-3 h-3 bg-blue-500 border-2 border-background rounded-full"></span>
+                <span className="absolute top-0 right-0 w-3 h-3 bg-primary border-2 border-background rounded-full"></span>
               )}
             </button>
           </div>
@@ -150,7 +150,7 @@ export function LiveSessionOverlay({
                   repeat: Infinity,
                   ease: "easeInOut"
                 }}
-                className="absolute w-64 h-64 rounded-full bg-blue-500/30 blur-3xl pointer-events-none"
+                className="absolute w-64 h-64 rounded-full bg-primary/20 blur-3xl pointer-events-none"
               />
             )}
 
@@ -249,7 +249,7 @@ export function LiveSessionOverlay({
                 <button
                   type="submit"
                   disabled={!draft.trim() || !onSendMessage || isBusy}
-                  className="px-3 py-2 rounded-xl bg-blue-500 text-white text-sm font-medium disabled:opacity-50"
+                  className="px-3 py-2 rounded-xl btn-bevel btn-bevel-primary text-sm font-medium disabled:opacity-50"
                 >
                   {isBusy ? 'Sending...' : 'Send'}
                 </button>
@@ -263,8 +263,8 @@ export function LiveSessionOverlay({
                 <button
                   onClick={() => void onToggleMicrophone?.()}
                   className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all ${isMuted
-                      ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20'
-                      : 'bg-secondary border-border text-foreground hover:bg-accent'
+                    ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20'
+                    : 'bg-secondary border-border text-foreground hover:bg-accent'
                     }`}
                 >
                   {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
@@ -293,8 +293,8 @@ export function LiveSessionOverlay({
                   <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === 'agent'
-                          ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
-                          : 'bg-secondary border border-border'
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'bg-secondary border border-border'
                         }`}
                     >
                       {message.role === 'agent' ? (
@@ -313,7 +313,7 @@ export function LiveSessionOverlay({
                 ))
               ) : (
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 border border-blue-500/20">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
                     <BrainCircuit size={16} />
                   </div>
                   <div>

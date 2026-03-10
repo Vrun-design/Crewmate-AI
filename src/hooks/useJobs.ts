@@ -16,6 +16,12 @@ interface UseJobsResult {
     deliverToNotion: boolean;
     notifyInSlack: boolean;
   }) => Promise<void>;
+  createWorkflowRun: (input: {
+    title: string;
+    intent: string;
+    deliverToNotion: boolean;
+    notifyInSlack: boolean;
+  }) => Promise<void>;
 }
 
 export function useJobs(): UseJobsResult {
@@ -66,5 +72,24 @@ export function useJobs(): UseJobsResult {
     }
   }
 
-  return { jobs, isLoading, isSubmitting, error, refresh, createResearchBrief };
+  async function createWorkflowRun(input: {
+    title: string;
+    intent: string;
+    deliverToNotion: boolean;
+    notifyInSlack: boolean;
+  }): Promise<void> {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const created = await jobsService.createWorkflowRun(input);
+      setJobs((current) => [created, ...current]);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to queue job');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return { jobs, isLoading, isSubmitting, error, refresh, createResearchBrief, createWorkflowRun };
 }

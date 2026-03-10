@@ -1,9 +1,26 @@
+function parseBooleanEnv(name: string, fallback = false): boolean {
+  const value = process.env[name];
+  if (value === undefined) {
+    return fallback;
+  }
+
+  return value === 'true';
+}
+
 export const serverConfig = {
+  appEnv: process.env.NODE_ENV ?? 'development',
   port: Number.parseInt(process.env.PORT ?? '8787', 10),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
   databasePath: process.env.CREWMATE_DB_PATH ?? 'data/crewmate.db',
   encryptionKey: process.env.CREWMATE_ENCRYPTION_KEY ?? '',
   geminiApiKey: process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY ?? '',
+  allowUnsafeCustomSkillWebhooks: parseBooleanEnv('ALLOW_UNSAFE_CUSTOM_SKILL_WEBHOOKS'),
+  featureFlags: {
+    offshiftInbox: parseBooleanEnv('FEATURE_OFFSHIFT_INBOX'),
+    jobTypesV2: parseBooleanEnv('FEATURE_JOB_TYPES_V2'),
+    slackInbound: parseBooleanEnv('FEATURE_SLACK_INBOUND'),
+    approvalGates: parseBooleanEnv('FEATURE_APPROVAL_GATES'),
+  },
 
   // ── Model routing ──────────────────────────────────────────────────────────
   // Live audio — real-time bidirectional sessions

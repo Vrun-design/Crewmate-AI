@@ -1,13 +1,13 @@
 import React from 'react';
-import type {Activity} from '../../types';
-import {getActivityBadge, getActivityListIcon} from './activityLogUtils';
+import type { Activity } from '../../types';
+import { getActivityBadge, getActivityListIcon } from './activityLogUtils';
 
 interface ActivityLogListProps {
   activities: Activity[];
   onOpenActivity: (activity: Activity) => void;
 }
 
-export function ActivityLogList({activities, onOpenActivity}: ActivityLogListProps): React.ReactNode {
+export function ActivityLogList({ activities, onOpenActivity }: ActivityLogListProps): React.ReactNode {
   return (
     <>
       <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted/30">
@@ -27,7 +27,7 @@ export function ActivityLogList({activities, onOpenActivity}: ActivityLogListPro
                 {getActivityListIcon(activity.type)}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <div className="text-sm font-medium truncate text-foreground group-hover:text-primary transition-colors">
                   {activity.title}
                 </div>
                 <div className="text-xs text-muted-foreground truncate mt-0.5">{activity.description}</div>

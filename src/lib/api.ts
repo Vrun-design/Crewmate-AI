@@ -15,8 +15,31 @@ function getAuthHeader(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export function getAuthToken(): string {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return window.localStorage.getItem(AUTH_TOKEN_KEY) ?? '';
+}
+
+export function buildApiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
+}
+
+export function buildAuthenticatedEventSourceUrl(path: string): string {
+  const url = new URL(buildApiUrl(path), typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+  const token = getAuthToken();
+
+  if (token) {
+    url.searchParams.set('authToken', token);
+  }
+
+  return url.toString();
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     headers: {
       'Content-Type': 'application/json',
       ...getAuthHeader(),

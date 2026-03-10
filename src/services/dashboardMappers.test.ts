@@ -17,6 +17,20 @@ describe('dashboardMappers', () => {
     expect(mapped.icon).not.toBe(Terminal);
   });
 
+  test('falls back to integration id for custom logos when icon name differs', () => {
+    const mapped = mapIntegration({
+      id: 'zapier',
+      name: 'Zapier',
+      status: 'disconnected',
+      iconName: 'zap',
+      color: 'text-orange-500',
+      bgColor: 'bg-orange-500/10',
+      desc: 'Zapier integration',
+    });
+
+    expect(mapped.logoUrl).toBe('/zapier.svg');
+  });
+
   test('falls back to Terminal for unknown icon names', () => {
     const mapped = mapIntegration({
       id: 'unknown',

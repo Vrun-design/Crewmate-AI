@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Zap } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '../../components/ui/Button';
 import { authService, authStorage } from '../../services/authService';
@@ -37,16 +37,14 @@ export function Login() {
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px]"></div>
       <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-foreground opacity-[0.03] blur-[100px]"></div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
         animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-[380px] relative z-10"
       >
         <div className="flex flex-col items-center text-center space-y-5 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-b from-foreground to-foreground/80 text-background flex items-center justify-center shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset,0_8px_20px_rgba(0,0,0,0.1)]">
-            <Zap size={24} className="fill-current" />
-          </div>
+          <img src="/Crewmate.svg" alt="Crewmate" className="h-14 w-14 object-contain shadow-[0_8px_20px_rgba(0,0,0,0.08)]" />
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Log in to Crewmate</h1>
             <p className="text-sm text-muted-foreground">Enter your email to continue into the local workspace preview.</p>
@@ -79,7 +77,7 @@ export function Login() {
             {error ? <div className="text-sm text-red-500">{error}</div> : null}
           </form>
         </div>
-        
+
         <p className="text-center text-xs text-muted-foreground mt-8">
           Local preview mode stores auth state in your browser and the workspace database.
         </p>

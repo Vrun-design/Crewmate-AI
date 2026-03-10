@@ -11,6 +11,8 @@ for (const col of [
   ['created_at', 'TEXT'],
   ['search_text', 'TEXT'],
   ['embedding', 'TEXT'],
+  ['user_id', 'TEXT'],
+  ['workspace_id', 'TEXT'],
 ]) {
   try {
     db.exec(`ALTER TABLE memory_nodes ADD COLUMN ${col[0]} ${col[1]}`);
@@ -19,29 +21,34 @@ for (const col of [
   }
 }
 
-export function listMemoryNodes(): MemoryNodeRecord[] {
+export function listMemoryNodesForUser(userId: string): MemoryNodeRecord[] {
   return db.prepare(`
     SELECT id, title, type, tokens, last_synced as lastSynced, active
     FROM memory_nodes
+    WHERE user_id = ?
     ORDER BY rowid DESC
-  `).all().map((row) => ({
+  `).all(userId).map((row) => ({
     ...row,
     active: Boolean((row as { active: number }).active),
   })) as MemoryNodeRecord[];
 }
 
 export function ingestMemoryNode(input: {
+  userId: string;
+  workspaceId?: string;
   title: string;
   type: MemoryNodeRecord['type'];
   tokens?: string;
   searchText?: string;
   personaId?: string;
   source?: string;
-}) {
+}): string {
   const id = `MEM-${randomUUID().slice(0, 8).toUpperCase()}`;
   const now = new Date().toISOString();
   const row = {
     id,
+    userId: input.userId,
+    workspaceId: input.workspaceId ?? null,
     title: input.title,
     type: input.type,
     tokens: input.tokens ?? '1.0k',
@@ -55,8 +62,8 @@ export function ingestMemoryNode(input: {
   };
 
   db.prepare(`
-    INSERT INTO memory_nodes (id, title, type, tokens, last_synced, active, search_text, embedding, persona_id, source, created_at)
-    VALUES (@id, @title, @type, @tokens, @lastSynced, @active, @searchText, @embedding, @personaId, @source, @createdAt)
+    INSERT INTO memory_nodes (id, user_id, workspace_id, title, type, tokens, last_synced, active, search_text, embedding, persona_id, source, created_at)
+    VALUES (@id, @userId, @workspaceId, @title, @type, @tokens, @lastSynced, @active, @searchText, @embedding, @personaId, @source, @createdAt)
   `).run(row);
 
   // Embed asynchronously — do not block ingestion
@@ -93,11 +100,13 @@ function compactSummary(text: string, maxLength: number): string {
   return `${normalized.slice(0, maxLength - 1).trim()}...`;
 }
 
-export function ingestLiveTurnMemory(input: { userText: string; assistantText: string }) {
+export function ingestLiveTurnMemory(input: { userId: string; workspaceId?: string; userText: string; assistantText: string }): string {
   const combined = `${input.userText}\n${input.assistantText}`.trim();
   const title = compactSummary(`Live turn: ${input.userText}`, 84);
 
   return ingestMemoryNode({
+    userId: input.userId,
+    workspaceId: input.workspaceId,
     title,
     type: 'core',
     tokens: estimateTokenCount(combined),
@@ -116,18 +125,26 @@ interface ScoredMemory {
  * Retrieve the top-K most semantically relevant memory nodes for a query.
  * Optionally filter by persona. Falls back to most recent nodes if embeddings are unavailable.
  */
-export async function retrieveRelevantMemories(queryText: string, topK = 5, personaId?: string): Promise<string[]> {
+export async function retrieveRelevantMemories(
+  userId: string,
+  queryText: string,
+  topK = 5,
+  personaId?: string,
+): Promise<string[]> {
   type MemoryRow = { id: string; title: string; search_text: string | null; embedding: string | null };
 
-  const whereClause = personaId
-    ? 'WHERE active = 1 AND (persona_id = ? OR persona_id IS NULL)'
-    : 'WHERE active = 1';
-  const params = personaId ? [personaId] : [];
+  const wheres = ['user_id = ?', 'active = 1'];
+  const params: unknown[] = [userId];
+
+  if (personaId) {
+    wheres.push('(persona_id = ? OR persona_id IS NULL)');
+    params.push(personaId);
+  }
 
   const rows = db.prepare(`
     SELECT id, title, search_text, embedding
     FROM memory_nodes
-    ${whereClause}
+    WHERE ${wheres.join(' AND ')}
     ORDER BY rowid DESC
     LIMIT 200
   `).all(...params) as MemoryRow[];

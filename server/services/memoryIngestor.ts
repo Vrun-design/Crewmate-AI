@@ -17,6 +17,8 @@ import type { MemoryNodeRecord } from '../types';
 export type MemorySource = 'live_turn' | 'skill_run' | 'agent_task' | 'manual' | 'integration';
 
 export interface IngestOptions {
+    userId: string;
+    workspaceId?: string;
     title: string;
     content: string;
     source: MemorySource;
@@ -37,6 +39,8 @@ export function ingestFromSource(opts: IngestOptions): string {
     const searchText = `${personaTag}${tagPrefix}${sourceTag}\n\n${opts.content}`;
 
     return ingestMemoryNode({
+        userId: opts.userId,
+        workspaceId: opts.workspaceId,
         title: opts.title.slice(0, 120),
         type: opts.type ?? 'core',
         tokens: `${Math.max(1, Math.ceil(opts.content.length / 4 / 1000)).toFixed(1)}k`,
@@ -51,6 +55,8 @@ export function ingestFromSource(opts: IngestOptions): string {
  * Only meaningful results (not error runs) are persisted.
  */
 export function ingestSkillResult(opts: {
+    userId: string;
+    workspaceId?: string;
     skillId: string;
     skillName: string;
     output: unknown;
@@ -64,6 +70,8 @@ export function ingestSkillResult(opts: {
     if (!text || text.length < 20) return null;
 
     return ingestFromSource({
+        userId: opts.userId,
+        workspaceId: opts.workspaceId,
         title: `${opts.skillName} result`,
         content: text.slice(0, 3000),
         source: 'skill_run',
@@ -77,6 +85,8 @@ export function ingestSkillResult(opts: {
  * Ingest an agent task result (research briefs, content, etc.)
  */
 export function ingestAgentResult(opts: {
+    userId: string;
+    workspaceId?: string;
     agentId: string;
     intent: string;
     result: unknown;
@@ -89,6 +99,8 @@ export function ingestAgentResult(opts: {
     if (!text || text.length < 20) return null;
 
     return ingestFromSource({
+        userId: opts.userId,
+        workspaceId: opts.workspaceId,
         title: `Agent: ${opts.intent.slice(0, 80)}`,
         content: text.slice(0, 4000),
         source: 'agent_task',
@@ -101,14 +113,14 @@ export function ingestAgentResult(opts: {
 /**
  * List memories filtered by persona and/or source.
  */
-export function listMemoriesByPersona(personaId: string, limit = 50): MemoryNodeRecord[] {
+export function listMemoriesByPersonaForUser(userId: string, personaId: string, limit = 50): MemoryNodeRecord[] {
     return db.prepare(`
     SELECT id, title, type, tokens, last_synced as lastSynced, active
     FROM memory_nodes
-    WHERE persona_id = ? AND active = 1
+    WHERE user_id = ? AND persona_id = ? AND active = 1
     ORDER BY rowid DESC
     LIMIT ?
-  `).all(personaId, limit).map((row) => ({
+  `).all(userId, personaId, limit).map((row) => ({
         ...row,
         active: Boolean((row as { active: number }).active),
     })) as MemoryNodeRecord[];
@@ -118,13 +130,14 @@ export function listMemoriesByPersona(personaId: string, limit = 50): MemoryNode
  * List memories timeline (for the new MemoryBase UI).
  */
 export function listMemoryTimeline(opts: {
+    userId: string;
     limit?: number;
     personaId?: string;
     source?: MemorySource;
     searchQuery?: string;
 }): Array<MemoryNodeRecord & { personaId?: string; source?: string; createdAt?: string }> {
-    const wheres: string[] = ['1=1'];
-    const params: unknown[] = [];
+    const wheres: string[] = ['user_id = ?'];
+    const params: unknown[] = [opts.userId];
 
     if (opts.personaId) {
         wheres.push('persona_id = ?');

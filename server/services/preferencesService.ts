@@ -1,8 +1,9 @@
+import { serverConfig } from '../config';
 import {db} from '../db';
 import type {UserPreferencesRecord} from '../types';
 
 const defaultPreferences: UserPreferencesRecord = {
-  voiceModel: 'alex',
+  voiceModel: serverConfig.geminiLiveVoices[0],
   textModel: 'gemini-3.1-pro',
   imageModel: 'gemini-3.1-flash-image',
   reasoningLevel: 'high',
@@ -10,6 +11,12 @@ const defaultPreferences: UserPreferencesRecord = {
   autoStartScreenShare: false,
   blurSensitiveFields: true,
 };
+
+function normalizeVoiceModel(voiceModel: string): string {
+  return serverConfig.geminiLiveVoices.includes(voiceModel as typeof serverConfig.geminiLiveVoices[number])
+    ? voiceModel
+    : serverConfig.geminiLiveVoices[0];
+}
 
 export function getUserPreferences(userId: string): UserPreferencesRecord {
   const row = db.prepare(`
@@ -37,6 +44,7 @@ export function getUserPreferences(userId: string): UserPreferencesRecord {
 
   return {
     ...row,
+    voiceModel: normalizeVoiceModel(row.voiceModel),
     proactiveSuggestions: Boolean(row.proactiveSuggestions),
     autoStartScreenShare: Boolean(row.autoStartScreenShare),
     blurSensitiveFields: Boolean(row.blurSensitiveFields),
@@ -69,7 +77,7 @@ export function saveUserPreferences(userId: string, input: UserPreferencesRecord
       updated_at = excluded.updated_at
   `).run(
     userId,
-    input.voiceModel,
+    normalizeVoiceModel(input.voiceModel),
     input.textModel,
     input.imageModel,
     input.reasoningLevel,

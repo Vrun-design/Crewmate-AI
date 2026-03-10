@@ -1,15 +1,55 @@
-import React from 'react';
-import {AlertCircle, AlignLeft, Calendar, Clock, Link as LinkIcon} from 'lucide-react';
-import {Button} from '../ui/Button';
-import {getTaskStatusBadge} from './tasksUtils';
-import type {Task} from '../../types';
+import { useState } from 'react';
+import { AlertCircle, AlignLeft, Calendar, Clock, Link as LinkIcon } from 'lucide-react';
+import { Button } from '../ui/Button';
+import { Select } from '../ui/Select';
+import { getTaskStatusBadge } from './tasksUtils';
+import type { Task } from '../../types';
+
+const TOOL_OPTIONS = [
+  { value: 'ClickUp', label: 'ClickUp' },
+  { value: 'GitHub', label: 'GitHub' },
+  { value: 'Notion', label: 'Notion' },
+  { value: 'Slack', label: 'Slack' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'Low', label: 'Low' },
+  { value: 'Medium', label: 'Medium' },
+  { value: 'High', label: 'High' },
+];
 
 interface TaskDrawerContentProps {
   task: Task | null;
   onClose: () => void;
 }
 
-export function TaskDrawerContent({task, onClose}: TaskDrawerContentProps): React.ReactNode {
+const TASK_METADATA_ITEMS = [
+  { key: 'priority', label: 'Priority', icon: AlertCircle },
+  { key: 'tool', label: 'Tool', icon: LinkIcon },
+  { key: 'created', label: 'Created', icon: Calendar },
+  { key: 'updated', label: 'Updated', icon: Clock },
+] as const;
+
+function getTaskMetadataValue(task: Task, key: typeof TASK_METADATA_ITEMS[number]['key']): string {
+  if (key === 'priority') {
+    return task.priority;
+  }
+
+  if (key === 'tool') {
+    return task.tool;
+  }
+
+  if (key === 'created') {
+    return 'Today, 10:30 AM';
+  }
+
+  return task.time;
+}
+
+export function TaskDrawerContent({ task, onClose }: TaskDrawerContentProps): React.JSX.Element {
+  const [tool, setTool] = useState('ClickUp');
+  const [priority, setPriority] = useState('Medium');
+
   if (task) {
     return (
       <div className="space-y-6">
@@ -22,30 +62,15 @@ export function TaskDrawerContent({task, onClose}: TaskDrawerContentProps): Reac
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <AlertCircle size={14} /> Priority
+          {TASK_METADATA_ITEMS.map(({ key, label, icon: Icon }) => (
+            <div key={key} className="space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Icon size={14} />
+                {label}
+              </div>
+              <div className="text-sm font-medium text-foreground">{getTaskMetadataValue(task, key)}</div>
             </div>
-            <div className="text-sm font-medium text-foreground">{task.priority}</div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <LinkIcon size={14} /> Tool
-            </div>
-            <div className="text-sm font-medium text-foreground">{task.tool}</div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Calendar size={14} /> Created
-            </div>
-            <div className="text-sm font-medium text-foreground">Today, 10:30 AM</div>
-          </div>
-          <div className="space-y-1">
-            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-              <Clock size={14} /> Updated
-            </div>
-            <div className="text-sm font-medium text-foreground">{task.time}</div>
-          </div>
+          ))}
         </div>
 
         <div className="space-y-2">
@@ -87,25 +112,24 @@ export function TaskDrawerContent({task, onClose}: TaskDrawerContentProps): Reac
           placeholder="Add more details..."
           rows={4}
           className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground resize-none"
-        ></textarea>
+        />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">Tool</label>
-          <select className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground appearance-none">
-            <option>ClickUp</option>
-            <option>GitHub</option>
-            <option>Notion</option>
-            <option>Slack</option>
-          </select>
+          <Select
+            value={tool}
+            onChange={setTool}
+            options={TOOL_OPTIONS}
+          />
         </div>
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">Priority</label>
-          <select className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground appearance-none">
-            <option>Low</option>
-            <option>Medium</option>
-            <option>High</option>
-          </select>
+          <Select
+            value={priority}
+            onChange={setPriority}
+            options={PRIORITY_OPTIONS}
+          />
         </div>
       </div>
       <div className="pt-4 flex gap-3">

@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, CheckSquare, Settings, MonitorUp, Activity, Wand2, Bot, Network,
-  MoreHorizontal, Zap, X, BrainCircuit, Moon, Sun, LogOut, User, Bell, Cpu, UsersRound, FlaskConical
+  LayoutDashboard, CheckSquare, Settings, MonitorUp, Network,
+  MoreHorizontal, X, BrainCircuit, Moon, Sun, LogOut, User, Cpu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { authService, authStorage } from '../../services/authService';
@@ -20,10 +20,40 @@ interface NavItemProps {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   label: string;
   to: string;
-  badge?: string;
   currentPath: string;
   onClick: () => void;
 }
+
+interface NavSection {
+  title: string;
+  items: Array<Pick<NavItemProps, 'icon' | 'label' | 'to'>>;
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: 'Operate',
+    items: [
+      { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+      { to: '/agents', icon: Network, label: 'Crew Network' },
+    ],
+  },
+  {
+    title: 'Workspace',
+    items: [
+      { to: '/memory', icon: BrainCircuit, label: 'Memory Base' },
+      { to: '/sessions', icon: MonitorUp, label: 'Sessions' },
+      { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
+      { to: '/skills', icon: Cpu, label: 'Skills Hub' },
+    ],
+  },
+  {
+    title: 'Settings',
+    items: [
+      { to: '/integrations', icon: CheckSquare, label: 'Integrations' },
+      { to: '/account', icon: User, label: 'Account' },
+    ],
+  },
+];
 
 function getInitials(name: string): string {
   return name
@@ -34,7 +64,13 @@ function getInitials(name: string): string {
     .join('');
 }
 
-export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, setIsDarkMode, user }: SidebarProps) {
+export function Sidebar({
+  isMobileMenuOpen,
+  setIsMobileMenuOpen,
+  isDarkMode,
+  setIsDarkMode,
+  user,
+}: SidebarProps): React.JSX.Element {
   const location = useLocation();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -45,8 +81,8 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
         setIsProfileMenuOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   return (
@@ -54,11 +90,11 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
       <div>
         <div className="h-14 flex items-center justify-between px-6 border-b border-border">
           <div className="flex items-center gap-2 font-semibold tracking-tight text-foreground">
-            <div className="w-6 h-6 rounded bg-foreground text-background flex items-center justify-center">
-              <Zap size={14} className="fill-current" />
+            <div className="w-7 h-7 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              <img src="/Crewmate.svg" alt="Crewmate" className="h-full w-full object-contain" />
             </div>
             Crewmate
-            <span className="ml-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-500 text-[10px] font-bold uppercase tracking-wider border border-blue-500/20">MVP</span>
+            <span className="ml-1 px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider border border-primary/20">MVP</span>
           </div>
           <button className="md:hidden text-muted-foreground" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={20} />
@@ -66,31 +102,23 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
         </div>
 
         <div className="p-4">
-          <div className="text-xs font-mono text-muted-foreground mb-3 px-2 uppercase tracking-wider">Operate</div>
-          <nav className="space-y-1">
-            <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/delegations" icon={Bot} label="Delegations" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/agents" icon={Network} label="Agent Network" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/studio" icon={Wand2} label="Creative Studio" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/notifications" icon={Bell} label="Notifications" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-          </nav>
-
-          <div className="text-xs font-mono text-muted-foreground mb-3 mt-8 px-2 uppercase tracking-wider">Workspace</div>
-          <nav className="space-y-1">
-            <NavItem to="/memory" icon={BrainCircuit} label="Memory Base" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/personas" icon={UsersRound} label="Persona" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/sessions" icon={MonitorUp} label="Sessions" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/tasks" icon={CheckSquare} label="Tasks" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/activity" icon={Activity} label="Activity" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/skills" icon={Cpu} label="Skills Hub" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/skills/build" icon={FlaskConical} label="Skill Builder" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-          </nav>
-
-          <div className="text-xs font-mono text-muted-foreground mb-3 mt-8 px-2 uppercase tracking-wider">Settings</div>
-          <nav className="space-y-1">
-            <NavItem to="/integrations" icon={CheckSquare} label="Integrations" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/account" icon={User} label="Account" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-          </nav>
+          {NAV_SECTIONS.map((section, index) => (
+            <div key={section.title} className={index === 0 ? '' : 'mt-8'}>
+              <div className="mb-3 px-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">{section.title}</div>
+              <nav className="space-y-1">
+                {section.items.map((item) => (
+                  <NavItem
+                    key={item.to}
+                    to={item.to}
+                    icon={item.icon}
+                    label={item.label}
+                    currentPath={location.pathname}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  />
+                ))}
+              </nav>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -149,10 +177,10 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
           type="button"
           aria-haspopup="menu"
           aria-expanded={isProfileMenuOpen}
-          onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-          className="flex items-center gap-3 px-2 py-2 rounded-lg hover-bg cursor-pointer transition-colors"
+          onClick={() => setIsProfileMenuOpen((current) => !current)}
+          className="flex w-full text-left items-center gap-3 p-2 rounded-xl hover:bg-accent cursor-pointer transition-colors"
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-sm font-medium text-white">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-medium text-primary-foreground">
             {getInitials(user?.name ?? 'Crewmate User')}
           </div>
           <div className="flex-1 min-w-0">
@@ -166,8 +194,9 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
   );
 }
 
-function NavItem({ icon: Icon, label, to, badge, currentPath, onClick }: NavItemProps) {
+function NavItem({ icon: Icon, label, to, currentPath, onClick }: NavItemProps): React.JSX.Element {
   const active = currentPath === to;
+
   return (
     <Link
       to={to}
@@ -179,13 +208,8 @@ function NavItem({ icon: Icon, label, to, badge, currentPath, onClick }: NavItem
     >
       <div className="flex items-center gap-3">
         <Icon size={16} className={active ? 'text-foreground' : 'text-muted-foreground'} />
-        <span className={`text-sm font-medium`}>{label}</span>
+        <span className="text-sm font-medium">{label}</span>
       </div>
-      {badge && (
-        <span className="bg-background border border-border text-foreground text-xs px-1.5 py-0.5 rounded-md font-mono">
-          {badge}
-        </span>
-      )}
     </Link>
   );
 }

@@ -25,7 +25,7 @@ vi.mock('../hooks/useAuth', () => ({
 vi.mock('../hooks/usePreferences', () => ({
   usePreferences: () => ({
     preferences: {
-      voiceModel: 'alex',
+      voiceModel: 'Aoede',
       textModel: 'gemini-3.1-pro',
       imageModel: 'gemini-3.1-flash-image',
       reasoningLevel: 'high',

@@ -87,12 +87,19 @@ export function listActivities(userId?: string): ActivityRecord[] {
   `).all() as ActivityRecord[];
 }
 
-export function listSessionHistory(): SessionHistoryRecord[] {
-  const rows = db.prepare(`
-    SELECT id, started_at as startedAt, ended_at as endedAt
-    FROM sessions
-    ORDER BY started_at DESC
-  `).all() as Array<{ id: string; startedAt: string; endedAt?: string | null }>;
+export function listSessionHistory(userId?: string): SessionHistoryRecord[] {
+  const rows = userId
+    ? db.prepare(`
+      SELECT id, started_at as startedAt, ended_at as endedAt
+      FROM sessions
+      WHERE user_id = ?
+      ORDER BY started_at DESC
+    `).all(userId) as Array<{ id: string; startedAt: string; endedAt?: string | null }>
+    : db.prepare(`
+      SELECT id, started_at as startedAt, ended_at as endedAt
+      FROM sessions
+      ORDER BY started_at DESC
+    `).all() as Array<{ id: string; startedAt: string; endedAt?: string | null }>;
 
   return rows.map((row) => ({
     id: row.id,

@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Square } from 'lucide-react';
 import { ActiveSessionCard } from '../components/dashboard/ActiveSessionCard';
-import { DashboardQuickStats } from '../components/dashboard/DashboardQuickStats';
-import { GmailInboxCard } from '../components/dashboard/GmailInboxCard';
+
 import { IntegrationsCard } from '../components/dashboard/IntegrationsCard';
 import { RecentActivityCard } from '../components/dashboard/RecentActivityCard';
 import { RecentTasksCard } from '../components/dashboard/RecentTasksCard';
@@ -14,7 +13,8 @@ import { useLiveSession } from '../hooks/useLiveSession';
 import { useMicrophoneCapture } from '../hooks/useMicrophoneCapture';
 import { useScreenShareCapture } from '../hooks/useScreenShareCapture';
 import { onboardingService } from '../services/onboardingService';
-import { buildGuidedSetupPrompt } from '../utils/onboarding';
+import { workspaceService } from '../services/workspaceService';
+import { buildGuidedSetupMemoryText, buildGuidedSetupPrompt } from '../utils/onboarding';
 import { getDisplayNameFromEmail } from '../utils/userName';
 
 export function Dashboard() {
@@ -22,7 +22,7 @@ export function Dashboard() {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [hasAttemptedGuidedSetup, setHasAttemptedGuidedSetup] = useState(false);
   const { data, isLoading, error, refresh } = useDashboard();
-  const { session, isBusy, elapsedLabel, isSessionActive, startSession, endSession, sendMessage } = useLiveSession({
+  const { session, isBusy, error: liveSessionError, elapsedLabel, isSessionActive, startSession, endSession, sendMessage } = useLiveSession({
     initialSession: data?.currentSession ?? null,
     onSessionChange: refresh,
   });
@@ -30,11 +30,12 @@ export function Dashboard() {
     status: screenShareStatus,
     error: screenShareError,
     isSupported: isScreenShareSupported,
+    previewStream,
     startScreenShare,
     stopScreenShare,
   } = useScreenShareCapture({
     sessionId: session?.id ?? null,
-    enabled: isOverlayOpen && isSessionActive,
+    enabled: isSessionActive,
   });
   const {
     status: microphoneStatus,
@@ -44,7 +45,7 @@ export function Dashboard() {
     stopMicrophone,
   } = useMicrophoneCapture({
     sessionId: session?.id ?? null,
-    enabled: isOverlayOpen && isSessionActive,
+    enabled: isSessionActive,
   });
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function Dashboard() {
   const integrations = data?.integrations ?? [];
   const disconnectedIntegrations = integrations.filter((integration) => integration.status !== 'connected').length;
   const pendingGuidedSetup = onboardingService.getPendingGuidedSetup();
+  const activeGuidedSetupSession = onboardingService.getActiveGuidedSetupSession();
 
   function handleSessionToggle(): void {
     if (isSessionActive) {
@@ -71,8 +73,6 @@ export function Dashboard() {
   }
 
   function handleOverlayClose(): void {
-    stopScreenShare();
-    void stopMicrophone();
     setIsOverlayOpen(false);
   }
 
@@ -90,10 +90,37 @@ export function Dashboard() {
         return;
       }
 
+      onboardingService.setActiveGuidedSetupSession({
+        profile: pendingGuidedSetup,
+        sessionId: nextSession.id,
+      });
       await sendMessage(buildGuidedSetupPrompt(pendingGuidedSetup), nextSession.id);
       onboardingService.clearPendingGuidedSetup();
     })();
   }, [hasAttemptedGuidedSetup, isBusy, isSessionActive, pendingGuidedSetup, sendMessage, startSession]);
+
+  useEffect(() => {
+    if (!session || session.status !== 'ended' || !activeGuidedSetupSession) {
+      return;
+    }
+
+    if (activeGuidedSetupSession.sessionId !== session.id) {
+      return;
+    }
+
+    const transcript = session.transcript.filter((message) => message.text.trim());
+    onboardingService.clearActiveGuidedSetupSession();
+
+    if (transcript.length === 0) {
+      return;
+    }
+
+    void workspaceService.ingestMemory({
+      title: 'Guided onboarding summary',
+      type: 'document',
+      searchText: buildGuidedSetupMemoryText(activeGuidedSetupSession.profile, transcript),
+    });
+  }, [activeGuidedSetupSession, session]);
 
   return (
     <div className="space-y-6 pb-10">
@@ -101,67 +128,59 @@ export function Dashboard() {
         title={`Hi ${userName}`}
         description="How can I help you today? Let's build something cool."
       >
-        <Button
-          variant={isSessionActive ? 'danger' : 'primary'}
-          onClick={handleSessionToggle}
-          disabled={isBusy}
-        >
-          {isSessionActive ? (
-            <>
-              <Square size={16} className="fill-current" />
-              {isBusy ? 'Ending...' : 'End Session'}
-            </>
-          ) : (
-            <>
-              <Play size={16} className="fill-current" />
-              {isBusy ? 'Starting...' : 'Start Live Session'}
-            </>
+        <div className="relative">
+          {pendingGuidedSetup && !isSessionActive && (
+            <span className="absolute -top-1 -right-1 flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+            </span>
           )}
-        </Button>
+          <Button
+            variant={isSessionActive ? 'danger' : 'primary'}
+            onClick={handleSessionToggle}
+            disabled={isBusy}
+            className={pendingGuidedSetup && !isSessionActive ? 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background' : ''}
+          >
+            {isSessionActive ? (
+              <>
+                <Square size={16} className="fill-current" />
+                {isBusy ? 'Ending...' : 'End Session'}
+              </>
+            ) : (
+              <>
+                <Play size={16} className="fill-current" />
+                {isBusy ? 'Starting...' : 'Start Live Session'}
+              </>
+            )}
+          </Button>
+        </div>
       </PageHeader>
 
-      {(error || isLoading) && (
+      {(error || isLoading || liveSessionError) && (
         <div className="glass-panel rounded-2xl px-4 py-3 text-sm text-muted-foreground">
-          {isLoading ? 'Loading local Crewmate workspace...' : `Local API status: ${error}`}
+          {isLoading ? 'Loading local Crewmate workspace...' : liveSessionError ?? `Local API status: ${error}`}
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-secondary/30 p-5 mt-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="text-sm font-medium text-foreground">Workspace readiness</div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              {pendingGuidedSetup
-                ? 'Guided live setup is queued. Crewmate will ask onboarding questions as soon as the live session starts.'
-                : disconnectedIntegrations > 0
-                  ? `${disconnectedIntegrations} integration${disconnectedIntegrations === 1 ? '' : 's'} still need setup before Crewmate can take actions for you.`
-                  : 'Your connected tools are ready. Start a live session or queue background work from the product surfaces.'}
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span>{isSessionActive ? 'Live session active' : 'Live session idle'}</span>
-            <span>{tasks.length} tracked tasks</span>
-            <span>{activities.length} recent activities</span>
-          </div>
-        </div>
-      </div>
 
-      <DashboardQuickStats
-        tasks={tasks}
-        integrations={integrations}
-        session={session}
-        isSessionActive={isSessionActive}
-      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <ActiveSessionCard session={session} isSessionActive={isSessionActive} elapsedLabel={elapsedLabel} />
+          <ActiveSessionCard
+            session={session}
+            isSessionActive={isSessionActive}
+            elapsedLabel={elapsedLabel}
+            isOverlayOpen={isOverlayOpen}
+            microphoneStatus={microphoneStatus}
+            previewStream={previewStream}
+            screenShareStatus={screenShareStatus}
+            onOpenOverlay={() => setIsOverlayOpen(true)}
+          />
           <RecentActivityCard activities={activities} />
         </div>
 
         <div className="space-y-6">
           <RecentTasksCard tasks={tasks} />
-          <GmailInboxCard />
           <IntegrationsCard integrations={integrations} />
         </div>
       </div>

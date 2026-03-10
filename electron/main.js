@@ -19,7 +19,7 @@ function createMainWindow() {
         vibrancy: 'under-window',
         visualEffectState: 'active',
         backgroundColor: '#00000000',
-        icon: path.join(__dirname, '../public/favicon.ico'),
+        icon: path.join(__dirname, '../public/Crewmate.svg'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             sandbox: false,
@@ -50,7 +50,7 @@ function startBackend() {
 }
 
 function createTray() {
-    tray = new Tray(path.join(__dirname, '../public/favicon.ico')); // ensure icon exists or fallback to default
+    tray = new Tray(path.join(__dirname, '../public/Crewmate.svg'));
     const contextMenu = Menu.buildFromTemplate([
         { label: 'Open Crewmate', click: () => { mainWindow.show(); } },
         { type: 'separator' },

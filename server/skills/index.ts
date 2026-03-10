@@ -4,24 +4,29 @@
  */
 import { registerSkill } from './registry';
 
-// ── Productivity Skills ──────────────────────────────────────────────────────
-import { clickupCreateTaskSkill } from './productivity/clickup-create-task.skill';
-import { notionCreatePageSkill } from './productivity/notion-create-page.skill';
-import { calendarScheduleSkill, calendarFindFreeTimeSkill, calendarListEventsSkill } from './productivity/calendar.skills';
-
-// ── Communication Skills ─────────────────────────────────────────────────────
-import { slackPostMessageSkill } from './communication/slack-post-message.skill';
-import { gmailSendSkill, gmailDraftSkill, gmailReadInboxSkill } from './communication/gmail.skills';
-
-// ── Code Skills ──────────────────────────────────────────────────────────────
-import { githubCreateIssueSkill } from './code/github-create-issue.skill';
-import { githubCreatePRSkill } from './code/github-create-pr.skill';
-import { terminalRunCommandSkill } from './code/terminal-run-command.skill';
-
-// ── Research Skills ──────────────────────────────────────────────────────────
+// ── Research Skills ───────────────────────────────────────────────────────────
 import { webSearchSkill, webSummarizeUrlSkill } from './research/web.skills';
 
-// ── Browser Skills (Phase 6) ─────────────────────────────────────────────────
+// ── Communication Skills ──────────────────────────────────────────────────────
+import { gmailSendSkill, gmailDraftSkill, gmailReadInboxSkill } from './communication/gmail.skills';
+import { slackPostMessageSkill } from './communication/slack-post-message.skill';
+import { slackListChannelsSkill } from './communication/slack-list-channels.skill';
+
+// ── Productivity Skills ───────────────────────────────────────────────────────
+import { calendarScheduleSkill, calendarFindFreeTimeSkill, calendarListEventsSkill } from './productivity/calendar.skills';
+import { notionCreatePageSkill } from './productivity/notion-create-page.skill';
+import { notionListPagesSkill } from './productivity/notion-list-pages.skill';
+import { clickupCreateTaskSkill } from './productivity/clickup-create-task.skill';
+import { clickupListTasksSkill } from './productivity/clickup-list-tasks.skill';
+import { memoryStoreSkill, memoryRetrieveSkill, memoryListSkill } from './productivity/memory.skills';
+
+// ── Code & DevOps Skills ──────────────────────────────────────────────────────
+import { githubCreateIssueSkill } from './code/github-create-issue.skill';
+import { githubCreatePRSkill } from './code/github-create-pr.skill';
+import { githubListPRsSkill } from './code/github-list-prs.skill';
+import { terminalRunCommandSkill } from './code/terminal-run-command.skill';
+
+// ── Browser Skills ────────────────────────────────────────────────────────────
 import {
     browserOpenUrlSkill,
     browserExtractSkill,
@@ -30,31 +35,50 @@ import {
     browserScreenshotSkill,
 } from './browser/browser.skills';
 
+// ── Automation Skills ─────────────────────────────────────────────────────────
+import { zapierTriggerSkill, zapierListSkill } from './automation/zapier.skills';
+
+// ── Creative Skills ───────────────────────────────────────────────────────────
+import { creativeGenerateImageSkill } from './creative/creative.skill';
+
 const ALL_SKILLS = [
-    // Productivity
-    clickupCreateTaskSkill,
-    notionCreatePageSkill,
-    calendarScheduleSkill,
-    calendarFindFreeTimeSkill,
-    calendarListEventsSkill,
-    // Communication
-    slackPostMessageSkill,
-    gmailSendSkill,
-    gmailDraftSkill,
-    gmailReadInboxSkill,
-    // Code
-    githubCreateIssueSkill,
-    githubCreatePRSkill,
-    terminalRunCommandSkill,
     // Research
     webSearchSkill,
     webSummarizeUrlSkill,
-    // Browser (Phase 6)
+    // Communication
+    gmailSendSkill,
+    gmailDraftSkill,
+    gmailReadInboxSkill,
+    slackPostMessageSkill,
+    slackListChannelsSkill,
+    // Productivity
+    calendarScheduleSkill,
+    calendarFindFreeTimeSkill,
+    calendarListEventsSkill,
+    notionCreatePageSkill,
+    notionListPagesSkill,
+    clickupCreateTaskSkill,
+    clickupListTasksSkill,
+    // Memory
+    memoryStoreSkill,
+    memoryRetrieveSkill,
+    memoryListSkill,
+    // Code & DevOps
+    githubCreateIssueSkill,
+    githubCreatePRSkill,
+    githubListPRsSkill,
+    terminalRunCommandSkill,
+    // Browser
     browserOpenUrlSkill,
     browserExtractSkill,
     browserFillFormSkill,
     browserSearchGoogleSkill,
     browserScreenshotSkill,
+    // Automation
+    zapierTriggerSkill,
+    zapierListSkill,
+    // Creative
+    creativeGenerateImageSkill,
 ];
 
 for (const skill of ALL_SKILLS) {

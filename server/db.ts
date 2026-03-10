@@ -55,7 +55,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL,
     started_at TEXT NOT NULL,
-    ended_at TEXT
+    ended_at TEXT,
+    provider TEXT NOT NULL DEFAULT 'local'
   );
 
   CREATE TABLE IF NOT EXISTS session_messages (
@@ -151,10 +152,33 @@ db.exec(`
     started_at TEXT,
     completed_at TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS workflow_templates (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    intent TEXT NOT NULL,
+    deliver_to_notion INTEGER NOT NULL DEFAULT 0,
+    notify_in_slack INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS onboarding_profiles (
+    user_id TEXT PRIMARY KEY,
+    agent_name TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN user_id TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN provider TEXT NOT NULL DEFAULT 'local'`);
 } catch { }
 
 try {
@@ -183,6 +207,54 @@ try {
 
 try {
   db.exec(`ALTER TABLE memory_nodes ADD COLUMN search_text TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE memory_nodes ADD COLUMN user_id TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE memory_nodes ADD COLUMN workspace_id TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE agent_tasks ADD COLUMN user_id TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE agent_tasks ADD COLUMN workspace_id TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN origin_type TEXT NOT NULL DEFAULT 'delegation'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN origin_ref TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN delivery_channels_json TEXT NOT NULL DEFAULT '[]'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN artifact_refs_json TEXT NOT NULL DEFAULT '[]'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'not_required'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN approval_requested_at TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN approved_at TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN handoff_log_json TEXT NOT NULL DEFAULT '[]'`);
 } catch { }
 
 // Migrate existing users to have a default workspace

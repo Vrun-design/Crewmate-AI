@@ -2,6 +2,10 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import ForceGraph2D, { ForceGraphMethods } from 'react-force-graph-2d';
 import type { MemoryNode } from '../../types';
 
+// Canvas API cannot read CSS variables, so we define the brand color here as a constant.
+// If the brand color changes, update this value AND index.css --primary.
+const BRAND_COLOR = '#E95420';
+
 interface MemoryMindMapProps {
   nodes: MemoryNode[];
 }
@@ -22,7 +26,7 @@ interface GraphNode {
 
 export function MemoryMindMap({ nodes }: MemoryMindMapProps): React.ReactNode {
   const containerRef = useRef<HTMLDivElement>(null);
-  const graphRef = useRef<ForceGraphMethods>();
+  const graphRef = useRef<ForceGraphMethods>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const isGraphSupported = useMemo(() => {
     if (typeof window === 'undefined' || typeof ResizeObserver === 'undefined') {
@@ -87,7 +91,7 @@ export function MemoryMindMap({ nodes }: MemoryMindMapProps): React.ReactNode {
 
   function getColor(group: GraphNode['group']): string {
     switch (group) {
-      case 'core': return '#E95420';
+      case 'core': return BRAND_COLOR;
       case 'document': return '#3b82f6';
       case 'integration': return '#8b5cf6';
       case 'preference': return '#10b981';
@@ -123,7 +127,7 @@ export function MemoryMindMap({ nodes }: MemoryMindMapProps): React.ReactNode {
             ctx.fill();
 
             if (graphNode.id === 'core') {
-              ctx.shadowColor = '#E95420';
+              ctx.shadowColor = BRAND_COLOR;
               ctx.shadowBlur = 15;
               ctx.fill();
               ctx.shadowBlur = 0;

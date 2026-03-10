@@ -28,6 +28,32 @@ function getMissingKeys(requiredKeys: string[], integrationId: string, userId: s
 
 const integrationDefinitions: IntegrationDefinition[] = [
   {
+    id: 'zapier',
+    name: 'Zapier',
+    status: 'disconnected',
+    iconName: 'zap',
+    color: 'text-orange-500 dark:text-orange-400',
+    bgColor: 'bg-orange-500/10 border-orange-500/20',
+    desc: 'Connect to 5,000+ apps instantly. Trigger any Zapier automation — CRM, spreadsheets, WhatsApp, Stripe, Airtable, and more.',
+    docsUrl: 'https://zapier.com/apps/webhook/integrations',
+    capabilities: [
+      'Trigger any Zapier automation via voice',
+      'Save leads to any CRM (HubSpot, Salesforce, Pipedrive)',
+      'Log data to Google Sheets or Airtable',
+      'Send WhatsApp messages or SMS',
+      'Connect to 5,000+ apps with no extra code',
+    ],
+    requiredKeys: ['webhookUrl'],
+    setupSteps: [
+      'Go to zapier.com and create a new Zap.',
+      'Choose "Webhooks by Zapier" as the trigger and select "Catch Hook".',
+      'Copy the generated webhook URL and paste it into the field below.',
+      'Add optional named automation URLs for specific workflows (save-lead, notify-team, etc).',
+      'Now say "trigger my Zapier automation" in a live session to fire it.',
+    ],
+    notes: 'Named automations let you trigger different Zaps by name — e.g. "save this lead" vs "notify the team".',
+  },
+  {
     id: 'github',
     name: 'GitHub',
     status: 'disconnected',

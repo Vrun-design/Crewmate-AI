@@ -1,45 +1,48 @@
 import React from 'react';
-import {Card, CardContent, CardTitle} from '../ui/Card';
-import type {Activity} from '../../types';
-import {getActivityIcon} from './dashboardUtils';
+import { Link } from 'react-router-dom';
+import { Card, CardContent, CardTitle } from '../ui/Card';
+import { Tooltip } from '../ui/Tooltip';
+import type { Activity } from '../../types';
+import { getActivityIcon } from './dashboardUtils';
 
 interface RecentActivityCardProps {
   activities: Activity[];
 }
 
-export function RecentActivityCard({activities}: RecentActivityCardProps): React.ReactNode {
+export function RecentActivityCard({ activities }: RecentActivityCardProps): React.ReactNode {
   return (
-    <Card>
+    <Card className="shadow-soft">
       <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-5">
           <CardTitle>Recent Activity</CardTitle>
-          <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">View All</button>
+          <Link to="/sessions?tab=activity" className="text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors">View All</Link>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {activities.slice(0, 4).map((activity) => (
-            <div
+            <Link
               key={activity.id}
-              className="group p-3 rounded-xl hover-bg border border-transparent hover:border-border transition-all cursor-pointer"
+              to="/sessions?tab=activity"
+              className="group block p-3 rounded-xl hover:bg-muted/30 border border-transparent transition-all -mx-3"
             >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 w-6 h-6 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0">
+              <div className="flex items-start gap-3.5">
+                <div className="mt-0.5 w-6 h-6 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0 group-hover:bg-background transition-colors">
                   {getActivityIcon(activity.type)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    {activity.title}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate mt-0.5">{activity.description}</div>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[10px] font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                      {activity.id}
-                    </span>
-                    <span className="w-1 h-1 rounded-full bg-border"></span>
-                    <span className="text-xs text-muted-foreground">{activity.time}</span>
+                  <Tooltip content={activity.title} className="block truncate text-left">
+                    <div className="text-sm font-medium truncate group-hover:text-amber-600 dark:group-hover:text-amber-500 transition-colors">
+                      {activity.title}
+                    </div>
+                  </Tooltip>
+                  <Tooltip content={activity.description} delayMs={500} className="block truncate text-left">
+                    <div className="text-[13px] text-muted-foreground truncate mt-0.5">{activity.description}</div>
+                  </Tooltip>
+                  <div className="flex items-center mt-1">
+                    <span className="text-xs text-muted-foreground opacity-70 group-hover:opacity-100 transition-opacity">{activity.time}</span>
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       </CardContent>

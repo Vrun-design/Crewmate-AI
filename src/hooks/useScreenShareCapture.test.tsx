@@ -86,6 +86,7 @@ describe('useScreenShareCapture', () => {
     });
 
     expect(getDisplayMediaMock).toHaveBeenCalledTimes(1);
+    expect(result.current.previewStream).not.toBeNull();
     expect(sendFrameMock).toHaveBeenCalledWith(
       'SES-200',
       expect.objectContaining({
@@ -131,6 +132,7 @@ describe('useScreenShareCapture', () => {
     await act(async () => {});
 
     expect(track.stop).toHaveBeenCalled();
+    expect(result.current.previewStream).toBeNull();
     expect(result.current.status).toBe('idle');
   });
 });

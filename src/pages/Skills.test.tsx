@@ -1,7 +1,13 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import { Skills } from './Skills';
+
+vi.mock('../lib/api', () => ({
+  api: {
+    get: vi.fn().mockResolvedValue([]),
+  },
+}));
 
 vi.mock('../hooks/useSkills', () => ({
   useSkills: () => ({
@@ -25,11 +31,15 @@ vi.mock('../hooks/useSkills', () => ({
 }));
 
 describe('Skills', () => {
-  test('renders the skills hub with interactive skill cards', () => {
+  test('renders the skills hub with interactive skill cards', async () => {
     render(<Skills />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Create GitHub Issue')).toBeInTheDocument();
+    });
 
     expect(screen.getByText('Skills Hub')).toBeInTheDocument();
     expect(screen.getByText('Create GitHub Issue')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /run/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create github issue/i })).toBeInTheDocument();
   });
 });

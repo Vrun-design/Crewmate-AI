@@ -31,9 +31,9 @@ export function getSessionStatusLabel(
     return 'Crewmate is connected to Gemini Live.';
   }
 
-  return 'Crewmate is listening through the local session gateway...';
+  return 'Crewmate is running in local preview mode.';
 }
 
 export function getSessionProviderLabel(provider?: 'local' | 'gemini-live'): string {
-  return provider === 'gemini-live' ? 'Real Gemini Live session' : 'Gemini Live-ready local backend';
+  return provider === 'gemini-live' ? 'Real Gemini Live session' : 'Local preview without Gemini Live';
 }

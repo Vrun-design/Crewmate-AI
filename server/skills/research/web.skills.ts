@@ -8,6 +8,8 @@
  * Set TAVILY_API_KEY env var to enable. DuckDuckGo used when absent/rate-limited.
  */
 import type { Skill } from '../types';
+import { selectModel } from '../../services/modelRouter';
+
 
 // ── Tavily search ─────────────────────────────────────────────────────────────
 
@@ -113,9 +115,10 @@ async function summarizeUrl(url: string): Promise<string> {
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY ?? '' });
     const result = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-preview',
+        model: selectModel('research', 'low'),
         contents: `Summarize this web page content concisely in 3-5 paragraphs. URL: ${url}\n\nContent:\n${text}`,
     });
+
     return result.text ?? 'Unable to summarize content.';
 }
 

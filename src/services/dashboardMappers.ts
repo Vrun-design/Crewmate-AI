@@ -22,14 +22,17 @@ const customLogos: Record<string, string> = {
   linear: '/Linear.svg',
   clickup: '/Clikcup.svg',
   figma: '/Figma.svg',
-  gmail: '/Gmail.svg',
-  calendar: '/GoogleCalendar.svg',
+  gmail: '/Google.svg',
+  calendar: '/Google.svg',
+  zapier: '/zapier.svg',
 };
 
 export function mapIntegration(integration: IntegrationApiShape): Integration {
+  const logoKey = integration.iconName?.toLowerCase() ?? integration.id.toLowerCase();
+
   return {
     ...integration,
     icon: integrationIcons[integration.iconName as keyof typeof integrationIcons] ?? Terminal,
-    logoUrl: integration.iconName ? customLogos[integration.iconName.toLowerCase()] : undefined,
+    logoUrl: customLogos[logoKey] ?? customLogos[integration.id.toLowerCase()],
   };
 }

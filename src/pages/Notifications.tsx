@@ -79,8 +79,8 @@ function NotificationSettings(): React.JSX.Element {
       <div className="rounded-xl border border-border bg-card/40 p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-              <Bell size={15} className="text-blue-400" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <Bell size={15} className="text-primary" />
             </div>
             <div>
               <p className="text-sm font-semibold">In-App Notifications</p>
@@ -215,12 +215,12 @@ export function Notifications(): React.JSX.Element {
   function getVisuals(type: 'success' | 'info' | 'warning' | 'default') {
     if (type === 'success') return { icon: CheckCircle2, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' };
     if (type === 'warning') return { icon: AlertCircle, color: 'text-amber-500', bgColor: 'bg-amber-500/10' };
-    if (type === 'info') return { icon: Bell, color: 'text-blue-500', bgColor: 'bg-blue-500/10' };
+    if (type === 'info') return { icon: Bell, color: 'text-primary', bgColor: 'bg-primary/10' };
     return { icon: CheckCircle2, color: 'text-muted-foreground', bgColor: 'bg-secondary' };
   }
 
   return (
-    <div className="space-y-6 max-w-4xl pb-10">
+    <div className="space-y-6 pb-10">
       <PageHeader
         title="Notifications"
         description="Agent task updates, system alerts, and delivery settings."
@@ -265,7 +265,7 @@ export function Notifications(): React.JSX.Element {
                 return (
                   <div
                     key={notification.id}
-                    className={`p-4 sm:p-6 flex gap-4 transition-colors hover:bg-secondary/50 ${notification.read ? 'opacity-70' : 'bg-blue-500/[0.02]'}`}
+                    className={`p-4 sm:p-6 flex gap-4 transition-colors hover:bg-secondary/50 ${notification.read ? 'opacity-70' : 'bg-primary/[0.02]'}`}
                   >
                     <div className={`mt-1 shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${visuals.bgColor} ${visuals.color}`}>
                       <visuals.icon size={20} />
@@ -284,7 +284,7 @@ export function Notifications(): React.JSX.Element {
                     </div>
                     {!notification.read && (
                       <div className="shrink-0 flex items-center">
-                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        <div className="w-2 h-2 rounded-full bg-primary" />
                       </div>
                     )}
                   </div>

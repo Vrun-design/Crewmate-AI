@@ -1,0 +1,19 @@
+import { describe, expect, test } from 'vitest';
+import { getFeatureFlags, isFeatureEnabled } from './featureFlagService';
+
+describe('featureFlagService', () => {
+  test('returns the configured feature flags shape', () => {
+    const flags = getFeatureFlags();
+
+    expect(flags).toEqual({
+      approvalGates: expect.any(Boolean),
+      jobTypesV2: expect.any(Boolean),
+      offshiftInbox: expect.any(Boolean),
+      slackInbound: expect.any(Boolean),
+    });
+  });
+
+  test('reads a single feature flag by name', () => {
+    expect(isFeatureEnabled('offshiftInbox')).toBe(getFeatureFlags().offshiftInbox);
+  });
+});

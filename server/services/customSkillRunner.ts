@@ -9,12 +9,92 @@
  * Mode B — LLM Recipe: run a mini-Gemini call with the user's instruction
  *   as system prompt, giving the LLM access to a safe subset of tools.
  */
+import { isIP } from 'node:net';
 import type { SkillRunContext } from '../skills/types';
 import { createGeminiClient } from './geminiClient';
 import { serverConfig } from '../config';
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
 const WEBHOOK_MAX_RESPONSE_BYTES = 256 * 1024; // 256KB
+
+interface WebhookPolicyOptions {
+    appEnv?: string;
+    allowUnsafeTargets?: boolean;
+}
+
+function isHostedProduction(options: WebhookPolicyOptions): boolean {
+    return (options.appEnv ?? serverConfig.appEnv) === 'production'
+        && !(options.allowUnsafeTargets ?? serverConfig.allowUnsafeCustomSkillWebhooks);
+}
+
+function isPrivateIpv4(hostname: string): boolean {
+    const segments = hostname.split('.').map((segment) => Number.parseInt(segment, 10));
+    if (segments.length !== 4 || segments.some(Number.isNaN)) {
+        return false;
+    }
+
+    const [first, second] = segments;
+    if (first === 10 || first === 127 || first === 0) {
+        return true;
+    }
+    if (first === 169 && second === 254) {
+        return true;
+    }
+    if (first === 172 && second >= 16 && second <= 31) {
+        return true;
+    }
+    return first === 192 && second === 168;
+}
+
+function isPrivateIpv6(hostname: string): boolean {
+    const normalizedHost = hostname.toLowerCase();
+    return normalizedHost === '::1'
+        || normalizedHost.startsWith('fc')
+        || normalizedHost.startsWith('fd')
+        || normalizedHost.startsWith('fe80:');
+}
+
+function isUnsafeWebhookHost(hostname: string): boolean {
+    const normalizedHost = hostname.toLowerCase();
+    if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost')) {
+        return true;
+    }
+
+    const ipVersion = isIP(normalizedHost);
+    if (ipVersion === 4) {
+        return isPrivateIpv4(normalizedHost);
+    }
+    if (ipVersion === 6) {
+        return isPrivateIpv6(normalizedHost);
+    }
+
+    return false;
+}
+
+export function validateWebhookUrl(webhookUrl: string, options: WebhookPolicyOptions = {}): URL {
+    let parsedUrl: URL;
+    try {
+        parsedUrl = new URL(webhookUrl);
+    } catch {
+        throw new Error('Webhook URL must be a valid absolute URL.');
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        throw new Error('Webhook URL must use http or https.');
+    }
+
+    if (isHostedProduction(options)) {
+        if (parsedUrl.protocol !== 'https:') {
+            throw new Error('Hosted production only allows HTTPS webhook URLs.');
+        }
+
+        if (isUnsafeWebhookHost(parsedUrl.hostname)) {
+            throw new Error('Hosted production blocks localhost and private-network webhook targets.');
+        }
+    }
+
+    return parsedUrl;
+}
 
 // ── Webhook execution ─────────────────────────────────────────────────────────
 
@@ -24,12 +104,13 @@ export async function executeWebhookSkill(
     authHeader?: string,
 ): Promise<{ success: boolean; output: unknown; message: string; durationMs: number }> {
     const t0 = Date.now();
+    const parsedUrl = validateWebhookUrl(webhookUrl);
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (authHeader) headers['Authorization'] = authHeader;
 
     try {
-        const response = await fetch(webhookUrl, {
+        const response = await fetch(parsedUrl.toString(), {
             method: 'POST',
             headers,
             body: JSON.stringify({ args }),

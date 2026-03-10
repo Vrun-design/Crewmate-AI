@@ -1,3 +1,4 @@
+import type { TranscriptMessage } from '../types/live';
 import type { OnboardingProfile } from '../services/onboardingService';
 
 export function buildGuidedSetupPrompt(profile: OnboardingProfile): string {
@@ -15,4 +16,19 @@ export function buildGuidedSetupPrompt(profile: OnboardingProfile): string {
     'Do not claim any integration or memory is configured unless the user confirms it or the app shows it.',
     'End by summarizing what you learned and telling the user to finish setup from Integrations and Memory Base if anything is still missing.',
   ].join(' ');
+}
+
+export function buildGuidedSetupMemoryText(profile: OnboardingProfile, transcript: TranscriptMessage[]): string {
+  const transcriptLines = transcript
+    .filter((message) => message.status !== 'streaming' && message.text.trim())
+    .map((message) => `${message.role === 'agent' ? profile.agentName : 'User'}: ${message.text.trim()}`);
+
+  return [
+    `Guided onboarding completed for ${profile.agentName}.`,
+    `Selected voice: ${profile.voiceModel}.`,
+    'This memory captures the onboarding conversation and final setup context for future recall.',
+    '',
+    'Transcript:',
+    ...transcriptLines,
+  ].join('\n');
 }

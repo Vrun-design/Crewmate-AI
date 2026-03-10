@@ -8,6 +8,8 @@ import { runSkill } from '../../skills/registry';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
+import { buildAgentSystemPrompt } from '../agentPromptBuilder';
+
 
 export const SALES_AGENT_MANIFEST = {
     id: 'crewmate-sales-agent',
@@ -48,7 +50,8 @@ export async function runSalesAgent(
     emitStep('generating', 'Crafting personalized outreach email...');
     const response = await ai.models.generateContent({
         model: serverConfig.geminiTextModel,
-        contents: `You are an expert B2B sales professional. Write a personalized, concise outreach email.
+        config: { systemInstruction: buildAgentSystemPrompt('sales') },
+        contents: `Write a personalized, concise outreach email.
 Task: ${intent}
 ${leadName ? `Lead: ${leadName}` : ''}
 ${company ? `Company: ${company}` : ''}
@@ -59,6 +62,7 @@ SUBJECT: <subject>
 BODY:
 <email body — 3-4 short paragraphs, personalized opener, clear value prop, soft CTA>`,
     });
+
 
     const email = response.text ?? '';
     emitStep('skill_result', `Outreach email ready (${email.split(/\s+/).length} words)`, { success: true });

@@ -23,6 +23,7 @@ interface UseScreenShareCaptureResult {
   status: ScreenShareStatus;
   error: string | null;
   isSupported: boolean;
+  previewStream: MediaStream | null;
   startScreenShare: () => Promise<void>;
   stopScreenShare: () => void;
 }
@@ -33,6 +34,7 @@ export function useScreenShareCapture({
 }: UseScreenShareCaptureOptions): UseScreenShareCaptureResult {
   const [status, setStatus] = useState<ScreenShareStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -80,6 +82,7 @@ export function useScreenShareCapture({
 
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    setPreviewStream(null);
 
     if (videoRef.current) {
       videoRef.current.pause();
@@ -179,6 +182,7 @@ export function useScreenShareCapture({
       }
 
       streamRef.current = stream;
+      setPreviewStream(stream);
 
       const [videoTrack] = stream.getVideoTracks();
       if (videoTrack) {
@@ -220,6 +224,7 @@ export function useScreenShareCapture({
     status,
     error,
     isSupported,
+    previewStream,
     startScreenShare,
     stopScreenShare,
   };

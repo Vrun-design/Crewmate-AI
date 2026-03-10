@@ -1,14 +1,14 @@
 import React from 'react';
-import {TaskStatusIcon} from '../ui/TaskStatusIcon';
-import type {Task} from '../../types';
-import {getPriorityColor, getPriorityDotColor, getTaskStatusBadge} from './tasksUtils';
+import { TaskStatusIcon } from '../ui/TaskStatusIcon';
+import type { Task } from '../../types';
+import { getPriorityColor, getPriorityDotColor, getTaskStatusBadge } from './tasksUtils';
 
 interface TaskListProps {
   tasks: Task[];
   onOpenTask: (task: Task) => void;
 }
 
-export function TaskList({tasks, onOpenTask}: TaskListProps): React.ReactNode {
+export function TaskList({ tasks, onOpenTask }: TaskListProps): React.ReactNode {
   return (
     <>
       <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wider bg-muted/30">
@@ -30,7 +30,7 @@ export function TaskList({tasks, onOpenTask}: TaskListProps): React.ReactNode {
                 <TaskStatusIcon status={task.status} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <div className="text-sm font-medium truncate text-foreground group-hover:text-primary transition-colors">
                   {task.title}
                 </div>
                 <div className="flex items-center gap-2 mt-1 md:hidden">

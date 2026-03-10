@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, ChevronRight, Sparkles, Zap } from 'lucide-react';
+import { Briefcase, Check, ChevronRight, Code2, Megaphone, Palette, Rocket, Sparkles, Zap } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { usePersonas } from '../hooks/usePersonas';
 
-const PERSONA_COLORS: Record<string, { bg: string; border: string; glow: string }> = {
-    developer: { bg: 'bg-blue-500/10', border: 'border-blue-500/40', glow: 'shadow-blue-500/20' },
-    marketer: { bg: 'bg-orange-500/10', border: 'border-orange-500/40', glow: 'shadow-orange-500/20' },
-    founder: { bg: 'bg-purple-500/10', border: 'border-purple-500/40', glow: 'shadow-purple-500/20' },
-    sales: { bg: 'bg-green-500/10', border: 'border-green-500/40', glow: 'shadow-green-500/20' },
-    designer: { bg: 'bg-pink-500/10', border: 'border-pink-500/40', glow: 'shadow-pink-500/20' },
+const PERSONA_ICONS: Record<string, React.ReactNode> = {
+    developer: <Code2 size={24} strokeWidth={1.5} />,
+    marketer: <Megaphone size={24} strokeWidth={1.5} />,
+    founder: <Rocket size={24} strokeWidth={1.5} />,
+    sales: <Briefcase size={24} strokeWidth={1.5} />,
+    designer: <Palette size={24} strokeWidth={1.5} />,
 };
 
 export function Personas() {
@@ -27,11 +27,11 @@ export function Personas() {
 
     if (isLoading) {
         return (
-            <div className="space-y-4">
-                <PageHeader title="Persona" description="Loading your agent configurations..." />
+            <div className="space-y-6 max-w-5xl mx-auto">
+                <PageHeader title="Personas" description="Loading your agent configurations..." />
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[...Array(5)].map((_, i) => (
-                        <div key={i} className="h-40 rounded-2xl bg-card animate-pulse border border-border" />
+                        <div key={i} className="h-40 rounded-xl bg-muted/20 animate-pulse border border-border" />
                     ))}
                 </div>
             </div>
@@ -39,14 +39,14 @@ export function Personas() {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-8 max-w-5xl mx-auto pb-12">
             <PageHeader
-                title="Persona"
-                description="Tell Crewmate who you are. It will switch its expertise, proactive behavior, and tool priorities accordingly."
+                title="Personas"
+                description="Configure Crewmate's core expertise, proactive behaviors, and integration priorities."
             />
 
             {error && (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     {error}
                 </div>
             )}
@@ -54,38 +54,31 @@ export function Personas() {
             {/* Persona grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {personas.map((persona) => {
-                    const colors = PERSONA_COLORS[persona.id] ?? { bg: 'bg-card', border: 'border-border', glow: '' };
                     const isActive = persona.id === activePersonaId;
                     const isSelected = persona.id === displayId;
+                    const Icon = PERSONA_ICONS[persona.id] ?? <Zap size={24} strokeWidth={1.5} />;
 
                     return (
                         <button
                             key={persona.id}
                             type="button"
                             onClick={() => setSelectedId(persona.id)}
-                            className={`relative text-left p-6 rounded-2xl border transition-all duration-200 group ${isSelected
-                                    ? `${colors.bg} ${colors.border} shadow-lg ${colors.glow}`
-                                    : 'bg-card border-border hover:border-muted-foreground/40'
+                            className={`relative text-left p-5 rounded-xl border transition-all duration-200 group flex flex-col items-start ${isSelected
+                                ? 'bg-card border-foreground ring-1 ring-foreground shadow-sm'
+                                : 'bg-card/50 border-border hover:border-muted-foreground/50 hover:bg-card'
                                 }`}
                         >
-                            {isActive && (
-                                <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-foreground/10 border border-foreground/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground">
-                                    <Zap size={9} className="fill-current" />
-                                    Active
-                                </span>
-                            )}
-
-                            <div className="mb-4 text-3xl">{persona.emoji}</div>
-                            <div className="font-semibold text-foreground text-base mb-1">{persona.name}</div>
-                            <div className="text-sm text-muted-foreground leading-relaxed">{persona.tagline}</div>
-
-                            {isSelected && (
-                                <motion.div
-                                    layoutId="persona-selection-indicator"
-                                    className={`absolute inset-0 rounded-2xl border-2 pointer-events-none ${colors.border}`}
-                                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                                />
-                            )}
+                            <div className="flex items-center justify-between w-full mb-4 text-foreground/80">
+                                {Icon}
+                                {isActive && (
+                                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-primary/10 text-[10px] font-semibold tracking-wider uppercase text-primary border border-primary/20">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                        Active
+                                    </span>
+                                )}
+                            </div>
+                            <div className="font-medium text-foreground text-sm mb-1">{persona.name}</div>
+                            <div className="text-[13px] text-muted-foreground leading-snug">{persona.tagline}</div>
                         </button>
                     );
                 })}
@@ -96,34 +89,37 @@ export function Personas() {
                 {displayPersona && (
                     <motion.div
                         key={displayPersona.id}
-                        initial={{ opacity: 0, y: 12 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                        className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2"
                     >
                         {/* Example commands */}
-                        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
+                        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
                             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                                 <Sparkles size={14} className="text-muted-foreground" />
-                                Example commands
+                                Example Commands
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {displayPersona.exampleCommands.map((cmd) => (
-                                    <div key={cmd} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                        <ChevronRight size={14} className="mt-0.5 shrink-0 text-foreground/40" />
-                                        <span className="font-mono text-[13px]">{cmd}</span>
+                                    <div key={cmd} className="flex items-start gap-3">
+                                        <ChevronRight size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
+                                        <span className="font-mono text-[12px] text-muted-foreground leading-relaxed">{cmd}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
                         {/* Proactive triggers */}
-                        <div className="bg-card border border-border rounded-2xl p-6 space-y-4">
-                            <div className="text-sm font-medium text-foreground">Proactive on screen</div>
+                        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+                            <div className="text-sm font-medium text-foreground flex items-center gap-2">
+                                <Zap size={14} className="text-muted-foreground" />
+                                Proactive Triggers
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 {displayPersona.proactiveTriggers.map((trigger) => (
-                                    <span key={trigger} className="rounded-full bg-secondary border border-border px-3 py-1 text-xs text-muted-foreground">
+                                    <span key={trigger} className="rounded-md border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                                         {trigger}
                                     </span>
                                 ))}
@@ -131,37 +127,40 @@ export function Personas() {
                         </div>
 
                         {/* Preferred tools + action */}
-                        <div className="bg-card border border-border rounded-2xl p-6 space-y-4 flex flex-col">
-                            <div className="text-sm font-medium text-foreground">Preferred integrations</div>
+                        <div className="bg-card border border-border rounded-xl p-5 flex flex-col space-y-4">
+                            <div className="text-sm font-medium text-foreground">Preferred Integrations</div>
                             <div className="flex flex-wrap gap-2 flex-1">
                                 {displayPersona.preferredTools.map((tool) => (
-                                    <span key={tool} className="rounded-lg bg-secondary border border-border px-3 py-1.5 text-xs font-medium text-foreground capitalize">
+                                    <span key={tool} className="rounded-md border border-border bg-muted/20 px-3 py-1.5 text-xs font-medium text-foreground capitalize">
                                         {tool}
                                     </span>
                                 ))}
                             </div>
 
-                            {selectedId && selectedId !== activePersonaId ? (
-                                <button
-                                    type="button"
-                                    onClick={() => void handleConfirmSwitch()}
-                                    disabled={isSwitching}
-                                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-foreground text-background py-3 text-sm font-medium transition-all hover:bg-foreground/90 disabled:opacity-50"
-                                >
-                                    {isSwitching ? (
-                                        'Switching...'
-                                    ) : (
-                                        <>
-                                            <Check size={14} />
-                                            Switch to {displayPersona.name}
-                                        </>
-                                    )}
-                                </button>
-                            ) : (
-                                <div className="w-full rounded-xl bg-secondary/50 border border-border py-3 text-center text-sm text-muted-foreground">
-                                    {displayPersona.id === activePersonaId ? '✓ Currently active' : 'Select above to switch'}
-                                </div>
-                            )}
+                            <div className="pt-4 border-t border-border mt-auto">
+                                {selectedId && selectedId !== activePersonaId ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleConfirmSwitch()}
+                                        disabled={isSwitching}
+                                        className="w-full flex items-center justify-center gap-2 rounded-lg bg-foreground text-background py-2.5 text-[13px] font-medium transition-colors hover:bg-foreground/90 disabled:opacity-50"
+                                    >
+                                        {isSwitching ? (
+                                            'Switching...'
+                                        ) : (
+                                            <>
+                                                Switch to {displayPersona.name}
+                                                <ChevronRight size={14} />
+                                            </>
+                                        )}
+                                    </button>
+                                ) : (
+                                    <div className="w-full flex items-center justify-center gap-2 rounded-lg bg-muted/50 border border-border/50 py-2.5 text-[13px] font-medium text-muted-foreground">
+                                        <Check size={14} />
+                                        Currently Active
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </motion.div>
                 )}

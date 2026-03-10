@@ -7,7 +7,8 @@ export type SkillCategory =
     | 'creative'
     | 'productivity'
     | 'data'
-    | 'browser';
+    | 'browser'
+    | 'automation';
 
 export type ModelPreference = 'quick' | 'research' | 'orchestration' | 'creative';
 

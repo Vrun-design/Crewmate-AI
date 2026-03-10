@@ -1,33 +1,62 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {useLocation, useNavigate} from 'react-router-dom';
-import { Search, Bell, ChevronRight, Menu, CheckCircle2, AlertCircle, Clock, Command } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Search, Bell, Menu, CheckCircle2, AlertCircle, Clock, Command } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CommandPalette } from '../ui/CommandPalette';
-import {useNotifications} from '../../hooks/useNotifications';
+import { useNotifications } from '../../hooks/useNotifications';
 
 interface HeaderProps {
-  isDarkMode: boolean;
-  setIsDarkMode: (isDark: boolean) => void;
   setIsMobileMenuOpen: (isOpen: boolean) => void;
 }
 
-export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: HeaderProps) {
+const VALID_ROUTES = new Set([
+  '/dashboard', '/agents', '/memory', '/sessions', '/tasks', '/skills',
+  '/integrations', '/account', '/notifications', '/personas', '/off-shift',
+]);
+
+const LEGACY_ROUTE_MAP: Record<string, string> = {
+  '/activity': '/sessions?tab=activity',
+  '/sessions/activity': '/sessions?tab=activity',
+  '/delegations': '/account',
+  '/offshift': '/account',
+  '/studio': '/dashboard',
+};
+
+function sanitizeSourcePath(path: string | undefined): string {
+  if (!path) {
+    return '/notifications';
+  }
+
+  const base = path.split('?')[0];
+  if (VALID_ROUTES.has(base)) {
+    return path;
+  }
+
+  return LEGACY_ROUTE_MAP[base] ?? '/notifications';
+}
+
+function getNotificationIcon(type: 'success' | 'info' | 'warning' | 'default'): React.JSX.Element {
+  if (type === 'success') {
+    return <CheckCircle2 size={16} className="text-emerald-500" />;
+  }
+
+  if (type === 'warning') {
+    return <AlertCircle size={16} className="text-amber-500" />;
+  }
+
+  return <Bell size={16} className="text-primary" />;
+}
+
+export function Header({ setIsMobileMenuOpen }: HeaderProps): React.JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
   const pathName = location.pathname.split('/')[1] || 'dashboard';
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
-  const {notifications, markAllRead} = useNotifications();
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
-
-  function getIcon(type: 'success' | 'info' | 'warning' | 'default') {
-    if (type === 'success') {
-      return <CheckCircle2 size={16} />;
-    }
-
-    return <AlertCircle size={16} />;
-  }
+  const { notifications, markAllRead } = useNotifications();
+  const unreadNotifications = notifications.filter((n) => !n.read);
+  const unreadCount = unreadNotifications.length;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -35,8 +64,9 @@ export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: Heade
         setIsNotificationsOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -49,7 +79,7 @@ export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: Heade
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-  
+
   return (
     <header className="h-14 flex items-center justify-between px-4 md:px-6 border-b border-border bg-card/80 backdrop-blur-md z-20">
       <div className="flex items-center gap-3">
@@ -60,10 +90,10 @@ export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: Heade
           <span className="text-foreground font-medium capitalize">{pathName.replace('-', ' ')}</span>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-3 md:gap-4">
         <div className="relative hidden md:block">
-          <button 
+          <button
             onClick={() => setIsCommandPaletteOpen(true)}
             className="flex items-center justify-between w-48 lg:w-64 bg-secondary border border-border rounded-full pl-3 pr-2 py-1.5 text-sm text-muted-foreground hover:border-ring hover:text-foreground transition-all"
           >
@@ -79,17 +109,18 @@ export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: Heade
         </div>
 
         <div className="relative" ref={notificationsRef}>
-          <button 
-            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+          <button
+            type="button"
+            onClick={() => setIsNotificationsOpen((current) => !current)}
             className={`text-muted-foreground hover:text-foreground transition-colors relative p-1.5 rounded-full hover:bg-accent ${isNotificationsOpen ? 'bg-accent text-foreground' : ''}`}
           >
             <Bell size={18} />
-            {unreadCount > 0 ? <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full border border-background"></span> : null}
+            {unreadCount > 0 ? <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full border border-background bg-primary" /> : null}
           </button>
 
           <AnimatePresence>
             {isNotificationsOpen && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -98,22 +129,22 @@ export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: Heade
               >
                 <div className="flex items-center justify-between p-3 border-b border-border">
                   <h3 className="text-sm font-medium text-foreground">Notifications</h3>
-                  <button className="text-xs text-blue-500 hover:text-blue-600 font-medium" onClick={() => void markAllRead()}>
+                  <button type="button" className="text-xs font-medium text-primary transition-opacity hover:opacity-75" onClick={() => void markAllRead()}>
                     Mark all as read
                   </button>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto">
-                  {notifications.length > 0 ? (
-                    notifications.slice(0, 5).map((notification) => (
+                  {unreadNotifications.length > 0 ? (
+                    unreadNotifications.slice(0, 5).map((notification) => (
                       <div
                         key={notification.id}
-                        className={`p-3 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer flex gap-3 ${notification.read ? 'opacity-60' : ''}`}
+                        className="p-3 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer flex gap-3"
                         onClick={() => {
                           setIsNotificationsOpen(false);
-                          navigate(notification.sourcePath ?? '/notifications');
+                          navigate(sanitizeSourcePath(notification.sourcePath));
                         }}
                       >
-                        <div className="mt-0.5 shrink-0 text-blue-500">{getIcon(notification.type)}</div>
+                        <div className="mt-0.5 shrink-0">{getNotificationIcon(notification.type)}</div>
                         <div>
                           <div className="text-sm font-medium text-foreground">{notification.title}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">{notification.message}</div>
@@ -125,22 +156,23 @@ export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: Heade
                     ))
                   ) : (
                     <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No notifications yet. Completed tasks and agent alerts will appear here.
+                      No new notifications. Completed tasks and agent alerts will appear here.
                     </div>
                   )}
                 </div>
                 <div className="p-2 border-t border-border bg-secondary/50 text-center">
-                  <button onClick={() => { setIsNotificationsOpen(false); navigate('/notifications'); }} className="text-xs text-muted-foreground hover:text-foreground font-medium">View all notifications</button>
+                  <button type="button" onClick={() => { setIsNotificationsOpen(false); navigate('/notifications'); }} className="text-xs font-medium text-muted-foreground hover:text-foreground">View all notifications</button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
       </div>
 
-      <CommandPalette 
-        isOpen={isCommandPaletteOpen} 
-        onClose={() => setIsCommandPaletteOpen(false)} 
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
       />
     </header>
   );
