@@ -2,6 +2,8 @@
 
 # 🤖 Crewmate
 
+![Crewmate](public/crewmate.png)
+
 ### Your AI-powered company — run an entire business with a crew of AI agents
 
 **14 specialist agents · 30+ real integrations · Real-time voice via Gemini Live · Custom skill builder · Slack notifications · MCP server**
