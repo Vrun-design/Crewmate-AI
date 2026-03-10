@@ -1,13 +1,15 @@
-import {isClickUpConfigured} from './clickupService';
+import { isClickUpConfigured } from './clickupService';
 import {
   getIntegrationConfigState,
   getIntegrationConfiguredVia,
   listIntegrationFieldDefinitions,
 } from './integrationConfigService';
-import {isGithubConfigured} from './githubService';
-import {isNotionConfigured} from './notionService';
-import {isSlackConfigured} from './slackService';
-import type {IntegrationRecord} from '../types';
+import { isGithubConfigured } from './githubService';
+import { isNotionConfigured } from './notionService';
+import { isSlackConfigured } from './slackService';
+import { isGmailConfigured } from './gmailService';
+import { isCalendarConfigured } from './calendarService';
+import type { IntegrationRecord } from '../types';
 
 interface IntegrationDefinition extends Omit<IntegrationRecord, 'status' | 'missingKeys' | 'configuredVia'> {
   status: IntegrationRecord['status'];
@@ -97,33 +99,79 @@ const integrationDefinitions: IntegrationDefinition[] = [
     ],
     notes: 'Strong demo choice when you want product-ops actions outside GitHub.',
   },
+  {
+    id: 'gmail',
+    name: 'Gmail',
+    status: 'disconnected',
+    iconName: 'gmail',
+    color: 'text-red-600 dark:text-red-400',
+    bgColor: 'bg-red-500/10 border-red-500/20',
+    desc: 'Send emails, draft responses, and read your inbox proactively during live sessions.',
+    docsUrl: 'https://developers.google.com/gmail/api',
+    capabilities: ['Read inbox', 'Send emails', 'Create drafts', 'Reply to threads'],
+    requiredKeys: [],
+    setupSteps: [
+      'Click Connect to authorize Crewmate via Google OAuth.',
+      'Allow the requested Gmail permissions (read + send).',
+      'Crewmate will now be able to read your inbox and send emails on your command.',
+    ],
+    notes: 'Uses Google OAuth2 — no API keys required. Connect via the button below.',
+    connectUrl: '/api/auth/gmail',
+  },
+  {
+    id: 'calendar',
+    name: 'Google Calendar',
+    status: 'disconnected',
+    iconName: 'calendar',
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-500/10 border-blue-500/20',
+    desc: 'Schedule meetings, find free time, and see your agenda — all via voice command.',
+    docsUrl: 'https://developers.google.com/calendar/api',
+    capabilities: ['Create events with Meet link', 'Find free time slots', 'List agenda', 'Smart scheduling'],
+    requiredKeys: [],
+    setupSteps: [
+      'Click Connect to authorize Crewmate via Google OAuth.',
+      'Allow the requested Calendar permissions (read + write events).',
+      'Crewmate will schedule meetings and find free slots on your behalf.',
+    ],
+    notes: 'Uses Google OAuth2 — no API keys required. Connect via the button below.',
+    connectUrl: '/api/auth/calendar',
+  },
 ];
 
-function getConnectedStatus(userId: string, integrationId: string): IntegrationRecord['status'] {
+function getConnectedStatus(workspaceId: string, integrationId: string): IntegrationRecord['status'] {
   if (integrationId === 'github') {
-    return isGithubConfigured(userId) ? 'connected' : 'disconnected';
+    return isGithubConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
   if (integrationId === 'slack') {
-    return isSlackConfigured(userId) ? 'connected' : 'disconnected';
+    return isSlackConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
   if (integrationId === 'notion') {
-    return isNotionConfigured(userId) ? 'connected' : 'disconnected';
+    return isNotionConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
   if (integrationId === 'clickup') {
-    return isClickUpConfigured(userId) ? 'connected' : 'disconnected';
+    return isClickUpConfigured(workspaceId) ? 'connected' : 'disconnected';
+  }
+
+  if (integrationId === 'gmail') {
+    return isGmailConfigured(workspaceId) ? 'connected' : 'disconnected';
+  }
+
+  if (integrationId === 'calendar') {
+    return isCalendarConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
   return 'disconnected';
 }
 
-export function listIntegrationCatalog(userId: string): IntegrationRecord[] {
+export function listIntegrationCatalog(workspaceId: string, userId: string): IntegrationRecord[] {
   return integrationDefinitions.map((integration) => ({
     ...integration,
-    configuredVia: getIntegrationConfiguredVia(userId, integration.id),
-    status: getConnectedStatus(userId, integration.id),
-    missingKeys: getMissingKeys(integration.requiredKeys ?? [], integration.id, userId),
+    configuredVia: getIntegrationConfiguredVia(workspaceId, integration.id),
+    status: getConnectedStatus(workspaceId, integration.id),
+    missingKeys: getMissingKeys(integration.requiredKeys ?? [], integration.id, workspaceId),
   }));
 }

@@ -1,7 +1,13 @@
 node_modules
 dist
 .git
+.env
+.env.*
+data/
+*.db
+*.db-wal
+*.db-shm
 .DS_Store
-data/*.db
-data/*.db-wal
-data/*.db-shm
+coverage
+.vite
+*.log

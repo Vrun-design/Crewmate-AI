@@ -1,11 +1,11 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
-import {serverConfig} from './config';
+import { serverConfig } from './config';
 
 function ensureDirectoryExists(filePath: string) {
   const directory = path.dirname(filePath);
-  fs.mkdirSync(directory, {recursive: true});
+  fs.mkdirSync(directory, { recursive: true });
 }
 
 ensureDirectoryExists(serverConfig.databasePath);
@@ -76,6 +76,22 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS workspace_members (
+    workspace_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    joined_at TEXT NOT NULL,
+    PRIMARY KEY (workspace_id, user_id),
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS auth_codes (
     email TEXT PRIMARY KEY,
     code TEXT NOT NULL,
@@ -90,6 +106,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS notifications (
     id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
     title TEXT NOT NULL,
     message TEXT NOT NULL,
     time TEXT NOT NULL,
@@ -100,11 +117,11 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS integration_connections (
-    user_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
     integration_id TEXT NOT NULL,
     encrypted_config TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    PRIMARY KEY (user_id, integration_id)
+    PRIMARY KEY (workspace_id, integration_id)
   );
 
   CREATE TABLE IF NOT EXISTS user_preferences (
@@ -121,6 +138,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     type TEXT NOT NULL,
     status TEXT NOT NULL,
@@ -137,4 +155,54 @@ db.exec(`
 
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN user_id TEXT`);
-} catch {}
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN workspace_id TEXT NOT NULL DEFAULT '__system__'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE integration_connections RENAME COLUMN user_id TO workspace_id`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE activities ADD COLUMN user_id TEXT NOT NULL DEFAULT '__system__'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE notifications ADD COLUMN user_id TEXT NOT NULL DEFAULT '__system__'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE tasks ADD COLUMN user_id TEXT NOT NULL DEFAULT '__system__'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE memory_nodes ADD COLUMN embedding TEXT`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE memory_nodes ADD COLUMN search_text TEXT`);
+} catch { }
+
+// Migrate existing users to have a default workspace
+try {
+  const usersWithoutWorkspace = db.prepare(`
+    SELECT id, name FROM users 
+    WHERE id NOT IN (SELECT user_id FROM workspace_members)
+  `).all() as { id: string, name: string }[];
+
+  const insertWorkspace = db.prepare('INSERT INTO workspaces (id, name, created_at) VALUES (?, ?, ?)');
+  const insertMember = db.prepare('INSERT INTO workspace_members (workspace_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)');
+
+  db.transaction(() => {
+    const now = new Date().toISOString();
+    for (const user of usersWithoutWorkspace) {
+      const workspaceId = `WS-${user.id.slice(-8)}`;
+      insertWorkspace.run(workspaceId, `${user.name}'s Workspace`, now);
+      insertMember.run(workspaceId, user.id, 'owner', now);
+    }
+  })();
+} catch (error) {
+  console.error('Failed to migrate default workspaces:', error);
+}

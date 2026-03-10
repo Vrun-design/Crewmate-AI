@@ -15,14 +15,15 @@
 2. Share a broken UI screen.
 3. Ask Crewmate to diagnose it and file a GitHub issue.
 4. Ask Crewmate to notify Slack.
-5. Queue a delegated async research brief.
-6. Show the job complete in Notion/Slack.
-7. Open Creative Studio and generate one mixed text + image artifact.
 
 ## Proof Points
 
-- `Live Agents`: realtime voice + vision session using Gemini Live
-- `UI Navigator`: visual understanding of a shared screen leading to tool actions
-- `Creative Storyteller`: mixed narrative + image generation from one prompt
-- `A2A`: async brief pipeline with orchestrator -> researcher -> editor handoff
-- `Google Cloud`: deploy backend to Cloud Run and record proof
+- **Primary Category: UI Navigator ☸️**
+  - **Interaction:** Visual understanding of a shared browser/screen leading to intent-based tool actions. Crewmate "sees" the UI bugs and navigates the API requests to fix them without the user typing.
+- **Secondary Category: Live Agents 🗣️**
+  - **Interaction:** Realtime voice + vision session using Gemini Live. The live agent handles interruptions gracefully while reviewing the screen.
+- **Google Cloud Usage:** 
+  - Deployed backend to Cloud Run. (Include raw recording of GCP console as proof).
+  - Uses `@google/genai` inside Node backend.
+  - Replicates the GCP **Always-On Memory Agent** Architecture (Backend workers natively implement the Ingest, Consolidate, and Query loop).
+  - Specifically designed the data abstraction layer to be **Vertex AI Ready** so an enterprise could swap the local SQLite prototype for Vertex Vector Search and Vertex AI Endpoints.

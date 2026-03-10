@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, Monitor, ScreenShare, ScreenShareOff, X, AlignLeft, BrainCircuit, User } from 'lucide-react';
 import { Drawer } from './Drawer';
-import type {MicrophoneStatus, ScreenShareStatus, TranscriptMessage} from '../../types/live';
-import {getDisplayNameFromEmail} from '../../utils/userName';
+import type { MicrophoneStatus, ScreenShareStatus, TranscriptMessage } from '../../types/live';
+import { getDisplayNameFromEmail } from '../../utils/userName';
 
 interface LiveSessionOverlayProps {
   isOpen: boolean;
@@ -26,7 +26,7 @@ interface LiveSessionOverlayProps {
 
 function getComposerPlaceholder(provider: 'local' | 'gemini-live'): string {
   if (provider === 'gemini-live') {
-    return 'Ask Crewmate something real. Try: create a GitHub issue for the checkout button overlap.';
+    return "Try: 'Crewmate, I see an alignment bug here on screen. File a ticket on ClickUp.'";
   }
 
   return 'Local mode active';
@@ -153,7 +153,7 @@ export function LiveSessionOverlay({
                 className="absolute w-64 h-64 rounded-full bg-blue-500/30 blur-3xl pointer-events-none"
               />
             )}
-            
+
             {/* Inner Orb */}
             <div className="relative w-48 h-48 rounded-full bg-secondary border border-border shadow-2xl flex items-center justify-center overflow-hidden">
               {/* Audio Wave */}
@@ -262,11 +262,10 @@ export function LiveSessionOverlay({
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => void onToggleMicrophone?.()}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all ${
-                    isMuted
+                  className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all ${isMuted
                       ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20'
                       : 'bg-secondary border-border text-foreground hover:bg-accent'
-                  }`}
+                    }`}
                 >
                   {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
                 </button>
@@ -282,7 +281,7 @@ export function LiveSessionOverlay({
               <div className="w-12 flex justify-end"></div>
             </div>
           </div>
-          
+
           <Drawer
             isOpen={isTranscriptOpen}
             onClose={() => setIsTranscriptOpen(false)}
@@ -293,11 +292,10 @@ export function LiveSessionOverlay({
                 transcript.map((message) => (
                   <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                        message.role === 'agent'
+                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === 'agent'
                           ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
                           : 'bg-secondary border border-border'
-                      }`}
+                        }`}
                     >
                       {message.role === 'agent' ? (
                         <BrainCircuit size={16} />

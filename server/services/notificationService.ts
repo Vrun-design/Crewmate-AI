@@ -1,22 +1,25 @@
-import {randomUUID} from 'node:crypto';
-import {db} from '../db';
-import type {NotificationRecord} from '../types';
+import { randomUUID } from 'node:crypto';
+import { db } from '../db';
+import { broadcastEvent } from './eventService';
+import type { NotificationRecord } from '../types';
 
 function getTimestampLabel(): string {
-  return new Date().toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+  return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export function createNotification(input: {
+export function createNotification(userId: string, input: {
   title: string;
   message: string;
   type: NotificationRecord['type'];
   sourcePath?: string;
 }): void {
+  const id = `NTF-${randomUUID()}`;
   db.prepare(`
-    INSERT INTO notifications (id, title, message, time, type, read, source_path, created_at)
-    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+    INSERT INTO notifications (id, user_id, title, message, time, type, read, source_path, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)
   `).run(
-    `NTF-${randomUUID()}`,
+    id,
+    userId,
     input.title,
     input.message,
     getTimestampLabel(),
@@ -24,22 +27,26 @@ export function createNotification(input: {
     input.sourcePath ?? null,
     new Date().toISOString(),
   );
+
+  broadcastEvent(userId, 'notification', { id, ...input });
 }
 
-export function listNotifications(): NotificationRecord[] {
+export function listNotifications(userId: string): NotificationRecord[] {
   return db.prepare(`
     SELECT id, title, message, time, type, read, source_path as sourcePath
     FROM notifications
+    WHERE user_id = ?
     ORDER BY created_at DESC
-  `).all().map((row) => ({
+  `).all(userId).map((row) => ({
     ...row,
-    read: Boolean((row as {read: number}).read),
+    read: Boolean((row as { read: number }).read),
   })) as NotificationRecord[];
 }
 
-export function markAllNotificationsRead(): void {
+export function markAllNotificationsRead(userId: string): void {
   db.prepare(`
     UPDATE notifications
     SET read = 1
-  `).run();
+    WHERE user_id = ?
+  `).run(userId);
 }

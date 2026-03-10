@@ -1,6 +1,7 @@
-import {useCallback, useEffect, useState} from 'react';
-import {notificationService} from '../services/notificationService';
-import type {Notification} from '../types';
+import { useCallback, useEffect, useState } from 'react';
+import { notificationService } from '../services/notificationService';
+import { useLiveEvents } from './useLiveEvents';
+import type { Notification } from '../types';
 
 interface UseNotificationsResult {
   notifications: Notification[];
@@ -29,6 +30,12 @@ export function useNotifications(): UseNotificationsResult {
   useEffect(() => {
     void loadNotifications();
   }, [loadNotifications]);
+
+  useLiveEvents({
+    onNotification: () => {
+      void loadNotifications();
+    }
+  });
 
   const markAllRead = useCallback(async () => {
     await notificationService.markAllRead();

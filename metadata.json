@@ -1,8 +1,8 @@
 {
-  "name": "Remix: Remix: Crewmate Dashboard",
-  "description": "A persistent, screen-sharing AI Product Manager that watches you work, talks to you in real-time about what it sees, and executes background tasks.",
+  "name": "Crewmate",
+  "description": "A multimodal AI operator for live screen-aware work, long-term memory, and delegated execution across GitHub, Slack, Notion, and ClickUp.",
   "requestFramePermissions": [
-    "camera",
-    "microphone"
+    "microphone",
+    "display-capture"
   ]
 }

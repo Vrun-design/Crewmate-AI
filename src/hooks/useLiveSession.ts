@@ -1,9 +1,9 @@
-import {useEffect, useRef, useState} from 'react';
-import {ApiError} from '../lib/api';
-import {liveSessionService} from '../services/liveSessionService';
-import type {AudioChunk, LiveSession} from '../types/live';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { ApiError } from '../lib/api';
+import { liveSessionService } from '../services/liveSessionService';
+import { useLiveEvents } from './useLiveEvents';
+import type { AudioChunk, LiveSession } from '../types/live';
 
-const SESSION_POLL_MS = 1000;
 const AUDIO_POLL_MS = 300;
 
 interface UseLiveSessionOptions {
@@ -17,9 +17,9 @@ interface UseLiveSessionResult {
   error: string | null;
   elapsedLabel: string;
   isSessionActive: boolean;
-  startSession: () => Promise<void>;
+  startSession: () => Promise<LiveSession | null>;
   endSession: () => Promise<void>;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string, sessionIdOverride?: string) => Promise<void>;
 }
 
 export function getElapsedLabel(startedAt: string): string {
@@ -36,7 +36,7 @@ function mergeSessionState(
   currentSession: LiveSession | null,
 ): LiveSession | null {
   if (!initialSession) {
-    return initialSession;
+    return currentSession;
   }
 
   return {
@@ -82,12 +82,12 @@ async function playAudioChunk(audioContext: AudioContext, chunk: AudioChunk): Pr
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(audioContext.destination);
-    source.addEventListener('ended', () => resolve(), {once: true});
+    source.addEventListener('ended', () => resolve(), { once: true });
     source.start();
   });
 }
 
-export function useLiveSession({initialSession, onSessionChange}: UseLiveSessionOptions): UseLiveSessionResult {
+export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessionOptions): UseLiveSessionResult {
   const [session, setSession] = useState<LiveSession | null>(initialSession);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,30 +117,39 @@ export function useLiveSession({initialSession, onSessionChange}: UseLiveSession
     return () => window.clearInterval(interval);
   }, [session]);
 
+  const refreshSession = useCallback(() => {
+    if (!session?.id) return;
+    void liveSessionService
+      .getSession(session.id)
+      .then((nextSession) => {
+        stopPollingRef.current = false;
+        setSession((currentSession) => ({
+          ...nextSession,
+          provider: nextSession.provider ?? currentSession?.provider,
+        }));
+      })
+      .catch((pollError: unknown) => {
+        if (pollError instanceof ApiError && pollError.status === 404) {
+          stopPollingRef.current = true;
+          setError('Live session polling route is unavailable. Restart `npm run dev:server` and start a new session.');
+        }
+      });
+  }, [session?.id]);
+
+  useLiveEvents({
+    onSessionUpdate: (data) => {
+      if (data.sessionId === session?.id) {
+        refreshSession();
+      }
+    }
+  });
+
   useEffect(() => {
     if (!session || session.status !== 'live') {
       lastAudioChunkIdRef.current = 0;
       stopPollingRef.current = false;
       return;
     }
-
-    const sessionInterval = window.setInterval(() => {
-      void liveSessionService
-        .getSession(session.id)
-        .then((nextSession) => {
-          stopPollingRef.current = false;
-          setSession((currentSession) => ({
-            ...nextSession,
-            provider: nextSession.provider ?? currentSession?.provider,
-          }));
-        })
-        .catch((pollError: unknown) => {
-          if (pollError instanceof ApiError && pollError.status === 404) {
-            stopPollingRef.current = true;
-            setError('Live session polling route is unavailable. Restart `npm run dev:server` and start a new session.');
-          }
-        });
-    }, SESSION_POLL_MS);
 
     const audioInterval = window.setInterval(() => {
       if (stopPollingRef.current) {
@@ -187,7 +196,6 @@ export function useLiveSession({initialSession, onSessionChange}: UseLiveSession
     }, AUDIO_POLL_MS);
 
     return () => {
-      window.clearInterval(sessionInterval);
       window.clearInterval(audioInterval);
     };
   }, [session]);
@@ -202,7 +210,7 @@ export function useLiveSession({initialSession, onSessionChange}: UseLiveSession
     };
   }, []);
 
-  const startSession = async () => {
+  const startSession = async (): Promise<LiveSession | null> => {
     setIsBusy(true);
     setError(null);
 
@@ -219,8 +227,10 @@ export function useLiveSession({initialSession, onSessionChange}: UseLiveSession
       lastAudioChunkIdRef.current = 0;
       audioQueueRef.current = [];
       await onSessionChange?.();
+      return next;
     } catch (startError) {
       setError(getErrorMessage(startError, 'Unable to start session'));
+      return null;
     } finally {
       setIsBusy(false);
     }
@@ -246,8 +256,9 @@ export function useLiveSession({initialSession, onSessionChange}: UseLiveSession
     }
   };
 
-  const sendMessage = async (text: string) => {
-    if (!session) {
+  const sendMessage = async (text: string, sessionIdOverride?: string) => {
+    const targetSessionId = sessionIdOverride ?? session?.id;
+    if (!targetSessionId) {
       return;
     }
 
@@ -255,9 +266,8 @@ export function useLiveSession({initialSession, onSessionChange}: UseLiveSession
     setError(null);
 
     try {
-      const next = await liveSessionService.sendMessage(session.id, text);
+      const next = await liveSessionService.sendMessage(targetSessionId, text);
       setSession(next);
-      await onSessionChange?.();
     } catch (messageError) {
       setError(getErrorMessage(messageError, 'Unable to send message'));
     } finally {

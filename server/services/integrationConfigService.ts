@@ -1,6 +1,6 @@
-import {db} from '../db';
-import {serverConfig} from '../config';
-import {decryptJson, encryptJson} from './secretVault';
+import { db } from '../db';
+import { serverConfig } from '../config';
+import { decryptJson, encryptJson } from './secretVault';
 import type {
   IntegrationConfigFieldDefinition,
   IntegrationConfigFieldState,
@@ -9,21 +9,21 @@ import type {
 
 const integrationFieldDefinitions: Record<string, IntegrationConfigFieldDefinition[]> = {
   github: [
-    {key: 'token', label: 'Access token', placeholder: 'ghp_...', secret: true, helpText: 'Token with issue creation access.'},
-    {key: 'repoOwner', label: 'Repository owner', placeholder: 'your-org', secret: false},
-    {key: 'repoName', label: 'Repository name', placeholder: 'your-repo', secret: false},
+    { key: 'token', label: 'Access token', placeholder: 'ghp_...', secret: true, helpText: 'Token with issue creation access.' },
+    { key: 'repoOwner', label: 'Repository owner', placeholder: 'your-org', secret: false },
+    { key: 'repoName', label: 'Repository name', placeholder: 'your-repo', secret: false },
   ],
   slack: [
-    {key: 'botToken', label: 'Bot token', placeholder: 'xoxb-...', secret: true, helpText: 'Bot token with chat:write scope.'},
-    {key: 'defaultChannelId', label: 'Default channel ID', placeholder: 'C0123456789', secret: false},
+    { key: 'botToken', label: 'Bot token', placeholder: 'xoxb-...', secret: true, helpText: 'Bot token with chat:write scope.' },
+    { key: 'defaultChannelId', label: 'Default channel ID', placeholder: 'C0123456789', secret: false },
   ],
   notion: [
-    {key: 'token', label: 'Internal integration token', placeholder: 'secret_...', secret: true},
-    {key: 'parentPageId', label: 'Parent page ID', placeholder: 'parent-page-id', secret: false},
+    { key: 'token', label: 'Internal integration token', placeholder: 'secret_...', secret: true },
+    { key: 'parentPageId', label: 'Parent page ID', placeholder: 'parent-page-id', secret: false },
   ],
   clickup: [
-    {key: 'token', label: 'API token', placeholder: 'pk_...', secret: true},
-    {key: 'listId', label: 'List ID', placeholder: '901234567890', secret: false},
+    { key: 'token', label: 'API token', placeholder: 'pk_...', secret: true },
+    { key: 'listId', label: 'List ID', placeholder: '901234567890', secret: false },
   ],
 };
 
@@ -47,12 +47,12 @@ const envValueMap: Record<string, Record<string, string>> = {
   },
 };
 
-function getStoredConfig(userId: string, integrationId: string): Record<string, string> {
+function getStoredConfig(workspaceId: string, integrationId: string): Record<string, string> {
   const row = db.prepare(`
     SELECT encrypted_config as encryptedConfig
     FROM integration_connections
-    WHERE user_id = ? AND integration_id = ?
-  `).get(userId, integrationId) as {encryptedConfig: string} | undefined;
+    WHERE workspace_id = ? AND integration_id = ?
+  `).get(workspaceId, integrationId) as { encryptedConfig: string } | undefined;
 
   if (!row) {
     return {};
@@ -69,15 +69,15 @@ export function listIntegrationFieldDefinitions(integrationId: string): Integrat
   return integrationFieldDefinitions[integrationId] ?? [];
 }
 
-export function getEffectiveIntegrationConfig(userId: string, integrationId: string): Record<string, string> {
+export function getEffectiveIntegrationConfig(workspaceId: string, integrationId: string): Record<string, string> {
   return {
     ...getEnvConfig(integrationId),
-    ...getStoredConfig(userId, integrationId),
+    ...getStoredConfig(workspaceId, integrationId),
   };
 }
 
-export function getIntegrationConfiguredVia(userId: string, integrationId: string): 'env' | 'vault' | 'none' {
-  const stored = getStoredConfig(userId, integrationId);
+export function getIntegrationConfiguredVia(workspaceId: string, integrationId: string): 'env' | 'vault' | 'none' {
+  const stored = getStoredConfig(workspaceId, integrationId);
   if (Object.values(stored).some(Boolean)) {
     return 'vault';
   }
@@ -90,10 +90,10 @@ export function getIntegrationConfiguredVia(userId: string, integrationId: strin
   return 'none';
 }
 
-export function getIntegrationConfigState(userId: string, integrationId: string): IntegrationConfigState {
+export function getIntegrationConfigState(workspaceId: string, integrationId: string): IntegrationConfigState {
   const fieldDefinitions = listIntegrationFieldDefinitions(integrationId);
-  const effective = getEffectiveIntegrationConfig(userId, integrationId);
-  const configuredVia = getIntegrationConfiguredVia(userId, integrationId);
+  const effective = getEffectiveIntegrationConfig(workspaceId, integrationId);
+  const configuredVia = getIntegrationConfiguredVia(workspaceId, integrationId);
 
   const fields: IntegrationConfigFieldState[] = fieldDefinitions.map((field) => ({
     ...field,
@@ -109,7 +109,7 @@ export function getIntegrationConfigState(userId: string, integrationId: string)
 }
 
 export function saveIntegrationConfig(
-  userId: string,
+  workspaceId: string,
   integrationId: string,
   values: Record<string, string>,
 ): IntegrationConfigState {
@@ -118,8 +118,8 @@ export function saveIntegrationConfig(
     throw new Error(`Unsupported integration: ${integrationId}`);
   }
 
-  const currentStored = getStoredConfig(userId, integrationId);
-  const nextStored: Record<string, string> = {...currentStored};
+  const currentStored = getStoredConfig(workspaceId, integrationId);
+  const nextStored: Record<string, string> = { ...currentStored };
 
   for (const field of fieldDefinitions) {
     const nextValue = values[field.key];
@@ -148,19 +148,19 @@ export function saveIntegrationConfig(
   const updatedAt = new Date().toISOString();
 
   db.prepare(`
-    INSERT INTO integration_connections (user_id, integration_id, encrypted_config, updated_at)
+    INSERT INTO integration_connections (workspace_id, integration_id, encrypted_config, updated_at)
     VALUES (?, ?, ?, ?)
-    ON CONFLICT(user_id, integration_id) DO UPDATE SET
+    ON CONFLICT(workspace_id, integration_id) DO UPDATE SET
       encrypted_config = excluded.encrypted_config,
       updated_at = excluded.updated_at
-  `).run(userId, integrationId, encryptedConfig, updatedAt);
+  `).run(workspaceId, integrationId, encryptedConfig, updatedAt);
 
-  return getIntegrationConfigState(userId, integrationId);
+  return getIntegrationConfigState(workspaceId, integrationId);
 }
 
-export function deleteIntegrationConfig(userId: string, integrationId: string): void {
+export function deleteIntegrationConfig(workspaceId: string, integrationId: string): void {
   db.prepare(`
     DELETE FROM integration_connections
-    WHERE user_id = ? AND integration_id = ?
-  `).run(userId, integrationId);
+    WHERE workspace_id = ? AND integration_id = ?
+  `).run(workspaceId, integrationId);
 }

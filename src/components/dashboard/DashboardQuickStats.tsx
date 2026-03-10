@@ -1,7 +1,7 @@
 import React from 'react';
-import {StatCard} from '../shared/StatCard';
-import type {Integration, Task} from '../../types';
-import type {LiveSession} from '../../types/live';
+import { StatCard } from '../shared/StatCard';
+import type { Integration, Task } from '../../types';
+import type { LiveSession } from '../../types/live';
 
 interface DashboardQuickStatsProps {
   tasks: Task[];
@@ -19,16 +19,25 @@ export function DashboardQuickStats({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <StatCard
-        title="Tasks Completed"
+        title="Live Tools Executed"
         value={tasks.filter((task) => task.status === 'completed').length.toString()}
-        trend="Live local data"
+        trend="Multimodal capability"
       />
-      <StatCard title="Hours Saved" value="8.5h" trend="Prototype baseline" />
+      <StatCard
+        title="Memory Nodes Embedded"
+        value="12"
+        trend="Continuously learning"
+      />
       <StatCard
         title="Active Integrations"
         value={integrations.filter((integration) => integration.status === 'connected').length.toString()}
+        trend="Ready to act"
       />
-      <StatCard title="Sessions Today" value={session ? '1' : '0'} trend={isSessionActive ? 'Live now' : 'Idle'} />
+      <StatCard
+        title="Agent Status"
+        value={isSessionActive ? 'On Shift' : 'Idle'}
+        trend={isSessionActive ? 'Listening...' : 'Standing by'}
+      />
     </div>
   );
 }

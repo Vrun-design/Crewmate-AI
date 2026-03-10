@@ -1,37 +1,35 @@
 import React from 'react';
-import {render, screen} from '@testing-library/react';
-import {describe, expect, test, vi} from 'vitest';
-import {Skills} from './Skills';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, test, vi } from 'vitest';
+import { Skills } from './Skills';
 
-vi.mock('../hooks/useCapabilities', () => ({
-  useCapabilities: () => ({
-    capabilities: [
+vi.mock('../hooks/useSkills', () => ({
+  useSkills: () => ({
+    skills: [
       {
-        id: 'live-screen',
-        title: 'Live screen perception',
-        description: 'Reads shared screen frames.',
-        status: 'live',
-        category: 'perception',
-      },
-      {
-        id: 'tool-routing',
-        title: 'Tool action routing',
-        description: 'Routes explicit requests into tools.',
-        status: 'setup_required',
-        category: 'action',
+        id: 'github.create-issue',
+        name: 'Create GitHub Issue',
+        description: 'Files a new issue in the connected GitHub repo.',
+        version: '1.0.0',
+        category: 'code',
+        personas: ['developer'],
+        requiresIntegration: ['github'],
+        triggerPhrases: ['"Create a GitHub issue for this bug"'],
+        preferredModel: 'quick',
       },
     ],
     isLoading: false,
     error: null,
+    runSkill: vi.fn(),
   }),
 }));
 
 describe('Skills', () => {
-  test('renders the operator stack with real capability statuses', () => {
+  test('renders the skills hub with interactive skill cards', () => {
     render(<Skills />);
 
-    expect(screen.getByText('Operator Stack')).toBeInTheDocument();
-    expect(screen.getByText('Live screen perception')).toBeInTheDocument();
-    expect(screen.getByText('Setup required')).toBeInTheDocument();
+    expect(screen.getByText('Skills Hub')).toBeInTheDocument();
+    expect(screen.getByText('Create GitHub Issue')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /run/i })).toBeInTheDocument();
   });
 });

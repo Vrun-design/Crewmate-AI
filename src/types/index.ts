@@ -1,3 +1,5 @@
+import type { LucideIcon } from 'lucide-react';
+
 export interface Activity {
   id: string;
   title: string;
@@ -20,7 +22,8 @@ export interface Integration {
   name: string;
   status: 'connected' | 'disconnected';
   configuredVia?: 'env' | 'vault' | 'none';
-  icon: any; // lucide-react icon
+  icon: LucideIcon;
+  logoUrl?: string;
   color: string;
   bgColor: string;
   desc: string;
@@ -30,6 +33,8 @@ export interface Integration {
   requiredKeys?: string[];
   missingKeys?: string[];
   notes?: string;
+  /** OAuth-based integrations provide a server-side connect URL */
+  connectUrl?: string;
 }
 
 export interface IntegrationConfigField {

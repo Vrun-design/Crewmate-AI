@@ -1,4 +1,5 @@
-import {getEffectiveIntegrationConfig} from './integrationConfigService';
+import { getEffectiveIntegrationConfig } from './integrationConfigService';
+import { registerTool } from '../mcp/mcpServer';
 
 interface CreateClickUpTaskInput {
   name: string;
@@ -11,22 +12,22 @@ interface ClickUpTaskResult {
   name: string;
 }
 
-function getClickUpConfig(userId: string) {
-  const config = getEffectiveIntegrationConfig(userId, 'clickup');
+function getClickUpConfig(workspaceId: string) {
+  const config = getEffectiveIntegrationConfig(workspaceId, 'clickup');
   return {
     token: config.token ?? '',
     listId: config.listId ?? '',
   };
 }
 
-export function isClickUpConfigured(userId: string): boolean {
-  const config = getClickUpConfig(userId);
+export function isClickUpConfigured(workspaceId: string): boolean {
+  const config = getClickUpConfig(workspaceId);
   return Boolean(config.token && config.listId);
 }
 
-export async function createClickUpTask(userId: string, input: CreateClickUpTaskInput): Promise<ClickUpTaskResult> {
-  const config = getClickUpConfig(userId);
-  if (!isClickUpConfigured(userId)) {
+export async function createClickUpTask(workspaceId: string, input: CreateClickUpTaskInput): Promise<ClickUpTaskResult> {
+  const config = getClickUpConfig(workspaceId);
+  if (!isClickUpConfigured(workspaceId)) {
     throw new Error('ClickUp integration is not configured. Save an API token and destination list ID.');
   }
 
@@ -59,3 +60,27 @@ export async function createClickUpTask(userId: string, input: CreateClickUpTask
     name: payload.name,
   };
 }
+
+registerTool({
+  name: 'create_clickup_task',
+  description: 'Create a ticket or task in ClickUp when the user asks to log a task, bug, or to-do item.',
+  inputSchema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      name: { type: 'string' },
+      description: { type: 'string' },
+    },
+  },
+  handler: async (context, args) => {
+    const description = typeof args.description === 'string' ? args.description : '';
+    const screenshotSection = context.frameData
+      ? `\n\n[Screenshot captured at time of delegation — base64 image attached at creation time]`
+      : '';
+
+    return createClickUpTask(context.workspaceId, {
+      name: typeof args.name === 'string' ? args.name : '',
+      description: `${description}${screenshotSection}`,
+    });
+  },
+});

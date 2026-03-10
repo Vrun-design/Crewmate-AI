@@ -1,6 +1,7 @@
-import {useEffect, useState} from 'react';
-import {jobsService} from '../services/jobsService';
-import type {Job} from '../types';
+import { useEffect, useState } from 'react';
+import { jobsService } from '../services/jobsService';
+import { useLiveEvents } from './useLiveEvents';
+import type { Job } from '../types';
 
 interface UseJobsResult {
   jobs: Job[];
@@ -37,12 +38,13 @@ export function useJobs(): UseJobsResult {
 
   useEffect(() => {
     void refresh();
-    const interval = window.setInterval(() => {
-      void refresh();
-    }, 4000);
-
-    return () => window.clearInterval(interval);
   }, []);
+
+  useLiveEvents({
+    onJobUpdate: () => {
+      void refresh();
+    }
+  });
 
   async function createResearchBrief(input: {
     topic: string;
@@ -64,5 +66,5 @@ export function useJobs(): UseJobsResult {
     }
   }
 
-  return {jobs, isLoading, isSubmitting, error, refresh, createResearchBrief};
+  return { jobs, isLoading, isSubmitting, error, refresh, createResearchBrief };
 }

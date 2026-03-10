@@ -1,5 +1,5 @@
-import {db} from '../db';
-import type {ActivityRecord, TaskRecord} from '../types';
+import { db } from '../db';
+import type { ActivityRecord, TaskRecord } from '../types';
 
 interface SessionHistoryRecord {
   id: string;
@@ -35,7 +35,7 @@ function getSessionTitle(sessionId: string): string {
     WHERE session_id = ? AND role = 'user'
     ORDER BY created_at ASC
     LIMIT 1
-  `).get(sessionId) as {text?: string} | undefined;
+  `).get(sessionId) as { text?: string } | undefined;
 
   const raw = firstUserMessage?.text?.trim();
   if (!raw) {
@@ -50,12 +50,20 @@ function getSessionTurnCount(sessionId: string): number {
     SELECT COUNT(*) as count
     FROM session_messages
     WHERE session_id = ? AND role = 'user'
-  `).get(sessionId) as {count: number};
+  `).get(sessionId) as { count: number };
 
   return row.count;
 }
 
-export function listTasks(): TaskRecord[] {
+export function listTasks(userId?: string): TaskRecord[] {
+  if (userId) {
+    return db.prepare(`
+      SELECT id, title, status, time, tool_name as tool, priority
+      FROM tasks
+      WHERE user_id = ? OR user_id = '__system__'
+      ORDER BY id DESC
+    `).all(userId) as TaskRecord[];
+  }
   return db.prepare(`
     SELECT id, title, status, time, tool_name as tool, priority
     FROM tasks
@@ -63,7 +71,15 @@ export function listTasks(): TaskRecord[] {
   `).all() as TaskRecord[];
 }
 
-export function listActivities(): ActivityRecord[] {
+export function listActivities(userId?: string): ActivityRecord[] {
+  if (userId) {
+    return db.prepare(`
+      SELECT id, title, description, time, type
+      FROM activities
+      WHERE user_id = ? OR user_id = '__system__'
+      ORDER BY id DESC
+    `).all(userId) as ActivityRecord[];
+  }
   return db.prepare(`
     SELECT id, title, description, time, type
     FROM activities
@@ -76,7 +92,7 @@ export function listSessionHistory(): SessionHistoryRecord[] {
     SELECT id, started_at as startedAt, ended_at as endedAt
     FROM sessions
     ORDER BY started_at DESC
-  `).all() as Array<{id: string; startedAt: string; endedAt?: string | null}>;
+  `).all() as Array<{ id: string; startedAt: string; endedAt?: string | null }>;
 
   return rows.map((row) => ({
     id: row.id,

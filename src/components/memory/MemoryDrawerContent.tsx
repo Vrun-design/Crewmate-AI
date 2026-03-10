@@ -1,20 +1,63 @@
-import React from 'react';
-import {Clock, Link as LinkIcon, UploadCloud} from 'lucide-react';
-import {Button} from '../ui/Button';
-import {getMemoryNodeIcon, type MemoryDrawerMode} from './memoryBaseUtils';
-import type {MemoryNode} from '../../types';
+import React, { useState } from 'react';
+import { Clock, Link as LinkIcon, UploadCloud, Loader2 } from 'lucide-react';
+import { Button } from '../ui/Button';
+import { getMemoryNodeIcon, type MemoryDrawerMode } from './memoryBaseUtils';
+import { workspaceService } from '../../services/workspaceService';
+import type { MemoryNode } from '../../types';
 
 interface MemoryDrawerContentProps {
   mode: MemoryDrawerMode;
   selectedNode: MemoryNode | null;
   onClose: () => void;
+  onRefresh: () => void;
 }
 
 export function MemoryDrawerContent({
   mode,
   selectedNode,
   onClose,
+  onRefresh,
 }: MemoryDrawerContentProps): React.ReactNode {
+  const [title, setTitle] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [type, setType] = useState<'document' | 'link'>('document');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleAddContext = async () => {
+    if (!title.trim() || !searchText.trim()) return;
+    try {
+      setIsSubmitting(true);
+      await workspaceService.ingestMemory({
+        title,
+        type: 'document',
+        searchText,
+      });
+      onRefresh();
+      onClose();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAppendContext = async () => {
+    if (!selectedNode || !searchText.trim()) return;
+    try {
+      setIsSubmitting(true);
+      await workspaceService.ingestMemory({
+        title: `Appended to ${selectedNode.title}`,
+        type: 'document',
+        searchText: `[Appended to ${selectedNode.title}]:\n${searchText}`,
+      });
+      onRefresh();
+      onClose();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   if (mode === 'remove' && selectedNode) {
     return (
       <div className="space-y-4">
@@ -67,6 +110,8 @@ export function MemoryDrawerContent({
           <label className="text-sm font-medium text-foreground">Context Name</label>
           <input
             type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Project Alpha Guidelines"
             className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground"
           />
@@ -74,29 +119,37 @@ export function MemoryDrawerContent({
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-foreground">Source Type</label>
           <div className="grid grid-cols-2 gap-3">
-            <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-border bg-secondary hover:border-ring transition-colors">
-              <UploadCloud size={24} className="text-muted-foreground" />
-              <span className="text-sm font-medium">Upload File</span>
+            <button
+              onClick={() => setType('document')}
+              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors ${type === 'document' ? 'bg-primary/10 border-primary text-primary' : 'border-border bg-secondary hover:border-ring'}`}
+            >
+              <UploadCloud size={24} className={type === 'document' ? 'text-primary' : 'text-muted-foreground'} />
+              <span className="text-sm font-medium">Text/Document</span>
             </button>
-            <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-border bg-secondary hover:border-ring transition-colors">
-              <LinkIcon size={24} className="text-muted-foreground" />
+            <button
+              onClick={() => setType('link')}
+              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors ${type === 'link' ? 'bg-primary/10 border-primary text-primary' : 'border-border bg-secondary hover:border-ring'}`}
+            >
+              <LinkIcon size={24} className={type === 'link' ? 'text-primary' : 'text-muted-foreground'} />
               <span className="text-sm font-medium">Add URL</span>
             </button>
           </div>
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground">Paste Content (Optional)</label>
+          <label className="text-sm font-medium text-foreground">Paste Content ({type === 'link' ? 'URL' : 'Text'})</label>
           <textarea
-            placeholder="Paste raw text here..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder={type === 'link' ? "Paste URL here..." : "Paste raw text here..."}
             rows={6}
             className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground resize-none"
           ></textarea>
         </div>
         <div className="pt-4 flex gap-3">
-          <Button variant="primary" className="flex-1" onClick={onClose}>
-            Add to Memory
+          <Button variant="primary" className="flex-1 flex justify-center items-center gap-2" onClick={handleAddContext} disabled={isSubmitting || !title.trim() || !searchText.trim()}>
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null} Add to Memory
           </Button>
-          <Button variant="secondary" className="flex-1" onClick={onClose}>
+          <Button variant="secondary" className="flex-1" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
         </div>
@@ -123,17 +176,25 @@ export function MemoryDrawerContent({
       <div className="space-y-1.5">
         <label className="text-sm font-medium text-foreground">Append New Information</label>
         <div className="grid grid-cols-2 gap-3 mb-3">
-          <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-border bg-secondary hover:border-ring transition-colors">
-            <UploadCloud size={24} className="text-muted-foreground" />
-            <span className="text-sm font-medium">Upload File</span>
+          <button
+            onClick={() => setType('document')}
+            className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors ${type === 'document' ? 'bg-primary/10 border-primary text-primary' : 'border-border bg-secondary hover:border-ring'}`}
+          >
+            <UploadCloud size={24} className={type === 'document' ? 'text-primary' : 'text-muted-foreground'} />
+            <span className="text-sm font-medium">Paste Text</span>
           </button>
-          <button className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl border border-border bg-secondary hover:border-ring transition-colors">
-            <LinkIcon size={24} className="text-muted-foreground" />
+          <button
+            onClick={() => setType('link')}
+            className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border transition-colors ${type === 'link' ? 'bg-primary/10 border-primary text-primary' : 'border-border bg-secondary hover:border-ring'}`}
+          >
+            <LinkIcon size={24} className={type === 'link' ? 'text-primary' : 'text-muted-foreground'} />
             <span className="text-sm font-medium">Add URL</span>
           </button>
         </div>
         <textarea
-          placeholder="Or paste new content to append to this context..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          placeholder={type === 'link' ? "Paste URL to ingest here..." : "Or paste new content to append to this context..."}
           rows={5}
           className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground resize-none"
         ></textarea>
@@ -167,8 +228,8 @@ export function MemoryDrawerContent({
       </div>
 
       <div className="pt-4 flex gap-3">
-        <Button variant="primary" className="flex-1" onClick={onClose}>
-          Update Context
+        <Button variant="primary" className="flex-1 flex justify-center items-center gap-2" onClick={handleAppendContext} disabled={isSubmitting || !searchText.trim()}>
+          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : null} Add to Memory
         </Button>
         <Button variant="secondary" className="flex-1" onClick={onClose}>
           Cancel

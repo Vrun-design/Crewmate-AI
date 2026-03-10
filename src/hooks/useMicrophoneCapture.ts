@@ -1,7 +1,7 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {liveSessionService} from '../services/liveSessionService';
-import {arrayBufferToBase64} from '../utils/mediaEncoding';
-import type {MicrophoneStatus} from '../types/live';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { liveSessionService } from '../services/liveSessionService';
+import { arrayBufferToBase64 } from '../utils/mediaEncoding';
+import type { MicrophoneStatus } from '../types/live';
 
 const PCM_SAMPLE_RATE = 16000;
 const PCM_FLUSH_MS = 250;
@@ -66,18 +66,16 @@ export function useMicrophoneCapture({
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const pcmChunksRef = useRef<Int16Array[]>([]);
   const flushTimerRef = useRef<number | null>(null);
-  const attemptedSessionIdRef = useRef<string | null>(null);
-
   const isSupported =
     typeof navigator !== 'undefined' &&
     !!navigator.mediaDevices &&
     typeof navigator.mediaDevices.getUserMedia === 'function' &&
     typeof window !== 'undefined' &&
-    typeof window.AudioContext !== 'undefined';
+    typeof window.AudioContext !== 'undefined' &&
+    typeof window.AudioWorklet !== 'undefined';
 
   const flushAudio = useCallback(async (currentSessionId: string) => {
     const chunks = pcmChunksRef.current;
@@ -117,10 +115,8 @@ export function useMicrophoneCapture({
       }
     }
 
-    processorRef.current?.disconnect();
-    processorRef.current = null;
-    sourceRef.current?.disconnect();
-    sourceRef.current = null;
+    workletNodeRef.current?.disconnect();
+    workletNodeRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
 
@@ -164,19 +160,24 @@ export function useMicrophoneCapture({
       const audioContext = new window.AudioContext();
       audioContextRef.current = audioContext;
       streamRef.current = stream;
-      const source = audioContext.createMediaStreamSource(stream);
-      sourceRef.current = source;
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
 
-      processor.onaudioprocess = (event) => {
-        const input = event.inputBuffer.getChannelData(0);
-        const reduced = downsampleBuffer(input, audioContext.sampleRate, PCM_SAMPLE_RATE);
-        pcmChunksRef.current.push(floatTo16BitPcm(reduced));
+      // Load the AudioWorklet module (served from /public)
+      await audioContext.audioWorklet.addModule('/pcm-processor.js');
+
+      const source = audioContext.createMediaStreamSource(stream);
+      const workletNode = new AudioWorkletNode(audioContext, 'pcm-capture-processor');
+      workletNodeRef.current = workletNode;
+
+      // Receive raw Float32 chunks from the worklet thread
+      workletNode.port.onmessage = (event: MessageEvent<Float32Array>) => {
+        const rawChunk = event.data;
+        const downsampled = downsampleBuffer(rawChunk, audioContext.sampleRate, PCM_SAMPLE_RATE);
+        pcmChunksRef.current.push(floatTo16BitPcm(downsampled));
       };
 
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      source.connect(workletNode);
+      // Worklet must be connected to destination to keep the audio graph alive
+      workletNode.connect(audioContext.destination);
 
       flushTimerRef.current = window.setInterval(() => {
         void flushAudio(sessionId).catch((captureError: unknown) => {
@@ -203,21 +204,12 @@ export function useMicrophoneCapture({
 
   useEffect(() => {
     if (!enabled || !sessionId) {
-      attemptedSessionIdRef.current = null;
       if (status === 'recording' || status === 'requesting') {
         void stopMicrophone();
       } else {
         setStatus('idle');
       }
-      return;
     }
-
-    if (attemptedSessionIdRef.current === sessionId || streamRef.current || !isSupported) {
-      return;
-    }
-
-    attemptedSessionIdRef.current = sessionId;
-    void startMicrophone();
   }, [enabled, isSupported, sessionId, startMicrophone, status, stopMicrophone]);
 
   useEffect(() => {
