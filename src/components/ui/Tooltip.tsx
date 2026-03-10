@@ -44,7 +44,7 @@ export function Tooltip({ content, children, position = 'top', className = '', d
                     className={`pointer-events-none absolute z-50 w-max max-w-xs transition-opacity duration-200 ${getTooltipPositionClasses(position)}`}
                     style={{ transitionDelay: `${delayMs}ms` }}
                 >
-                    <div className="bg-zinc-900 text-zinc-50 border border-zinc-700 shadow-[0_0_20px_rgba(0,0,0,0.3)] text-[11px] font-medium px-2.5 py-1.5 rounded-md whitespace-normal break-words leading-relaxed">
+                    <div className="rounded-md border border-border bg-popover px-2.5 py-1.5 text-[11px] font-medium whitespace-normal break-words leading-relaxed text-popover-foreground shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.32)]">
                         {content}
                     </div>
                 </div>

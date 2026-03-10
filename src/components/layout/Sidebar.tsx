@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, CheckSquare, Settings, MonitorUp, Network,
+  Grid2x2Plus, LayoutDashboard, CheckSquare, Settings, MonitorUp, Network,
   MoreHorizontal, X, BrainCircuit, Moon, Sun, LogOut, User, Cpu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,7 +49,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Settings',
     items: [
-      { to: '/integrations', icon: CheckSquare, label: 'Integrations' },
+      { to: '/integrations', icon: Grid2x2Plus, label: 'Integrations' },
       { to: '/account', icon: User, label: 'Account' },
     ],
   },

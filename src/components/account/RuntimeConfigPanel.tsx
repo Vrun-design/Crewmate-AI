@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cpu, Image as ImageIcon, MessageSquare, Sparkles } from 'lucide-react';
+import { Cpu, Image as ImageIcon, MessageSquare, WandSparkles } from 'lucide-react';
 import { LIVE_VOICE_OPTIONS } from '../../constants/liveVoices';
 import { Card, CardContent } from '../ui/Card';
 import { Select } from '../ui/Select';
@@ -61,7 +61,7 @@ export function RuntimeConfigPanel({
 
           <div className="p-5 flex items-start gap-4">
             <div className="mt-0.5 p-2 bg-purple-500/10 text-purple-500 rounded-lg shrink-0">
-              <Sparkles size={16} />
+              <WandSparkles size={16} />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">

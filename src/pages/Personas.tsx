@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Briefcase, Check, ChevronRight, Code2, Megaphone, Palette, Rocket, Sparkles, Zap } from 'lucide-react';
+import { Briefcase, Check, ChevronRight, Code2, Megaphone, Palette, Rocket, WandSparkles, Zap } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { usePersonas } from '../hooks/usePersonas';
 
@@ -98,7 +98,7 @@ export function Personas() {
                         {/* Example commands */}
                         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
                             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                                <Sparkles size={14} className="text-muted-foreground" />
+                                <WandSparkles size={14} className="text-muted-foreground" />
                                 Example Commands
                             </div>
                             <div className="space-y-3">

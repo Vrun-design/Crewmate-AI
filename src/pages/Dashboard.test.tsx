@@ -8,40 +8,49 @@ const refreshMock = vi.fn();
 const startSessionMock = vi.fn();
 const endSessionMock = vi.fn();
 const sendMessageMock = vi.fn();
+const useDashboardMock = vi.fn();
+const baseDashboardData = {
+  tasks: [
+    {id: 'TSK-1', title: 'Fix checkout bug', status: 'completed', time: 'Today', tool: 'GitHub', priority: 'High'},
+  ],
+  activities: [
+    {
+      id: 'ACT-1',
+      title: 'GitHub issue created',
+      description: 'Opened issue #11',
+      time: 'Today',
+      type: 'action',
+    },
+  ],
+  integrations: [
+    {
+      id: 'github',
+      name: 'GitHub',
+      status: 'connected',
+      icon: () => <span>GH</span>,
+      color: 'text-foreground',
+      bgColor: 'bg-foreground/10',
+      desc: 'GitHub',
+    },
+  ],
+  memoryNodes: [],
+  currentSession: null,
+};
 
-vi.mock('../hooks/useDashboard', () => ({
-  useDashboard: () => ({
+function mockDashboard(overrides: Partial<typeof baseDashboardData> = {}) {
+  useDashboardMock.mockReturnValue({
     data: {
-      tasks: [
-        {id: 'TSK-1', title: 'Fix checkout bug', status: 'completed', time: 'Today', tool: 'GitHub', priority: 'High'},
-      ],
-      activities: [
-        {
-          id: 'ACT-1',
-          title: 'GitHub issue created',
-          description: 'Opened issue #11',
-          time: 'Today',
-          type: 'action',
-        },
-      ],
-      integrations: [
-        {
-          id: 'github',
-          name: 'GitHub',
-          status: 'connected',
-          icon: () => <span>GH</span>,
-          color: 'text-foreground',
-          bgColor: 'bg-foreground/10',
-          desc: 'GitHub',
-        },
-      ],
-      memoryNodes: [],
-      currentSession: null,
+      ...baseDashboardData,
+      ...overrides,
     },
     isLoading: false,
     error: null,
     refresh: refreshMock,
-  }),
+  });
+}
+
+vi.mock('../hooks/useDashboard', () => ({
+  useDashboard: () => useDashboardMock(),
 }));
 
 vi.mock('../hooks/useLiveSession', () => ({
@@ -70,6 +79,7 @@ describe('Dashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.setItem('crewmate_user_email', 'varun@example.com');
+    mockDashboard();
   });
 
   test('renders dashboard data from hooks', () => {
@@ -97,5 +107,24 @@ describe('Dashboard', () => {
     await waitFor(() => {
       expect(startSessionMock).toHaveBeenCalledTimes(1);
     });
+  });
+
+  test('renders empty states when tasks and activity are missing', () => {
+    mockDashboard({
+      tasks: [],
+      activities: [],
+      integrations: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('No tasks queued')).toBeInTheDocument();
+    expect(screen.getByText('No activity yet')).toBeInTheDocument();
+    expect(screen.getByRole('link', {name: 'Go to Tasks'})).toBeInTheDocument();
+    expect(screen.getByRole('link', {name: 'Open Sessions'})).toBeInTheDocument();
   });
 });

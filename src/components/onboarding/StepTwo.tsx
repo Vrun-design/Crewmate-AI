@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, Settings2, Sparkles } from 'lucide-react';
+import { Mic, Settings2, WandSparkles } from 'lucide-react';
 import { StepShell } from './StepShell';
 
 type StepTwoProps = {
@@ -30,7 +30,7 @@ export function StepTwo({ onManual, onVoice }: StepTwoProps): React.JSX.Element 
               <div className="flex items-center gap-2 mb-3">
                 <h3 className="text-xl font-medium tracking-tight">Guided Live Setup</h3>
                 <span className="px-2 py-0.5 rounded-full bg-foreground/10 text-foreground text-[10px] font-semibold tracking-widest uppercase border border-foreground/20 flex items-center gap-1">
-                  <Sparkles size={10} />
+                  <WandSparkles size={10} />
                   Real-time
                 </span>
               </div>

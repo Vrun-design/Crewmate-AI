@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Brain, Search, RefreshCw, Zap, BookOpen, Star, Sparkles, Plus, Link as LinkIcon, FileText, Loader2, Upload
+  Brain, Search, RefreshCw, Zap, BookOpen, Star, WandSparkles, Plus, Link as LinkIcon, FileText, Loader2, Upload
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Select } from '../components/ui/Select';
@@ -26,7 +26,7 @@ const SOURCE_OPTIONS = [
 const MEMORY_STATS = [
   { label: 'Total Memories', icon: Brain, color: 'text-primary' },
   { label: 'Active', icon: Zap, color: 'text-emerald-500' },
-  { label: 'Context', icon: Sparkles, color: 'text-violet-500' },
+  { label: 'Context', icon: WandSparkles, color: 'text-violet-500' },
 ] as const;
 
 function useMemoryNodes(searchQuery: string, personaFilter: string, sourceFilter: string) {
@@ -94,7 +94,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   preference: <Star size={12} className="text-amber-400" />,
   skill: <Zap size={12} className="text-green-400" />,
   document: <BookOpen size={12} className="text-purple-400" />,
-  persona: <Sparkles size={12} className="text-pink-400" />,
+  persona: <WandSparkles size={12} className="text-pink-400" />,
 };
 
 function formatDate(dateStr?: string): string {

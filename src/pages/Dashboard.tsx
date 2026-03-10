@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Square } from 'lucide-react';
 import { ActiveSessionCard } from '../components/dashboard/ActiveSessionCard';
-
 import { IntegrationsCard } from '../components/dashboard/IntegrationsCard';
 import { RecentActivityCard } from '../components/dashboard/RecentActivityCard';
 import { RecentTasksCard } from '../components/dashboard/RecentTasksCard';
@@ -55,7 +54,6 @@ export function Dashboard() {
   const tasks = data?.tasks ?? [];
   const activities = data?.activities ?? [];
   const integrations = data?.integrations ?? [];
-  const disconnectedIntegrations = integrations.filter((integration) => integration.status !== 'connected').length;
   const pendingGuidedSetup = onboardingService.getPendingGuidedSetup();
   const activeGuidedSetupSession = onboardingService.getActiveGuidedSetupSession();
 
@@ -161,8 +159,6 @@ export function Dashboard() {
           {isLoading ? 'Loading local Crewmate workspace...' : liveSessionError ?? `Local API status: ${error}`}
         </div>
       )}
-
-
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

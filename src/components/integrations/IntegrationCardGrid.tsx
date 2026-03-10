@@ -3,6 +3,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
 import type { Integration } from '../../types';
+import { IntegrationLogo } from './IntegrationLogo';
 
 interface IntegrationCardGridProps {
   integrations: Integration[];
@@ -18,19 +19,12 @@ export function IntegrationCardGrid({
       {integrations.map((integration) => (
         <Card key={integration.id} className="p-5 flex flex-col h-full hover:border-border transition-colors">
           <div className="flex items-start justify-between mb-4">
-            <div
-              className={`w-10 h-10 rounded-xl border flex items-center justify-center ${integration.logoUrl ? 'bg-card border-border' : `${integration.bgColor} ${integration.color}`}`}
-            >
-              {integration.logoUrl ? (
-                <img
-                  src={integration.logoUrl}
-                  alt={integration.name}
-                  className={`w-7 h-7 object-contain ${integration.name.toLowerCase() === 'github' ? 'dark:invert' : ''}`}
-                />
-              ) : (
-                <integration.icon size={20} />
-              )}
-            </div>
+            <IntegrationLogo
+              integration={integration}
+              containerClassName="h-10 w-10 rounded-xl"
+              iconSize={20}
+              imagePaddingClassName="p-1.5"
+            />
             <Badge variant={integration.status === 'connected' ? 'success' : 'default'}>
               {integration.status === 'connected' ? 'Connected' : 'Disconnected'}
             </Badge>

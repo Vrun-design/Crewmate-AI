@@ -13,7 +13,8 @@ export function createApp(): express.Express {
       origin: serverConfig.corsOrigin,
     }),
   );
-  app.use(express.json());
+  app.use(express.json({ limit: serverConfig.requestBodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: serverConfig.requestBodyLimit }));
 
   registerRoutes(app);
   registerMcpRoutes(app);

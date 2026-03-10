@@ -56,6 +56,12 @@ vi.mock('../hooks/useIntegrationConfig', () => ({
 }));
 
 describe('Integrations', () => {
+  test('adds bottom padding to the page shell', () => {
+    const {container} = render(<Integrations />);
+
+    expect(container.firstChild).toHaveClass('pb-10');
+  });
+
   test('opens integration drawer for configuration', () => {
     render(<Integrations />);
 

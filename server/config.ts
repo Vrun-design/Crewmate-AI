@@ -11,6 +11,7 @@ export const serverConfig = {
   appEnv: process.env.NODE_ENV ?? 'development',
   port: Number.parseInt(process.env.PORT ?? '8787', 10),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+  requestBodyLimit: process.env.REQUEST_BODY_LIMIT ?? '25mb',
   databasePath: process.env.CREWMATE_DB_PATH ?? 'data/crewmate.db',
   encryptionKey: process.env.CREWMATE_ENCRYPTION_KEY ?? '',
   geminiApiKey: process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY ?? '',

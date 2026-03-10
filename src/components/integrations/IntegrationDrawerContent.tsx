@@ -3,6 +3,7 @@ import { ArrowUpRight, Check, ExternalLink, Settings, Shield, Trash2 } from 'luc
 import { useIntegrationConfig } from '../../hooks/useIntegrationConfig';
 import { Button } from '../ui/Button';
 import type { Integration } from '../../types';
+import { IntegrationLogo } from './IntegrationLogo';
 
 interface IntegrationDrawerContentProps {
   integration: Integration;
@@ -46,22 +47,16 @@ export function IntegrationDrawerContent({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-4">
       {/* Header */}
-      <div className="flex items-center gap-4 p-4 bg-secondary rounded-xl border border-border">
-        <div
-          className={`w-12 h-12 rounded-xl border flex items-center justify-center ${integration.logoUrl ? 'bg-card border-border shadow-sm' : `${integration.bgColor} ${integration.color}`}`}
-        >
-          {integration.logoUrl ? (
-            <img
-              src={integration.logoUrl}
-              alt={integration.name}
-              className={`w-8 h-8 object-contain ${integration.name.toLowerCase() === 'github' ? 'dark:invert' : ''}`}
-            />
-          ) : (
-            <integration.icon size={24} />
-          )}
-        </div>
+      <div className="flex items-center gap-4 rounded-xl border border-border bg-secondary p-4">
+        <IntegrationLogo
+          integration={integration}
+          containerClassName="h-14 w-14 rounded-2xl"
+          iconSize={24}
+          imagePaddingClassName="p-2"
+          showShadow
+        />
         <div>
           <h3 className="text-lg font-semibold text-foreground">{integration.name}</h3>
           <p className="text-sm text-muted-foreground">{integration.desc}</p>

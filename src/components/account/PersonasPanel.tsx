@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Briefcase, ChevronRight, Code, Megaphone, Palette, Rocket, Sparkles, Zap } from 'lucide-react';
+import { Briefcase, ChevronRight, Code, Megaphone, Palette, Rocket, WandSparkles, Zap } from 'lucide-react';
 import { usePersonas } from '../../hooks/usePersonas';
 
 const PERSONA_ICONS: Record<string, React.ReactNode> = {
@@ -98,7 +98,7 @@ export function PersonasPanel() {
                         {/* Example commands */}
                         <div className="bg-card border border-border rounded-xl p-5">
                             <div className="flex items-center gap-2 text-[13px] font-medium text-foreground mb-4">
-                                <Sparkles size={14} className="text-muted-foreground" />
+                                <WandSparkles size={14} className="text-muted-foreground" />
                                 Example Commands
                             </div>
                             <div className="space-y-3">

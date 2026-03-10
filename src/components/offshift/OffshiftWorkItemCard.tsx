@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, Clock3, FileText, Send, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight, Clock3, FileText, Send, ShieldCheck, WandSparkles } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Card, CardContent } from '../ui/Card';
 import { formatJobType, formatStartedFrom, getApprovalVariant, getStatusVariant } from './offshiftUtils';
@@ -58,7 +58,7 @@ export function OffshiftWorkItemCard({ item }: OffshiftWorkItemCardProps): React
         </div>
 
         <div className="grid gap-3 xl:grid-cols-4">
-          <MetaBlock icon={Sparkles} label="Started From" value={formatStartedFrom(item.startedFromLabel)} />
+          <MetaBlock icon={WandSparkles} label="Started From" value={formatStartedFrom(item.startedFromLabel)} />
           <MetaBlock
             icon={Send}
             label="Delivered To"

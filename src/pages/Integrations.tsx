@@ -6,7 +6,7 @@ import {PageHeader} from '../components/ui/PageHeader';
 import {useIntegrations} from '../hooks/useIntegrations';
 import type {Integration} from '../types';
 
-export function Integrations() {
+export function Integrations(): React.JSX.Element {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const {integrations, isLoading, error, refresh} = useIntegrations();
@@ -17,7 +17,7 @@ export function Integrations() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
       <PageHeader 
         title="Integrations" 
         description="Connect your tools to allow the agent to execute tasks."
