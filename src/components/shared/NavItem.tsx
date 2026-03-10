@@ -1,14 +1,15 @@
 import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 
 interface NavItemProps {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   active?: boolean;
   badge?: string;
   onClick?: () => void;
 }
 
-export function NavItem({ icon: Icon, label, active, badge, onClick }: NavItemProps) {
+export function NavItem({ icon: Icon, label, active, badge, onClick }: NavItemProps): React.ReactNode {
   return (
     <button 
       onClick={onClick}

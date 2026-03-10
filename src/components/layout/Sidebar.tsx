@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, CheckSquare, Settings, MonitorUp, Activity, Wand2, Bot,
-  MoreHorizontal, Zap, X, BrainCircuit, Moon, Sun, LogOut, User, Sparkles
+import {
+  LayoutDashboard, CheckSquare, Settings, MonitorUp, Activity, Wand2, Bot, Network,
+  MoreHorizontal, Zap, X, BrainCircuit, Moon, Sun, LogOut, User, Bell, Cpu, UsersRound, FlaskConical
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import {authService, authStorage} from '../../services/authService';
-import type {AuthUser} from '../../types';
+import { authService, authStorage } from '../../services/authService';
+import type { AuthUser } from '../../types';
 
 interface SidebarProps {
   isMobileMenuOpen: boolean;
@@ -14,6 +14,15 @@ interface SidebarProps {
   isDarkMode: boolean;
   setIsDarkMode: (isDark: boolean) => void;
   user: AuthUser | null;
+}
+
+interface NavItemProps {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  to: string;
+  badge?: string;
+  currentPath: string;
+  onClick: () => void;
 }
 
 function getInitials(name: string): string {
@@ -39,7 +48,7 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  
+
   return (
     <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-border bg-card flex flex-col justify-between transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       <div>
@@ -55,18 +64,26 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="p-4">
-          <div className="text-xs font-mono text-muted-foreground mb-3 px-2 uppercase tracking-wider">Overview</div>
+          <div className="text-xs font-mono text-muted-foreground mb-3 px-2 uppercase tracking-wider">Operate</div>
           <nav className="space-y-1">
             <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/skills" icon={Sparkles} label="Operator Stack" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/studio" icon={Wand2} label="Creative Studio" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/memory" icon={BrainCircuit} label="Memory Base" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
-            <NavItem to="/sessions" icon={MonitorUp} label="Sessions" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
             <NavItem to="/delegations" icon={Bot} label="Delegations" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+            <NavItem to="/agents" icon={Network} label="Agent Network" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+            <NavItem to="/studio" icon={Wand2} label="Creative Studio" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+            <NavItem to="/notifications" icon={Bell} label="Notifications" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+          </nav>
+
+          <div className="text-xs font-mono text-muted-foreground mb-3 mt-8 px-2 uppercase tracking-wider">Workspace</div>
+          <nav className="space-y-1">
+            <NavItem to="/memory" icon={BrainCircuit} label="Memory Base" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+            <NavItem to="/personas" icon={UsersRound} label="Persona" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+            <NavItem to="/sessions" icon={MonitorUp} label="Sessions" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
             <NavItem to="/tasks" icon={CheckSquare} label="Tasks" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
             <NavItem to="/activity" icon={Activity} label="Activity" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+            <NavItem to="/skills" icon={Cpu} label="Skills Hub" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
+            <NavItem to="/skills/build" icon={FlaskConical} label="Skill Builder" currentPath={location.pathname} onClick={() => setIsMobileMenuOpen(false)} />
           </nav>
 
           <div className="text-xs font-mono text-muted-foreground mb-3 mt-8 px-2 uppercase tracking-wider">Settings</div>
@@ -76,11 +93,11 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
           </nav>
         </div>
       </div>
-      
+
       <div className="p-4 border-t border-border relative" ref={profileMenuRef}>
         <AnimatePresence>
           {isProfileMenuOpen && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -100,7 +117,7 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
                   <Settings size={16} className="text-muted-foreground" />
                   Account Settings
                 </Link>
-                <button 
+                <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
                   className="w-full flex items-center justify-between px-2.5 py-2 text-sm text-foreground hover:bg-accent rounded-lg transition-colors"
                 >
@@ -111,7 +128,7 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
                 </button>
               </div>
               <div className="p-1.5 border-t border-border">
-                <button 
+                <button
                   onClick={() => {
                     void authService.logout().finally(() => {
                       authStorage.clearSession();
@@ -128,7 +145,10 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
           )}
         </AnimatePresence>
 
-        <div 
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={isProfileMenuOpen}
           onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
           className="flex items-center gap-3 px-2 py-2 rounded-lg hover-bg cursor-pointer transition-colors"
         >
@@ -140,27 +160,26 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, set
             <div className="text-xs text-muted-foreground truncate">{user?.plan ?? 'MVP'}</div>
           </div>
           <MoreHorizontal size={16} className="text-muted-foreground" />
-        </div>
+        </button>
       </div>
     </aside>
   );
 }
 
-function NavItem({ icon: Icon, label, to, badge, currentPath, onClick }: any) {
+function NavItem({ icon: Icon, label, to, badge, currentPath, onClick }: NavItemProps) {
   const active = currentPath === to;
   return (
-    <Link 
+    <Link
       to={to}
       onClick={onClick}
-      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-        active 
-          ? 'bg-secondary text-foreground' 
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-      }`}
+      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${active
+        ? 'bg-secondary text-foreground'
+        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+        }`}
     >
       <div className="flex items-center gap-3">
         <Icon size={16} className={active ? 'text-foreground' : 'text-muted-foreground'} />
-        <span className="text-sm font-medium">{label}</span>
+        <span className={`text-sm font-medium`}>{label}</span>
       </div>
       {badge && (
         <span className="bg-background border border-border text-foreground text-xs px-1.5 py-0.5 rounded-md font-mono">

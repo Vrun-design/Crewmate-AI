@@ -82,7 +82,7 @@ describe('Dashboard', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', {name: /start hero session/i}));
+    fireEvent.click(screen.getByRole('button', {name: /start live session/i}));
 
     await waitFor(() => {
       expect(startSessionMock).toHaveBeenCalledTimes(1);

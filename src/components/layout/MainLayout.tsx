@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {useAuth} from '../../hooks/useAuth';
 import {authStorage} from '../../services/authService';
+import { applyTheme, getInitialTheme } from '../../services/themeService';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 
 export function MainLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => getInitialTheme() === 'dark');
   const location = useLocation();
   const navigate = useNavigate();
   const {user, isLoading} = useAuth();
@@ -19,11 +20,7 @@ export function MainLayout() {
   }, [isLoading, navigate]);
 
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    applyTheme(isDarkMode ? 'dark' : 'light');
   }, [isDarkMode]);
 
   useEffect(() => {

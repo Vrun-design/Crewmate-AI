@@ -67,15 +67,19 @@ describe('useScreenShareCapture', () => {
     vi.restoreAllMocks();
   });
 
-  test('captures and uploads a frame when enabled', async () => {
+  test('captures and uploads a frame when started explicitly', async () => {
     sendFrameMock.mockResolvedValue({ok: true});
 
-    renderHook(() =>
+    const {result} = renderHook(() =>
       useScreenShareCapture({
         sessionId: 'SES-200',
         enabled: true,
       }),
     );
+
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
 
     await waitFor(() => {
       expect(sendFrameMock).toHaveBeenCalledTimes(1);
@@ -114,6 +118,10 @@ describe('useScreenShareCapture', () => {
         initialProps: {enabled: true},
       },
     );
+
+    await act(async () => {
+      await result.current.startScreenShare();
+    });
 
     await waitFor(() => {
       expect(result.current.status).toBe('sharing');

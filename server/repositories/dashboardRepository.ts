@@ -1,5 +1,5 @@
-import {db} from '../db';
-import {listIntegrationCatalog} from '../services/integrationCatalog';
+import { db } from '../db';
+import { listIntegrationCatalog } from '../services/integrationCatalog';
 import type {
   ActivityRecord,
   DashboardPayload,
@@ -39,7 +39,7 @@ function getCurrentSession(): SessionRecord | null {
   };
 }
 
-export function getDashboardPayload(userId: string): DashboardPayload {
+export function getDashboardPayload(workspaceId: string, userId: string): DashboardPayload {
   const tasks = db.prepare(`
     SELECT id, title, status, time, tool_name as tool, priority
     FROM tasks
@@ -54,7 +54,7 @@ export function getDashboardPayload(userId: string): DashboardPayload {
     LIMIT 8
   `).all() as ActivityRecord[];
 
-  const integrations = listIntegrationCatalog(userId);
+  const integrations = listIntegrationCatalog(workspaceId, userId);
 
   const memoryNodes = db.prepare(`
     SELECT id, title, type, tokens, last_synced as lastSynced, active
@@ -62,7 +62,7 @@ export function getDashboardPayload(userId: string): DashboardPayload {
     ORDER BY id ASC
   `).all().map((row) => ({
     ...row,
-    active: Boolean((row as {active: number}).active),
+    active: Boolean((row as { active: number }).active),
   })) as MemoryNodeRecord[];
 
   return {

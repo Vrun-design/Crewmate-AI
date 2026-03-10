@@ -1,13 +1,13 @@
 import React from 'react';
-import {Card, CardContent, CardTitle} from '../ui/Card';
-import {Badge} from '../ui/Badge';
-import type {Integration} from '../../types';
+import { Card, CardContent, CardTitle } from '../ui/Card';
+import { Badge } from '../ui/Badge';
+import type { Integration } from '../../types';
 
 interface IntegrationsCardProps {
   integrations: Integration[];
 }
 
-export function IntegrationsCard({integrations}: IntegrationsCardProps): React.ReactNode {
+export function IntegrationsCard({ integrations }: IntegrationsCardProps): React.ReactNode {
   return (
     <Card>
       <CardContent className="p-5">
@@ -23,9 +23,17 @@ export function IntegrationsCard({integrations}: IntegrationsCardProps): React.R
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 rounded-lg border flex items-center justify-center ${integration.bgColor} ${integration.color}`}
+                  className={`w-8 h-8 rounded-lg border flex items-center justify-center ${integration.logoUrl ? 'bg-card border-border' : `${integration.bgColor} ${integration.color}`}`}
                 >
-                  <integration.icon size={16} />
+                  {integration.logoUrl ? (
+                    <img
+                      src={integration.logoUrl}
+                      alt={integration.name}
+                      className={`w-5 h-5 object-contain ${integration.name.toLowerCase() === 'github' ? 'dark:invert' : ''}`}
+                    />
+                  ) : (
+                    <integration.icon size={16} />
+                  )}
                 </div>
                 <span className="text-sm font-medium text-foreground">{integration.name}</span>
               </div>

@@ -1,8 +1,8 @@
 import React from 'react';
-import {Badge} from '../ui/Badge';
-import {MemoryNodeActionsMenu} from './MemoryNodeActionsMenu';
-import {getMemoryNodeIcon} from './memoryBaseUtils';
-import type {MemoryNode} from '../../types';
+import { Badge } from '../ui/Badge';
+import { MemoryNodeActionsMenu } from './MemoryNodeActionsMenu';
+import { getMemoryNodeIcon } from './memoryBaseUtils';
+import type { MemoryNode } from '../../types';
 
 interface MemoryNodeListItemProps {
   node: MemoryNode;
@@ -11,6 +11,7 @@ interface MemoryNodeListItemProps {
   onRename: () => void;
   onUpdate: () => void;
   onRemove: () => void;
+  onToggleActive: () => void;
 }
 
 export function MemoryNodeListItem({
@@ -20,14 +21,14 @@ export function MemoryNodeListItem({
   onRename,
   onUpdate,
   onRemove,
+  onToggleActive,
 }: MemoryNodeListItemProps): React.ReactNode {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl subtle-border hover-bg transition-colors">
       <div className="flex items-center gap-4">
         <div
-          className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-            node.active ? 'bg-blue-500/10 text-blue-500' : 'bg-secondary text-muted-foreground'
-          }`}
+          className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${node.active ? 'bg-blue-500/10 text-blue-500' : 'bg-secondary text-muted-foreground'
+            }`}
         >
           {getMemoryNodeIcon(node.type)}
         </div>
@@ -46,10 +47,12 @@ export function MemoryNodeListItem({
 
       <MemoryNodeActionsMenu
         isOpen={isMenuOpen}
+        isActive={Boolean(node.active)}
         onToggle={onToggleMenu}
         onRename={onRename}
         onUpdate={onUpdate}
         onRemove={onRemove}
+        onToggleActive={onToggleActive}
       />
     </div>
   );

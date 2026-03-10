@@ -1,9 +1,27 @@
-import {listIntegrationCatalog} from './integrationCatalog';
-import type {CapabilityRecord} from '../types';
+import { listIntegrationCatalog } from './integrationCatalog';
+import { listTools } from '../mcp/mcpServer';
+import { listDiscoveredAgents } from './agents/agentDiscovery';
+import type { CapabilityRecord } from '../types';
 
-export function listCapabilities(userId: string): CapabilityRecord[] {
-  const integrations = listIntegrationCatalog(userId);
+export function listCapabilities(workspaceId: string, userId: string): CapabilityRecord[] {
+  const integrations = listIntegrationCatalog(workspaceId, userId);
   const connectedIntegrationCount = integrations.filter((integration) => integration.status === 'connected').length;
+
+  const mcpCapabilities: CapabilityRecord[] = listTools().map((t) => ({
+    id: `mcp - ${t.name} `,
+    title: `MCP: ${t.name} `,
+    description: t.description,
+    status: 'live',
+    category: 'action'
+  }));
+
+  const a2aCapabilities: CapabilityRecord[] = listDiscoveredAgents().map((a) => ({
+    id: `a2a - ${a.id} `,
+    title: `A2A Agent: ${a.name} `,
+    description: a.description,
+    status: a.status === 'online' ? 'live' : 'setup_required',
+    category: 'orchestration'
+  }));
 
   return [
     {
@@ -21,12 +39,13 @@ export function listCapabilities(userId: string): CapabilityRecord[] {
       category: 'perception',
     },
     {
-      id: 'tool-routing',
-      title: 'Tool action routing',
-      description: `Routes explicit requests into ${connectedIntegrationCount} configured external tools plus the local memory brain.`,
-      status: connectedIntegrationCount > 0 ? 'live' : 'setup_required',
-      category: 'action',
+      id: 'live-mic',
+      title: 'Live microphone perception',
+      description: 'Transcribes and reasons over live microphone input in-session.',
+      status: 'live',
+      category: 'perception',
     },
+    ...mcpCapabilities,
     {
       id: 'memory-checkpoints',
       title: 'Memory checkpointing',
@@ -34,13 +53,7 @@ export function listCapabilities(userId: string): CapabilityRecord[] {
       status: 'live',
       category: 'memory',
     },
-    {
-      id: 'a2a-handoff',
-      title: 'Async delegation engine',
-      description: 'Routes off-shift research briefs through an orchestrator -> researcher -> editor pipeline.',
-      status: 'live',
-      category: 'orchestration',
-    },
+    ...a2aCapabilities,
     {
       id: 'creative-studio',
       title: 'Creative mixed output',

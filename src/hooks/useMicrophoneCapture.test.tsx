@@ -1,6 +1,10 @@
-import {act, renderHook} from '@testing-library/react';
-import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
-import {useMicrophoneCapture} from './useMicrophoneCapture';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { useMicrophoneCapture } from './useMicrophoneCapture';
+
+interface MockAudioWorkletMessageEvent {
+  data: Float32Array;
+}
 
 const {
   endAudioMock,
@@ -22,21 +26,23 @@ vi.mock('../services/liveSessionService', () => ({
 }));
 
 class MockScriptProcessorNode {
-  public onaudioprocess: ((event: {inputBuffer: {getChannelData: (_channel: number) => Float32Array}}) => void) | null = null;
+  public onaudioprocess: ((event: { inputBuffer: { getChannelData: (_channel: number) => Float32Array } }) => void) | null = null;
 
-  connect(): void {}
+  connect(): void { }
 
-  disconnect(): void {}
+  disconnect(): void { }
 }
 
 class MockMediaStreamSource {
-  connect(_processor: MockScriptProcessorNode): void {}
+  connect(_processor: MockScriptProcessorNode): void { }
 
-  disconnect(): void {}
+  disconnect(): void { }
 }
 
 class MockAudioContext {
   public sampleRate = 48000;
+  public audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
+  public destination = {};
 
   createMediaStreamSource(_stream: MediaStream): MockMediaStreamSource {
     return new MockMediaStreamSource();
@@ -56,18 +62,18 @@ class MockAudioContext {
     return processor;
   }
 
-  async close(): Promise<void> {}
+  async close(): Promise<void> { }
 }
 
 describe('useMicrophoneCapture', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    sendAudioMock.mockResolvedValue({ok: true});
-    endAudioMock.mockResolvedValue({ok: true});
+    sendAudioMock.mockResolvedValue({ ok: true });
+    endAudioMock.mockResolvedValue({ ok: true });
 
     getUserMediaMock.mockResolvedValue({
-      getTracks: () => [{stop: trackStopMock}],
+      getTracks: () => [{ stop: trackStopMock }],
     });
 
     Object.defineProperty(window.navigator, 'mediaDevices', {
@@ -78,6 +84,17 @@ describe('useMicrophoneCapture', () => {
     });
 
     vi.stubGlobal('AudioContext', MockAudioContext);
+    vi.stubGlobal('AudioWorkletNode', class {
+      port: { onmessage: ((event: MockAudioWorkletMessageEvent) => void) | null } = { onmessage: null };
+      constructor() {
+        queueMicrotask(() => {
+          this.port.onmessage?.({ data: new Float32Array([0.25, -0.25, 0.5, -0.5]) });
+        });
+      }
+      connect() { }
+      disconnect() { }
+    });
+    vi.stubGlobal('AudioWorklet', {});
   });
 
   afterEach(() => {
@@ -86,8 +103,8 @@ describe('useMicrophoneCapture', () => {
     vi.unstubAllGlobals();
   });
 
-  test('auto-starts when enabled and streams PCM chunks', async () => {
-    const {result} = renderHook(() =>
+  test('starts explicitly and streams PCM chunks', async () => {
+    const { result } = renderHook(() =>
       useMicrophoneCapture({
         sessionId: 'SES-301',
         enabled: true,
@@ -95,6 +112,7 @@ describe('useMicrophoneCapture', () => {
     );
 
     await act(async () => {
+      await result.current.startMicrophone();
       await vi.advanceTimersByTimeAsync(300);
     });
 
@@ -109,7 +127,7 @@ describe('useMicrophoneCapture', () => {
   });
 
   test('mutes microphone and closes upstream audio stream', async () => {
-    const {result} = renderHook(() =>
+    const { result } = renderHook(() =>
       useMicrophoneCapture({
         sessionId: 'SES-302',
         enabled: true,
@@ -117,6 +135,7 @@ describe('useMicrophoneCapture', () => {
     );
 
     await act(async () => {
+      await result.current.startMicrophone();
       await vi.advanceTimersByTimeAsync(300);
     });
 

@@ -92,7 +92,7 @@ export function Verify() {
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Check your email</h1>
-            <p className="text-sm text-muted-foreground">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span></p>
+            <p className="text-sm text-muted-foreground">Enter the 6-digit code for <span className="font-medium text-foreground">{email}</span></p>
           </div>
         </div>
 
@@ -118,7 +118,7 @@ export function Verify() {
             {error ? <div className="text-sm text-red-500">{error}</div> : null}
             {devCode ? (
               <div className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
-                Local dev code: <span className="font-mono text-foreground">{devCode}</span>
+                Local preview code: <span className="font-mono text-foreground">{devCode}</span>
               </div>
             ) : null}
             {resendMessage ? <div className="text-sm text-emerald-500">{resendMessage}</div> : null}

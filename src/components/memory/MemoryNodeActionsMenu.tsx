@@ -1,21 +1,25 @@
 import React from 'react';
-import {AnimatePresence, motion} from 'motion/react';
-import {Edit2, MoreVertical, RefreshCw, Trash2} from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Edit2, MoreVertical, RefreshCw, Trash2 } from 'lucide-react';
 
 interface MemoryNodeActionsMenuProps {
   isOpen: boolean;
+  isActive: boolean;
   onToggle: () => void;
   onRename: () => void;
   onUpdate: () => void;
   onRemove: () => void;
+  onToggleActive: () => void;
 }
 
 export function MemoryNodeActionsMenu({
   isOpen,
+  isActive,
   onToggle,
   onRename,
   onUpdate,
   onRemove,
+  onToggleActive,
 }: MemoryNodeActionsMenuProps): React.ReactNode {
   return (
     <div className="relative">
@@ -31,10 +35,10 @@ export function MemoryNodeActionsMenu({
           <>
             <div className="fixed inset-0 z-40" onClick={onToggle}></div>
             <motion.div
-              initial={{opacity: 0, y: 5, scale: 0.95}}
-              animate={{opacity: 1, y: 0, scale: 1}}
-              exit={{opacity: 0, y: 5, scale: 0.95}}
-              transition={{duration: 0.15}}
+              initial={{ opacity: 0, y: 5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 5, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
               className="absolute right-0 mt-2 w-48 bg-popover border border-border rounded-xl shadow-lg overflow-hidden z-50"
             >
               <div className="p-1.5">
@@ -51,6 +55,16 @@ export function MemoryNodeActionsMenu({
                 >
                   <RefreshCw size={14} className="text-muted-foreground" />
                   Update Context
+                </button>
+                <div className="h-px bg-border my-1.5 mx-1"></div>
+                <button
+                  onClick={() => {
+                    onToggle();
+                    onToggleActive();
+                  }}
+                  className="w-full flex items-center justify-between px-2.5 py-2 text-sm text-foreground hover:bg-accent rounded-lg transition-colors"
+                >
+                  <span>{isActive ? 'Deactivate' : 'Activate'}</span>
                 </button>
                 <div className="h-px bg-border my-1.5 mx-1"></div>
                 <button

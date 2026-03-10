@@ -1,8 +1,8 @@
-import React, {useEffect, useState} from 'react';
-import {ArrowUpRight, Check, Settings, Shield, Trash2} from 'lucide-react';
-import {useIntegrationConfig} from '../../hooks/useIntegrationConfig';
-import {Button} from '../ui/Button';
-import type {Integration} from '../../types';
+import React, { useEffect, useState } from 'react';
+import { ArrowUpRight, Check, ExternalLink, Settings, Shield, Trash2 } from 'lucide-react';
+import { useIntegrationConfig } from '../../hooks/useIntegrationConfig';
+import { Button } from '../ui/Button';
+import type { Integration } from '../../types';
 
 interface IntegrationDrawerContentProps {
   integration: Integration;
@@ -17,23 +17,21 @@ export function IntegrationDrawerContent({
 }: IntegrationDrawerContentProps): React.ReactNode {
   const setupSteps = integration.setupSteps ?? [];
   const capabilities = integration.capabilities ?? [];
-  const {config, isLoading, isSaving, error, saveConfig, clearConfig} = useIntegrationConfig(integration.id, true);
+  const { config, isLoading, isSaving, error, saveConfig, clearConfig } = useIntegrationConfig(integration.id, true);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!config) {
-      return;
-    }
-
+    if (!config) return;
     setFormValues(
       config.fields.reduce<Record<string, string>>((acc, field) => {
         acc[field.key] = field.value ?? '';
         return acc;
-      }, {}),
+      }, {})
     );
   }, [config]);
 
   const isConnected = integration.status === 'connected';
+  const isOAuth = Boolean(integration.connectUrl);
 
   async function handleSave(): Promise<void> {
     await saveConfig(formValues);
@@ -47,11 +45,20 @@ export function IntegrationDrawerContent({
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4 p-4 bg-secondary rounded-xl border border-border">
         <div
-          className={`w-12 h-12 rounded-xl border flex items-center justify-center ${integration.bgColor} ${integration.color}`}
+          className={`w-12 h-12 rounded-xl border flex items-center justify-center ${integration.logoUrl ? 'bg-card border-border shadow-sm' : `${integration.bgColor} ${integration.color}`}`}
         >
-          <integration.icon size={24} />
+          {integration.logoUrl ? (
+            <img
+              src={integration.logoUrl}
+              alt={integration.name}
+              className={`w-8 h-8 object-contain ${integration.name.toLowerCase() === 'github' ? 'dark:invert' : ''}`}
+            />
+          ) : (
+            <integration.icon size={24} />
+          )}
         </div>
         <div>
           <h3 className="text-lg font-semibold text-foreground">{integration.name}</h3>
@@ -71,6 +78,7 @@ export function IntegrationDrawerContent({
         </div>
       ) : null}
 
+      {/* ── CONNECTED STATE ──────────────────────────────────────────── */}
       {isConnected ? (
         <div className="space-y-6">
           <div className="p-4 border border-green-500/20 bg-green-500/5 rounded-lg">
@@ -80,7 +88,22 @@ export function IntegrationDrawerContent({
             </p>
           </div>
 
-          {config ? (
+          {/* OAuth connected — show reconnect button instead of key form */}
+          {isOAuth ? (
+            <div className="space-y-4">
+              <div className="p-4 border border-border rounded-lg bg-secondary/50 space-y-2">
+                <p className="text-xs text-muted-foreground">Authenticated via Google OAuth. Token is stored securely.</p>
+              </div>
+              <a
+                href={`${import.meta.env.VITE_API_URL ?? ''}${integration.connectUrl}`}
+                className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-accent hover:border-foreground/30"
+              >
+                <img src="/GoogleG.svg" alt="Google" className="w-5 h-5" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                Reconnect with Google
+                <ExternalLink size={14} className="text-muted-foreground ml-auto" />
+              </a>
+            </div>
+          ) : config ? (
             <div className="space-y-4">
               <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
                 <Settings size={16} className="text-muted-foreground" />
@@ -95,7 +118,7 @@ export function IntegrationDrawerContent({
                       placeholder={field.configured && field.secret ? 'Stored securely' : field.placeholder}
                       value={formValues[field.key] ?? ''}
                       onChange={(event) =>
-                        setFormValues((current) => ({...current, [field.key]: event.target.value}))
+                        setFormValues((current) => ({ ...current, [field.key]: event.target.value }))
                       }
                       className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring"
                     />
@@ -106,12 +129,12 @@ export function IntegrationDrawerContent({
             </div>
           ) : null}
 
+          {/* Capabilities */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
               <Settings size={16} className="text-muted-foreground" />
               Available Capabilities
             </h4>
-
             <div className="space-y-2">
               {capabilities.map((capability) => (
                 <div key={capability} className="flex items-center gap-2 p-3 border border-border rounded-lg bg-card text-sm text-foreground">
@@ -122,19 +145,22 @@ export function IntegrationDrawerContent({
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-              <Shield size={16} className="text-muted-foreground" />
-              Permissions
-            </h4>
-            <div className="p-4 border border-border rounded-lg bg-secondary/50 space-y-2">
-              {(integration.requiredKeys ?? []).map((requiredKey) => (
-                <div key={requiredKey} className="flex items-center gap-2 text-sm text-foreground">
-                  <Check size={14} className="text-green-500" /> {requiredKey}
-                </div>
-              ))}
+          {/* Permissions */}
+          {!isOAuth && (integration.requiredKeys ?? []).length > 0 ? (
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Shield size={16} className="text-muted-foreground" />
+                Permissions
+              </h4>
+              <div className="p-4 border border-border rounded-lg bg-secondary/50 space-y-2">
+                {(integration.requiredKeys ?? []).map((requiredKey) => (
+                  <div key={requiredKey} className="flex items-center gap-2 text-sm text-foreground">
+                    <Check size={14} className="text-green-500" /> {requiredKey}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {integration.notes ? (
             <div className="p-4 border border-border rounded-lg bg-secondary/50 text-sm text-muted-foreground">
@@ -143,9 +169,11 @@ export function IntegrationDrawerContent({
           ) : null}
 
           <div className="pt-4 border-t border-border space-y-3">
-            <Button variant="primary" className="w-full" onClick={() => void handleSave()} disabled={isSaving}>
-              {isSaving ? 'Saving...' : 'Save Configuration'}
-            </Button>
+            {!isOAuth ? (
+              <Button variant="primary" className="w-full" onClick={() => void handleSave()} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save Configuration'}
+              </Button>
+            ) : null}
             {integration.docsUrl ? (
               <a
                 href={integration.docsUrl}
@@ -157,7 +185,7 @@ export function IntegrationDrawerContent({
                 Open Official Docs
               </a>
             ) : null}
-            {config?.configuredVia === 'vault' ? (
+            {config?.configuredVia === 'vault' && !isOAuth ? (
               <Button variant="danger" className="w-full" onClick={() => void handleDisconnect()} disabled={isSaving}>
                 <Trash2 size={16} className="mr-2" />
                 Remove Saved Connection
@@ -168,26 +196,63 @@ export function IntegrationDrawerContent({
             </Button>
           </div>
         </div>
+
       ) : (
+        /* ── DISCONNECTED STATE ────────────────────────────────────── */
         <div className="space-y-6">
           <div className="p-4 border border-blue-500/20 bg-blue-500/5 rounded-lg">
             <h4 className="text-sm font-medium text-blue-500 dark:text-blue-400 mb-1">Connection Required</h4>
             <p className="text-xs text-muted-foreground">
-              You can connect {integration.name} directly from this workspace. Env vars still work, but they are no longer required.
+              Connect {integration.name} to let Crewmate take actions on your behalf.
             </p>
           </div>
 
-          <div className="space-y-3">
-            {setupSteps.map((step) => (
-              <div key={step} className="p-3 border border-border rounded-lg bg-card text-sm text-foreground">
-                {step}
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-4">
+          {/* Step-by-step setup instructions */}
+          {setupSteps.length > 0 ? (
             <div className="space-y-2">
-              <h4 className="text-sm font-medium text-foreground">Workspace Connection</h4>
+              {setupSteps.map((step, i) => (
+                <div key={step} className="flex items-start gap-3 p-3 border border-border rounded-lg bg-card text-sm text-foreground">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-secondary border border-border text-[10px] flex items-center justify-center font-semibold mt-0.5">
+                    {i + 1}
+                  </span>
+                  {step}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {/* OAuth path — big Google button */}
+          {isOAuth ? (
+            <div className="pt-4 border-t border-border space-y-3">
+              <a
+                href={`${import.meta.env.VITE_API_URL ?? ''}${integration.connectUrl}`}
+                className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-foreground/30 hover:shadow-sm"
+              >
+                <img
+                  src="/GoogleG.svg"
+                  alt="Google"
+                  className="w-5 h-5"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+                Connect with Google
+                <ExternalLink size={14} className="text-muted-foreground ml-auto" />
+              </a>
+              {integration.docsUrl ? (
+                <a
+                  href={integration.docsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <ArrowUpRight size={16} />
+                  Open Official Docs
+                </a>
+              ) : null}
+              <Button variant="secondary" className="w-full" onClick={onClose}>Close</Button>
+            </div>
+          ) : (
+            /* API key form path */
+            <div className="space-y-4">
               <div className="space-y-3">
                 {config?.fields.map((field) => (
                   <div key={field.key} className="space-y-2">
@@ -197,7 +262,7 @@ export function IntegrationDrawerContent({
                       placeholder={field.placeholder}
                       value={formValues[field.key] ?? ''}
                       onChange={(event) =>
-                        setFormValues((current) => ({...current, [field.key]: event.target.value}))
+                        setFormValues((current) => ({ ...current, [field.key]: event.target.value }))
                       }
                       className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring"
                     />
@@ -205,34 +270,32 @@ export function IntegrationDrawerContent({
                   </div>
                 ))}
               </div>
-            </div>
 
-            {(integration.missingKeys ?? []).length > 0 ? (
-              <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-lg text-sm text-muted-foreground">
-                Missing required values: {(integration.missingKeys ?? []).join(', ')}
+              {(integration.missingKeys ?? []).length > 0 ? (
+                <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-lg text-sm text-muted-foreground">
+                  Missing required values: {(integration.missingKeys ?? []).join(', ')}
+                </div>
+              ) : null}
+
+              <div className="pt-4 border-t border-border space-y-3">
+                <Button variant="primary" className="w-full" onClick={() => void handleSave()} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : `Save ${integration.name} Connection`}
+                </Button>
+                {integration.docsUrl ? (
+                  <a
+                    href={integration.docsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center gap-2 w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                  >
+                    <ArrowUpRight size={16} />
+                    Open Official Docs
+                  </a>
+                ) : null}
+                <Button variant="secondary" className="w-full" onClick={onClose}>Close</Button>
               </div>
-            ) : null}
-          </div>
-
-          <div className="pt-4 border-t border-border space-y-3">
-            <Button variant="primary" className="w-full" onClick={() => void handleSave()} disabled={isSaving}>
-              {isSaving ? 'Saving...' : `Save ${integration.name} Connection`}
-            </Button>
-            {integration.docsUrl ? (
-              <a
-                href={integration.docsUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full rounded-xl border border-border bg-secondary px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-              >
-                <ArrowUpRight size={16} />
-                Open Official Docs
-              </a>
-            ) : null}
-            <Button variant="secondary" className="w-full" onClick={onClose}>
-              Close
-            </Button>
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

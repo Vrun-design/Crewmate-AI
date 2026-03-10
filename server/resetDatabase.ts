@@ -1,4 +1,4 @@
-import {db} from './db';
+import { db } from './db';
 
 const tables = [
   'auth_sessions',
@@ -16,14 +16,18 @@ const tables = [
   'users',
 ] as const;
 
+db.exec('PRAGMA foreign_keys = OFF;');
 db.exec('BEGIN');
 
 try {
   for (const table of tables) {
     db.prepare(`DELETE FROM ${table}`).run();
   }
+  db.prepare('DELETE FROM workspace_members').run();
+  db.prepare('DELETE FROM workspaces').run();
 
   db.exec('COMMIT');
+  db.exec('PRAGMA foreign_keys = ON;');
   console.log('Crewmate local database reset complete.');
 } catch (error) {
   db.exec('ROLLBACK');

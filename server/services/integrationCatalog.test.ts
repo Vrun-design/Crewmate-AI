@@ -1,9 +1,9 @@
-import {describe, expect, test} from 'vitest';
-import {listIntegrationCatalog} from './integrationCatalog';
+import { describe, expect, test } from 'vitest';
+import { listIntegrationCatalog } from './integrationCatalog';
 
 describe('integrationCatalog', () => {
   test('includes the core hackathon integrations and required setup metadata', () => {
-    const catalog = listIntegrationCatalog('USR-test');
+    const catalog = listIntegrationCatalog('WS-test', 'USR-test');
     const ids = catalog.map((integration) => integration.id);
 
     expect(ids).toContain('github');

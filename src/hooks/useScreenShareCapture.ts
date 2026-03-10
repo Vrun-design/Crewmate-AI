@@ -1,7 +1,15 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {liveSessionService} from '../services/liveSessionService';
-import {arrayBufferToBase64} from '../utils/mediaEncoding';
-import type {ScreenShareStatus} from '../types/live';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { liveSessionService } from '../services/liveSessionService';
+import { arrayBufferToBase64 } from '../utils/mediaEncoding';
+import type { ScreenShareStatus } from '../types/live';
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      getDesktopSourceId: () => Promise<string | null>;
+    };
+  }
+}
 
 const CAPTURE_INTERVAL_MS = 4000;
 const VIDEO_READY_TIMEOUT_MS = 1500;
@@ -30,8 +38,6 @@ export function useScreenShareCapture({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const intervalRef = useRef<number | null>(null);
   const uploadInFlightRef = useRef(false);
-  const attemptedSessionIdRef = useRef<string | null>(null);
-
   const isSupported =
     typeof navigator !== 'undefined' &&
     !!navigator.mediaDevices &&
@@ -145,13 +151,32 @@ export function useScreenShareCapture({
     setError(null);
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          frameRate: 1,
-          width: {ideal: 1440},
-        },
-        audio: false,
-      });
+      let stream: MediaStream;
+
+      if (window.electronAPI) {
+        // Native Electron capture 
+        const sourceId = await window.electronAPI.getDesktopSourceId();
+        if (!sourceId) throw new Error('No desktop source found.');
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId,
+            }
+          } as unknown as MediaTrackConstraints // Type cast required for Chrome-specific electron constraints
+        });
+      } else {
+        // Fallback to standard web picker
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            frameRate: 1,
+            width: { ideal: 1440 },
+          },
+          audio: false,
+        });
+      }
 
       streamRef.current = stream;
 
@@ -185,18 +210,9 @@ export function useScreenShareCapture({
 
   useEffect(() => {
     if (!enabled || !sessionId) {
-      attemptedSessionIdRef.current = null;
       stopScreenShare();
-      return;
     }
-
-    if (attemptedSessionIdRef.current === sessionId || streamRef.current || !isSupported) {
-      return;
-    }
-
-    attemptedSessionIdRef.current = sessionId;
-    void startScreenShare();
-  }, [enabled, isSupported, sessionId, startScreenShare, stopScreenShare]);
+  }, [enabled, sessionId, stopScreenShare]);
 
   useEffect(() => () => stopScreenShare(), [stopScreenShare]);
 

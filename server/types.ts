@@ -32,6 +32,8 @@ export interface IntegrationRecord {
   requiredKeys?: string[];
   missingKeys?: string[];
   notes?: string;
+  /** OAuth integrations provide a connect URL instead of API key fields */
+  connectUrl?: string;
 }
 
 export interface IntegrationConfigFieldDefinition {
@@ -108,6 +110,7 @@ export interface AuthUserRecord {
   email: string;
   name: string;
   plan: string;
+  workspaceId: string;
 }
 
 export interface CapabilityRecord {

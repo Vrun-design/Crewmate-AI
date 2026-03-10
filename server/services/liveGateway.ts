@@ -1,4 +1,4 @@
-import {randomUUID} from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   FunctionDeclaration,
   GoogleGenAI,
@@ -8,7 +8,6 @@ import {
   type LiveServerMessage,
   type Session,
 } from '@google/genai';
-import {serverConfig} from '../config';
 import {
   getSession,
   getSessionUserId,
@@ -16,76 +15,27 @@ import {
   updateSessionStatus,
   updateTranscriptMessage,
 } from '../repositories/sessionRepository';
-import {insertActivity, insertTask} from './activityService';
-import {createClickUpTask} from './clickupService';
-import {createGithubIssue} from './githubService';
-import {getEffectiveIntegrationConfig} from './integrationConfigService';
-import {listIntegrationCatalog} from './integrationCatalog';
-import {ingestLiveTurnMemory} from './memoryService';
-import {createNotionPage} from './notionService';
-import {postSlackMessage} from './slackService';
-import type {AudioChunkRecord, SessionRecord} from '../types';
+import { db } from '../db';
+import { serverConfig } from '../config';
+import { getEffectiveIntegrationConfig } from './integrationConfigService';
+import { listIntegrationCatalog } from './integrationCatalog';
+import { ingestLiveTurnMemory, retrieveRelevantMemories } from './memoryService';
+import { getUserPreferences } from './preferencesService';
+import { callTool, getToolDeclarations } from '../mcp/mcpServer';
+import { broadcastEvent } from './eventService';
+import { selectModel } from './modelRouter';
+import { buildPersonaSystemPrompt } from './personaService';
+import { insertActivity, insertTask } from './activityService';
+// Ensure tools are registered by importing their modules
+import './clickupService';
+import './githubService';
+import './notionService';
+import './slackService';
+import type { AudioChunkRecord, SessionRecord } from '../types';
 
-type ToolCall = LiveServerMessage['toolCall'] extends {functionCalls?: infer T} ? T extends Array<infer U> ? U : never : never;
+type ToolCall = LiveServerMessage['toolCall'] extends { functionCalls?: infer T } ? T extends Array<infer U> ? U : never : never;
 
-const functionDeclarations: FunctionDeclaration[] = [
-  {
-    name: 'create_github_issue',
-    description: 'Create a GitHub issue when the user explicitly asks to file, log, or create an issue for an engineering problem.',
-    parametersJsonSchema: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        title: {type: 'string'},
-        body: {type: 'string'},
-        labels: {
-          type: 'array',
-          items: {type: 'string'},
-        },
-      },
-      required: ['title', 'body'],
-    },
-  },
-  {
-    name: 'post_slack_message',
-    description: 'Post a concise update to Slack when the user explicitly asks to notify, post, or send a summary to the team.',
-    parametersJsonSchema: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        text: {type: 'string'},
-        channelId: {type: 'string'},
-      },
-      required: ['text'],
-    },
-  },
-  {
-    name: 'create_notion_page',
-    description: 'Create a Notion page when the user explicitly asks to draft, write, or save a summary, PRD, or research artifact.',
-    parametersJsonSchema: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        title: {type: 'string'},
-        content: {type: 'string'},
-      },
-      required: ['title', 'content'],
-    },
-  },
-  {
-    name: 'create_clickup_task',
-    description: 'Create a ClickUp task when the user explicitly asks to log, create, or track follow-up work or a bug.',
-    parametersJsonSchema: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        name: {type: 'string'},
-        description: {type: 'string'},
-      },
-      required: ['name', 'description'],
-    },
-  },
-];
+// Tools are now dynamically loaded from the MCP registry via getToolDeclarations()
 
 interface PendingTurn {
   resolve: (session: SessionRecord) => void;
@@ -107,6 +57,10 @@ interface RuntimeSession {
   hasAudioContext: boolean;
   audioChunks: AudioChunkRecord[];
   nextAudioChunkId: number;
+  lastFrameData: { mimeType: string; data: string } | null;
+  lastUserActivityTime: number;
+  lastProactiveTime: number | null;
+  proactiveInterval: NodeJS.Timeout | null;
 }
 
 const runtimeSessions = new Map<string, RuntimeSession>();
@@ -116,7 +70,7 @@ function createAiClient(): GoogleGenAI {
     throw new Error('Missing GOOGLE_API_KEY or GEMINI_API_KEY for Gemini Live.');
   }
 
-  return new GoogleGenAI({apiKey: serverConfig.geminiApiKey});
+  return new GoogleGenAI({ apiKey: serverConfig.geminiApiKey });
 }
 
 function clearPendingTurn(runtime: RuntimeSession): void {
@@ -196,6 +150,11 @@ function appendAssistantTranscript(runtime: RuntimeSession, nextText: string): v
 
   runtime.currentAssistantText = normalizedText;
   updateTranscriptMessage(runtime.currentAssistantMessageId, runtime.currentAssistantText, 'streaming');
+
+  const userId = getSessionUserId(runtime.id);
+  if (userId) {
+    broadcastEvent(userId, 'session_update', { sessionId: runtime.id });
+  }
 }
 
 function collectAudioChunks(runtime: RuntimeSession, message: LiveServerMessage): void {
@@ -216,88 +175,7 @@ function collectAudioChunks(runtime: RuntimeSession, message: LiveServerMessage)
   }
 }
 
-async function executeToolCall(userId: string, call: ToolCall): Promise<unknown> {
-  if (call.name === 'create_github_issue') {
-    return createGithubIssue(userId, {
-      title: getStringArgument(call, 'title'),
-      body: getStringArgument(call, 'body'),
-      labels: getStringArrayArgument(call, 'labels'),
-    });
-  }
-
-  if (call.name === 'post_slack_message') {
-    return postSlackMessage(userId, {
-      text: getStringArgument(call, 'text'),
-      channelId: getStringArgument(call, 'channelId') || undefined,
-    });
-  }
-
-  if (call.name === 'create_notion_page') {
-    return createNotionPage(userId, {
-      title: getStringArgument(call, 'title'),
-      content: getStringArgument(call, 'content'),
-    });
-  }
-
-  if (call.name === 'create_clickup_task') {
-    return createClickUpTask(userId, {
-      name: getStringArgument(call, 'name'),
-      description: getStringArgument(call, 'description'),
-    });
-  }
-
-  throw new Error(`Unsupported tool call: ${call.name ?? 'unknown'}`);
-}
-
-function recordToolSuccess(userId: string, call: ToolCall, output: unknown): void {
-  if (call.name === 'create_github_issue') {
-    const issue = output as {issueNumber: number; title: string};
-    const config = getEffectiveIntegrationConfig(userId, 'github');
-    insertTask(`Created GitHub issue #${issue.issueNumber}: ${issue.title}`, 'GitHub');
-    insertActivity('GitHub issue created', `Opened issue #${issue.issueNumber} in ${config.repoOwner}/${config.repoName}.`, 'action');
-    return;
-  }
-
-  if (call.name === 'post_slack_message') {
-    insertTask('Posted live update to Slack', 'Slack');
-    insertActivity('Slack update posted', 'Delivered a live status update to the configured Slack channel.', 'communication');
-    return;
-  }
-
-  if (call.name === 'create_notion_page') {
-    const page = output as {title: string};
-    insertTask(`Created Notion page: ${page.title}`, 'Notion');
-    insertActivity('Notion page created', `Saved a live session artifact to Notion: ${page.title}.`, 'action');
-    return;
-  }
-
-  if (call.name === 'create_clickup_task') {
-    const task = output as {name: string};
-    insertTask(`Created ClickUp task: ${task.name}`, 'ClickUp');
-    insertActivity('ClickUp task created', `Logged a new ClickUp task from the live session: ${task.name}.`, 'action');
-  }
-}
-
-function recordToolFailure(call: ToolCall, messageText: string): void {
-  if (call.name === 'create_github_issue') {
-    insertActivity('GitHub issue failed', messageText, 'note');
-    return;
-  }
-
-  if (call.name === 'post_slack_message') {
-    insertActivity('Slack update failed', messageText, 'note');
-    return;
-  }
-
-  if (call.name === 'create_notion_page') {
-    insertActivity('Notion page failed', messageText, 'note');
-    return;
-  }
-
-  if (call.name === 'create_clickup_task') {
-    insertActivity('ClickUp task failed', messageText, 'note');
-  }
-}
+// Handled by generic activity logging below
 
 async function handleToolCall(runtime: RuntimeSession, message: LiveServerMessage): Promise<void> {
   const calls = message.toolCall?.functionCalls ?? [];
@@ -310,29 +188,51 @@ async function handleToolCall(runtime: RuntimeSession, message: LiveServerMessag
     throw new Error('Live session is missing its owner context.');
   }
 
+  const frameData = runtime.lastFrameData;
   const functionResponses: FunctionResponse[] = [];
+
+  const memberRow = db.prepare(`SELECT workspace_id as workspaceId FROM workspace_members WHERE user_id = ? LIMIT 1`).get(userId) as { workspaceId: string } | undefined;
+  const workspaceId = memberRow?.workspaceId ?? '';
 
   for (const call of calls) {
     try {
-      const output = await executeToolCall(userId, call);
-      recordToolSuccess(userId, call, output);
+      if (!call.name) {
+        throw new Error('Tool call missing name');
+      }
+      const args = call.args as Record<string, unknown>;
+
+      // Try skill registry first (Phase 2 typed skills), fall back to mcpServer (legacy)
+      let output: unknown;
+      const skillId = call.name?.replace(/_/g, '.') ?? '';
+      const { getSkill, runSkill } = await import('../skills/registry');
+      const skill = getSkill(skillId);
+
+      if (skill) {
+        const runRecord = await runSkill(skillId, { userId, workspaceId }, args);
+        output = runRecord.result;
+      } else {
+        output = await callTool(call.name, { userId, workspaceId, frameData }, args);
+      }
+
+      insertActivity(`Executed ${call.name}`, 'Tool call executed successfully.', 'action', userId);
+
       functionResponses.push({
         id: call.id,
         name: call.name,
-        response: {output},
+        response: { output },
       });
     } catch (error) {
       const messageText = getToolErrorMessage(error);
-      recordToolFailure(call, messageText);
+      insertActivity(`${call.name ?? 'Tool'} failed`, messageText, 'note', userId);
       functionResponses.push({
         id: call.id,
         name: call.name,
-        response: {error: messageText},
+        response: { error: messageText },
       });
     }
   }
 
-  runtime.session.sendToolResponse({functionResponses});
+  runtime.session.sendToolResponse({ functionResponses });
 }
 
 function handleInputTranscription(runtime: RuntimeSession, message: LiveServerMessage): void {
@@ -361,6 +261,12 @@ function handleInputTranscription(runtime: RuntimeSession, message: LiveServerMe
     runtime.lastUserTurnText = runtime.currentUserTranscriptionText;
     runtime.currentUserTranscriptionMessageId = null;
     runtime.currentUserTranscriptionText = '';
+    runtime.lastUserActivityTime = Date.now();
+
+    const userId = getSessionUserId(runtime.id);
+    if (userId) {
+      broadcastEvent(userId, 'session_update', { sessionId: runtime.id });
+    }
   }
 }
 
@@ -424,18 +330,37 @@ function sendInitialGreeting(runtime: RuntimeSession): Promise<SessionRecord> {
   return sessionPromise;
 }
 
-function buildUserSystemInstruction(userId: string): string {
-  const integrations = listIntegrationCatalog(userId);
+async function buildUserSystemInstruction(userId: string): Promise<string> {
+  const memberRow = db.prepare(`SELECT workspace_id as workspaceId FROM workspace_members WHERE user_id = ? LIMIT 1`).get(userId) as { workspaceId: string } | undefined;
+  const workspaceId = memberRow?.workspaceId ?? '';
+
+  // Persona-specific system prompt (the biggest differentiator)
+  const personaPrompt = buildPersonaSystemPrompt(userId);
+
+  const integrations = listIntegrationCatalog(workspaceId, userId);
   const connected = integrations
     .filter((integration) => integration.status === 'connected')
     .map((integration) => `${integration.name}: ${integration.capabilities?.join(', ') ?? integration.desc}`)
     .join('\n');
 
-  return `
-You are Crewmate, a live AI product operator helping a founder or PM.
+  let memoryContext = 'No relevant past memory found.';
+  try {
+    const memories = await retrieveRelevantMemories('Current workspace context and open tickets', 5);
+    if (memories.length > 0) {
+      memoryContext = memories.map((m) => `- ${m}`).join('\n');
+    }
+  } catch {
+    // Graceful fallback if embeddings fail
+  }
+
+  return `${personaPrompt}
+
 Be concise, concrete, and grounded in the visible screen, the live transcript, and the user's explicit intent.
-Only call tools for explicit action requests.
-If a tool is not available, say so plainly and continue helping.
+Only call tools for explicit action requests. If a tool is not available, say so plainly and continue helping.
+
+Relevant past context (Memory):
+${memoryContext}
+
 Connected integrations:
 ${connected || 'No external integrations are currently configured beyond the local memory brain.'}
 `;
@@ -447,16 +372,18 @@ export async function startGeminiLiveSession(sessionId: string): Promise<Session
   if (!userId) {
     throw new Error('Cannot start a live session without an authenticated user.');
   }
+
+  const systemInstruction = await buildUserSystemInstruction(userId);
   updateSessionStatus(sessionId, 'connecting', null);
 
   const runtime = await new Promise<RuntimeSession>(async (resolve, reject) => {
     try {
       const session = await ai.live.connect({
-        model: serverConfig.geminiLiveModel,
+        model: selectModel('live'),
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: buildUserSystemInstruction(userId),
-          tools: [{functionDeclarations}],
+          systemInstruction,
+          tools: [{ functionDeclarations: getToolDeclarations() }],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
           speechConfig: {
@@ -506,7 +433,32 @@ export async function startGeminiLiveSession(sessionId: string): Promise<Session
         hasAudioContext: false,
         audioChunks: [],
         nextAudioChunkId: 1,
+        lastFrameData: null,
+        lastUserActivityTime: Date.now(),
+        lastProactiveTime: null,
+        proactiveInterval: null,
       };
+
+      created.proactiveInterval = setInterval(() => {
+        if (!created.hasVideoContext) return;
+
+        const now = Date.now();
+        // Check for 5 minutes of inactivity
+        if (now - created.lastUserActivityTime > 5 * 60 * 1000) {
+          // Avoid firing again if it already fired recently
+          if (created.lastProactiveTime && (now - created.lastProactiveTime) < 5 * 60 * 1000) return;
+
+          const prefs = getUserPreferences(userId);
+          if (!prefs.proactiveSuggestions) return;
+
+          created.lastProactiveTime = now;
+          created.session.sendClientContent({
+            turns: createUserContent('Silently analyze the current screen and proactively flag any issues, blockers, or things I should know about.'),
+            turnComplete: true,
+          });
+          insertActivity('Proactive analysis', 'Triggered a background screen analysis due to user inactivity.', 'observation', userId);
+        }
+      }, 30000); // Check every 30s
 
       runtimeSessions.set(sessionId, created);
       resolve(created);
@@ -532,6 +484,7 @@ export async function sendLiveMessage(sessionId: string, text: string): Promise<
   }
 
   runtime.lastUserTurnText = text;
+  runtime.lastUserActivityTime = Date.now();
   insertTranscriptMessage({
     id: randomUUID(),
     sessionId,
@@ -539,6 +492,11 @@ export async function sendLiveMessage(sessionId: string, text: string): Promise<
     text,
     status: 'complete',
   });
+
+  const userId = getSessionUserId(runtime.id);
+  if (userId) {
+    broadcastEvent(userId, 'session_update', { sessionId: runtime.id });
+  }
 
   const responsePromise = createPendingTurn(runtime, 45000, 'Gemini Live response timed out.');
   runtime.session.sendClientContent({
@@ -549,11 +507,13 @@ export async function sendLiveMessage(sessionId: string, text: string): Promise<
   return responsePromise;
 }
 
-export function sendLiveVideoFrame(sessionId: string, input: {mimeType: string; data: string}): void {
+export function sendLiveVideoFrame(sessionId: string, input: { mimeType: string; data: string }): void {
   const runtime = runtimeSessions.get(sessionId);
   if (!runtime) {
     throw new Error('Live runtime not found. Start a Gemini session first.');
   }
+
+  runtime.lastFrameData = { mimeType: input.mimeType, data: input.data };
 
   runtime.session.sendRealtimeInput({
     video: {
@@ -568,7 +528,7 @@ export function sendLiveVideoFrame(sessionId: string, input: {mimeType: string; 
   }
 }
 
-export function sendLiveAudioChunk(sessionId: string, input: {mimeType: string; data: string}): void {
+export function sendLiveAudioChunk(sessionId: string, input: { mimeType: string; data: string }): void {
   const runtime = runtimeSessions.get(sessionId);
   if (!runtime) {
     throw new Error('Live runtime not found. Start a Gemini session first.');
@@ -623,9 +583,17 @@ export function getLiveSessionState(sessionId: string): SessionRecord | null {
 
 export function endGeminiLiveSession(sessionId: string): SessionRecord | null {
   const runtime = runtimeSessions.get(sessionId);
+  if (runtime?.proactiveInterval) {
+    clearInterval(runtime.proactiveInterval);
+  }
   runtime?.session.close();
   runtimeSessions.delete(sessionId);
   updateSessionStatus(sessionId, 'ended', new Date().toISOString());
+
+  const userId = getSessionUserId(sessionId);
+  if (userId) {
+    broadcastEvent(userId, 'session_update', { sessionId });
+  }
 
   const session = getSession(sessionId);
   if (!session) {

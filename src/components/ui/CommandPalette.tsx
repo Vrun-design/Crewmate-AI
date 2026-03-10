@@ -40,7 +40,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
     { path: '/delegations', label: 'Delegations', desc: 'Queue off-shift work', icon: Bot, color: 'text-lime-500', bg: 'bg-lime-500/10' },
     { path: '/studio', label: 'Creative Studio', desc: 'Generate mixed-media artifacts', icon: Wand2, color: 'text-orange-500', bg: 'bg-orange-500/10' },
     { path: '/memory', label: 'Memory Base', desc: 'Manage agent context', icon: BrainCircuit, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-    { path: '/skills', label: 'Operator Stack', desc: 'Inspect live agent capabilities', icon: Cpu, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+    { path: '/skills', label: 'Capabilities', desc: 'Inspect live agent capabilities', icon: Cpu, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
     { path: '/integrations', label: 'Integrations', desc: 'Connect your tools', icon: PlugZap, color: 'text-pink-500', bg: 'bg-pink-500/10' },
     { path: '/account', label: 'Account & Settings', desc: 'Manage profile and preferences', icon: User, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
     { path: '/notifications', label: 'Notifications', desc: 'View all alerts', icon: Bell, color: 'text-rose-500', bg: 'bg-rose-500/10' },
@@ -88,10 +88,11 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 {filteredLinks.length > 0 ? 'Quick Links' : 'No results found'}
               </div>
               {filteredLinks.map((link) => (
-                <div 
+                <button
+                  type="button"
                   key={link.path}
                   onClick={() => { navigate(link.path); onClose(); }}
-                  className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary cursor-pointer transition-colors"
+                  className="flex w-full items-center gap-3 px-3 py-3 rounded-xl hover:bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors text-left"
                 >
                   <div className={`w-8 h-8 rounded-lg ${link.bg} ${link.color} flex items-center justify-center`}>
                     <link.icon size={16} />
@@ -100,7 +101,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                     <div className="text-sm font-medium text-foreground">{link.label}</div>
                     <div className="text-xs text-muted-foreground">{link.desc}</div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
             <div className="p-3 border-t border-border bg-secondary/30 text-xs text-muted-foreground flex items-center justify-between">

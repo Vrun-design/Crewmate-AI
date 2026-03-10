@@ -12,7 +12,7 @@ export class ApiError extends Error {
 
 function getAuthHeader(): Record<string, string> {
   const token = typeof window !== 'undefined' ? window.localStorage.getItem(AUTH_TOKEN_KEY) : null;
-  return token ? {Authorization: `Bearer ${token}`} : {};
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -26,7 +26,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new ApiError(response.status, `API request failed: ${response.status}`);
+    const contentType = response.headers.get('content-type') ?? '';
+    let message = `API request failed: ${response.status}`;
+
+    try {
+      if (contentType.includes('application/json')) {
+        const payload = await response.json() as { message?: string };
+        if (payload.message) {
+          message = payload.message;
+        }
+      } else {
+        const text = await response.text();
+        if (text.trim()) {
+          message = text.trim();
+        }
+      }
+    } catch {
+      // Keep the default message when the body cannot be parsed.
+    }
+
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) {
@@ -51,5 +70,10 @@ export const api = {
   delete: <T>(path: string) =>
     request<T>(path, {
       method: 'DELETE',
+    }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: 'PATCH',
+      body: body ? JSON.stringify(body) : undefined,
     }),
 };

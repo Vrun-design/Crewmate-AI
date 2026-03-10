@@ -103,25 +103,31 @@ export function Header({ isDarkMode, setIsDarkMode, setIsMobileMenuOpen }: Heade
                   </button>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto">
-                  {notifications.slice(0, 5).map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-3 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer flex gap-3 ${notification.read ? 'opacity-60' : ''}`}
-                      onClick={() => {
-                        setIsNotificationsOpen(false);
-                        navigate(notification.sourcePath ?? '/notifications');
-                      }}
-                    >
-                      <div className="mt-0.5 shrink-0 text-blue-500">{getIcon(notification.type)}</div>
-                      <div>
-                        <div className="text-sm font-medium text-foreground">{notification.title}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{notification.message}</div>
-                        <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
-                          <Clock size={10} /> {notification.time}
+                  {notifications.length > 0 ? (
+                    notifications.slice(0, 5).map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`p-3 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer flex gap-3 ${notification.read ? 'opacity-60' : ''}`}
+                        onClick={() => {
+                          setIsNotificationsOpen(false);
+                          navigate(notification.sourcePath ?? '/notifications');
+                        }}
+                      >
+                        <div className="mt-0.5 shrink-0 text-blue-500">{getIcon(notification.type)}</div>
+                        <div>
+                          <div className="text-sm font-medium text-foreground">{notification.title}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{notification.message}</div>
+                          <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
+                            <Clock size={10} /> {notification.time}
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      No notifications yet. Completed tasks and agent alerts will appear here.
                     </div>
-                  ))}
+                  )}
                 </div>
                 <div className="p-2 border-t border-border bg-secondary/50 text-center">
                   <button onClick={() => { setIsNotificationsOpen(false); navigate('/notifications'); }} className="text-xs text-muted-foreground hover:text-foreground font-medium">View all notifications</button>

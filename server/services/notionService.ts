@@ -1,4 +1,5 @@
-import {getEffectiveIntegrationConfig} from './integrationConfigService';
+import { getEffectiveIntegrationConfig } from './integrationConfigService';
+import { registerTool } from '../mcp/mcpServer';
 
 interface CreateNotionPageInput {
   title: string;
@@ -11,22 +12,22 @@ interface NotionPageResult {
   title: string;
 }
 
-function getNotionConfig(userId: string) {
-  const config = getEffectiveIntegrationConfig(userId, 'notion');
+function getNotionConfig(workspaceId: string) {
+  const config = getEffectiveIntegrationConfig(workspaceId, 'notion');
   return {
     token: config.token ?? '',
     parentPageId: config.parentPageId ?? '',
   };
 }
 
-export function isNotionConfigured(userId: string): boolean {
-  const config = getNotionConfig(userId);
+export function isNotionConfigured(workspaceId: string): boolean {
+  const config = getNotionConfig(workspaceId);
   return Boolean(config.token && config.parentPageId);
 }
 
-export async function createNotionPage(userId: string, input: CreateNotionPageInput): Promise<NotionPageResult> {
-  const config = getNotionConfig(userId);
-  if (!isNotionConfigured(userId)) {
+export async function createNotionPage(workspaceId: string, input: CreateNotionPageInput): Promise<NotionPageResult> {
+  const config = getNotionConfig(workspaceId);
+  if (!isNotionConfigured(workspaceId)) {
     throw new Error('Notion integration is not configured. Save an integration token and parent page ID.');
   }
 
@@ -87,3 +88,22 @@ export async function createNotionPage(userId: string, input: CreateNotionPageIn
     title: input.title,
   };
 }
+
+registerTool({
+  name: 'create_notion_page',
+  description: 'Create a Notion page when the user asks to save a document, knowledge base article, or meeting notes.',
+  inputSchema: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      title: { type: 'string' },
+      content: { type: 'string', description: 'Raw text content for the page body.' },
+    },
+  },
+  handler: async (context, args) => {
+    return createNotionPage(context.workspaceId, {
+      title: typeof args.title === 'string' ? args.title : '',
+      content: typeof args.content === 'string' ? args.content : '',
+    });
+  },
+});
