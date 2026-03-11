@@ -22,7 +22,7 @@ export function SessionHistoryPanel() {
     return (
         <EmptyStateCard
             title="No sessions recorded yet"
-            description="Start a live session and Crewmate will build a real history here, including transcript-derived titles and durations."
+            description="Start a live session and Crewmate will build a real history here."
         />
     );
 }

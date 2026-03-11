@@ -9,7 +9,9 @@ describe('featureFlagService', () => {
       approvalGates: expect.any(Boolean),
       jobTypesV2: expect.any(Boolean),
       offshiftInbox: expect.any(Boolean),
+      researchGrounding: expect.any(Boolean),
       slackInbound: expect.any(Boolean),
+      uiNavigator: expect.any(Boolean),
     });
   });
 

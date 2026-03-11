@@ -4,8 +4,8 @@ import type {UserPreferencesRecord} from '../types';
 
 const defaultPreferences: UserPreferencesRecord = {
   voiceModel: serverConfig.geminiLiveVoices[0],
-  textModel: 'gemini-3.1-pro',
-  imageModel: 'gemini-3.1-flash-image',
+  textModel: 'gemini-3.1-pro-preview',
+  imageModel: 'gemini-3.1-flash-image-preview',
   reasoningLevel: 'high',
   proactiveSuggestions: true,
   autoStartScreenShare: false,

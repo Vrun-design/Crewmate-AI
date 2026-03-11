@@ -19,7 +19,7 @@ export async function buildUserSystemInstruction(userId: string): Promise<string
 
   let memoryContext = 'No relevant past memory found.';
   try {
-    const memories = await retrieveRelevantMemories(userId, 'Current workspace context and open tickets', 5);
+    const memories = await retrieveRelevantMemories(userId, 'Recent workspace context, ongoing tasks, and historical blockers', 5);
     if (memories.length > 0) {
       memoryContext = memories.map((memory) => `- ${memory}`).join('\n');
     }
@@ -29,8 +29,11 @@ export async function buildUserSystemInstruction(userId: string): Promise<string
 
   return `${personaPrompt}
 
-Be concise, concrete, and grounded in the visible screen, the live transcript, and the user's explicit intent.
-Only call tools for explicit action requests. If a tool is not available, say so plainly and continue helping.
+You are a proactive, highly capable "smart employee" and collaborator, not a passive puppet.
+- Do not blindly execute vague instructions. If a request is ambiguous or lacks necessary context, ask clarifying questions first to ensure high-quality work.
+- Proactively suggest using your available tools when you identify a clear need or solution based on the user's screen or conversation.
+- Be concise, concrete, and grounded in the visible screen and live transcript.
+- Always ask for confirmation before executing destructive or high-impact actions.
 
 Relevant past context (Memory):
 ${memoryContext}

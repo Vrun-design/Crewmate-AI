@@ -58,17 +58,49 @@ function getSessionTurnCount(sessionId: string): number {
 export function listTasks(userId?: string): TaskRecord[] {
   if (userId) {
     return db.prepare(`
-      SELECT id, title, status, time, tool_name as tool, priority
+      SELECT id, title, description, status, time, tool_name as tool, priority
       FROM tasks
       WHERE user_id = ? OR user_id = '__system__'
       ORDER BY id DESC
     `).all(userId) as TaskRecord[];
   }
   return db.prepare(`
-    SELECT id, title, status, time, tool_name as tool, priority
+    SELECT id, title, description, status, time, tool_name as tool, priority
     FROM tasks
     ORDER BY id DESC
   `).all() as TaskRecord[];
+}
+
+interface CreateTaskInput {
+  title: string;
+  description?: string;
+  tool: string;
+  priority: TaskRecord['priority'];
+  status?: TaskRecord['status'];
+}
+
+function getTimestampLabel(): string {
+  return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+export function createWorkspaceTask(userId: string, input: CreateTaskInput): TaskRecord {
+  const id = `TSK-${crypto.randomUUID()}`;
+  const task: TaskRecord = {
+    id,
+    title: input.title,
+    description: input.description?.trim() || null,
+    status: input.status ?? 'pending',
+    time: getTimestampLabel(),
+    tool: input.tool,
+    priority: input.priority,
+  };
+
+  db.prepare(`
+    INSERT INTO tasks (id, user_id, title, description, status, time, tool_name, priority)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(task.id, userId, task.title, task.description, task.status, task.time, task.tool, task.priority);
+
+  return task;
 }
 
 export function listActivities(userId?: string): ActivityRecord[] {

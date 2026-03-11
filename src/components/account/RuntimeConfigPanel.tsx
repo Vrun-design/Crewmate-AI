@@ -13,7 +13,7 @@ type RuntimeConfigPanelProps = {
 };
 
 const MODEL_ROUTING_ROWS = [
-  { tier: 'live', model: 'gemini-2.5-flash-native-audio-preview', note: 'Real-time voice' },
+  { tier: 'live', model: 'gemini-2.5-flash-native-audio-preview-12-2025', note: 'Real-time voice' },
   { tier: 'orchestration', model: 'gemini-3.1-pro-preview', note: 'Intent routing' },
   { tier: 'research', model: 'gemini-3.1-pro-preview', note: 'Deep analysis' },
   { tier: 'creative', model: 'gemini-3.1-flash-image-preview', note: 'Image gen' },

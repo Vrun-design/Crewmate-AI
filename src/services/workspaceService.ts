@@ -5,6 +5,9 @@ export const workspaceService = {
   getTasks(): Promise<Task[]> {
     return api.get<Task[]>('/api/tasks');
   },
+  createTask(data: { title: string; description?: string; tool: string; priority: Task['priority'] }): Promise<Task> {
+    return api.post<Task>('/api/tasks', data);
+  },
   getActivities(): Promise<Activity[]> {
     return api.get<Activity[]>('/api/activities');
   },

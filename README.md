@@ -6,13 +6,13 @@
 
 ### Your AI-powered company — run an entire business with a crew of AI agents 🚀
 
-**14 specialist agents · 30+ real integrations · Real-time voice via Gemini Live · Custom skill builder · MCP server**
+**15 specialist agents · 30+ real integrations · Real-time voice via Gemini Live · Custom skill builder · MCP server**
 
 [![Built with Gemini](https://img.shields.io/badge/Built%20with-Gemini%20Live%20API-4285F4?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Gemini Live Challenge](https://img.shields.io/badge/Gemini%20Live%20Agent%20Challenge-2025-orange?style=flat-square)](https://ai.google.dev/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/Tests-43%2F43%20passing-22c55e?style=flat-square)](./server)
+[![Tests](https://img.shields.io/badge/Tests-51%2F55%20passing-22c55e?style=flat-square)](./server)
 
 </div>
 
@@ -38,7 +38,7 @@ Crewmate was built specifically to win the **Google Gemini Live Agent Challenge 
 - 🗣️ **Speak (Native Output)** — Fast, expressive audio output using Gemini's native voices (Aoede, Charon, Fenrir, Kore, Puck) directly from the `gemini-2.5-flash-native-audio-preview-12-2025` model.
 
 ### 2. Autonomous Background Delegations (Off-shift Work)
-Crewmate isn't a chatbot that stops working when you close the tab. As the Captain, you assign work. The Orchestrator routes the intent, and the 14-agent specialist crew executes the work autonomously. 
+Crewmate isn't a chatbot that stops working when you close the tab. As the Captain, you assign work. The Orchestrator routes the intent, and the 15-agent specialist crew executes the work autonomously. 
 If a task takes 10 minutes (like scraping 5 competitor websites), it gets routed to the **Off-shift Inbox**. Your crew works asynchronously in the background and delivers the final asset (Notion page, Slack message, PDF) whenever it's done.
 
 ### 3. Native Barge-in & Interruptibility
@@ -64,7 +64,7 @@ Using a single model for everything is poor engineering. Crewmate dynamically ro
 | **Lite** | `gemini-3.1-flash-lite-preview` | Ultra-fast tool calls and pre-routing filters |
 
 ### B. A2A Orchestration (Agent-to-Agent) 👥
-Crewmate operates a true *Agent-to-Agent (A2A)* dynamic graph. When the Orchestrator (the router agent) receives an intent, it evaluates confidence scores across **14 discrete domain expert agents**. 
+Crewmate operates a true *Agent-to-Agent (A2A)* dynamic graph. When the Orchestrator (the router agent) receives an intent, it evaluates confidence scores across **15 discrete domain expert agents**. 
 
 Crucially, **agents can invoke other agents**. A typical A2A workflow looks like this:
 1. Orchestrator receives: *"Research Acme Corp and draft a cold email to their CTO."*
@@ -140,7 +140,7 @@ Standard context windows fill up. Crewmate solves this with a multi-layered sema
 
 ---
 
-## 🤖 The Full Crew — 14 Specialist Agents
+## 🤖 The Full Crew — 15 Specialist Agents
 
 No other hackathon entry has an agent architecture this wide. Each agent is a discrete, state-independent async domain expert. 
 
@@ -160,6 +160,7 @@ No other hackathon entry has an agent architecture this wide. Each agent is a di
 | 💰 **Finance** | Gemini 3.1 Pro | Unit economics, P&Ls, modeling | `web.search`, structured JSON output |
 | ⚖️ **Legal** | Gemini 3.1 Pro | Policy drafts, compliance checks | High-temperature logic constraint |
 | 📊 **Data** | Gemini 3.1 Pro | SQL generation, analytics reviews | Code interpretation, JSON parsing |
+| ☸️ **Navigation** | Gemini 3.1 Pro | Visual UI automation, form filling | `browser.ui-navigate`, `browser.click-element` |
 
 ---
 
@@ -169,6 +170,15 @@ No other hackathon entry has an agent architecture this wide. Each agent is a di
 - `web.search` (v2.0 — Tavily primary, DuckDuckGo fallback for high-quality LLM-optimized snippets)
 - `web.summarize-url` (Fetches any URL, strips HTML, uses Gemini Flash for summaries)
 - `browser.extract`, `browser.open-url`, `browser.screenshot`
+
+Crewmate also includes a **Playwright-powered browser operations layer** on the server, exposed through the built-in `browser.*` skills. This gives agents real browser capabilities such as URL navigation, readable content extraction, screenshot capture, Google search, and form filling via:
+- `browser.ui-navigate` (Autonomous vision-based UI completion)
+- `browser.click-element` & `browser.type-into`
+- `browser.open-url`
+- `browser.extract`
+- `browser.fill-form`
+- `browser.search-google`
+- `browser.screenshot`
 
 ### 📧 Productivity & Comms (OAuth2)
 - **Gmail**: `gmail.send`, `gmail.draft`, `gmail.read-inbox`
@@ -229,7 +239,7 @@ Internally, the 14-agent A2A network uses the exact same MCP-compliant JSON sche
 When giving AI access to run tool code locally or access your Slack/Email, security cannot be an afterthought:
 - **Sandbox Executions (`terminal.run-command`)**: We use strict regex-enforced allowlists. Destructive changes (`rm`, `mv`) are blocked at the router layer. 
 - **SQLite AES Encryption**: All OAuth and webhook secrets from Integrations (Gmail, Slack, Notion) are encrypted via AES-256-GCM in `integrationCredentials.ts` before hitting SQLite.
-- **Testing (`npm test`)**: 43/43 passing Vitest suites, with *17 dedicated test cases* verifying the `terminal-sandbox` skill cannot be tricked with injection attacks.
+- **Testing (`npm test`)**: 51/55 passing Vitest suites, with *17 dedicated test cases* verifying the `terminal-sandbox` skill cannot be tricked with injection attacks.
 
 ---
 

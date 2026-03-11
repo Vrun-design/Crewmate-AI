@@ -31,7 +31,9 @@ import { runSocialAgent, SOCIAL_AGENT_MANIFEST } from './agents/socialAgent';
 import { runFinanceAgent, FINANCE_AGENT_MANIFEST } from './agents/financeAgent';
 import { runLegalAgent, LEGAL_AGENT_MANIFEST } from './agents/legalAgent';
 import { runDataAgent, DATA_AGENT_MANIFEST } from './agents/dataAgent';
+import { runUiNavigatorAgent, UI_NAVIGATOR_AGENT_MANIFEST } from './agents/uiNavigatorAgent';
 import { notifyTaskComplete } from './agentNotifier';
+import { isFeatureEnabled } from './featureFlagService';
 
 // ── Task record types ─────────────────────────────────────────────────────────
 
@@ -186,6 +188,7 @@ export const AGENT_MANIFESTS = [
     FINANCE_AGENT_MANIFEST,
     LEGAL_AGENT_MANIFEST,
     DATA_AGENT_MANIFEST,
+    UI_NAVIGATOR_AGENT_MANIFEST,
 ];
 
 // ── Intent routing via Gemini Flash ──────────────────────────────────────────
@@ -193,19 +196,34 @@ export const AGENT_MANIFESTS = [
 interface RoutingDecision {
     agent: 'research' | 'content' | 'devops' | 'communications' | 'calendar'
     | 'sales' | 'marketing' | 'product' | 'hr' | 'support' | 'social'
-    | 'finance' | 'legal' | 'data' | 'skill';
+    | 'finance' | 'legal' | 'data' | 'ui_navigator' | 'skill';
     skillId?: string;
     confidence: number;
     reasoning: string;
 }
 
 async function routeIntent(intent: string, userId: string): Promise<RoutingDecision> {
+    if (isFeatureEnabled('uiNavigator')) {
+        const lowerIntent = intent.toLowerCase();
+        const looksLikeUiNavigatorRequest = lowerIntent.includes('ui navigator')
+            || lowerIntent.includes('start url:')
+            || /\b(click|fill|type into|press|scroll|open the site|navigate the ui|use the website)\b/.test(lowerIntent);
+
+        if (looksLikeUiNavigatorRequest) {
+            return {
+                agent: 'ui_navigator',
+                confidence: 0.95,
+                reasoning: 'Intent explicitly references browser UI navigation or direct on-page interaction.',
+            };
+        }
+    }
+
     const ai = createGeminiClient();
     const skills = listSkillsForUser(userId).map((s) => `${s.id}: ${s.description}`).join('\n');
 
     const response = await ai.models.generateContent({
         model: serverConfig.geminiOrchestrationModel,
-        contents: `You are an intent router for a 14-agent AI workforce. Route the user's intent to the most appropriate agent or direct skill.
+        contents: `You are an intent router for a 15-agent AI workforce. Route the user's intent to the most appropriate agent or direct skill.
 
 Agents:
 - research: Deep research, market analysis, technical deep-dives, competitive intelligence
@@ -222,6 +240,7 @@ Agents:
 - finance: Invoices, expense reports, budgets, financial templates
 - legal: Contract analysis, NDA review, compliance, policy drafts
 - data: SQL queries, data analysis, metrics, KPI reports, data stories
+- ui_navigator: Visual browser interaction, clicking, typing, scrolling, and navigating website UIs
 
 Direct skills (for simple single atomic tasks):
 ${skills}
@@ -331,6 +350,8 @@ export async function orchestrate(
                 result = await runLegalAgent(intent, ctx, emitStep);
             } else if (routing.agent === 'data') {
                 result = await runDataAgent(intent, ctx, emitStep);
+            } else if (routing.agent === 'ui_navigator') {
+                result = await runUiNavigatorAgent(intent, ctx, emitStep);
             } else {
                 // Fallback to research
                 result = await runResearchAgent(intent, ctx, emitStep);

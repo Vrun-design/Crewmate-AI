@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Network } from 'lucide-react';
-import { AGENT_DEPT_ICONS } from './agentUi';
+import { getAgentIcon } from './agentUi';
 import type { AgentManifest } from './types';
 import { Tooltip } from '../ui/Tooltip';
 
@@ -9,9 +9,11 @@ interface AgentNodeMapProps {
     activeAgentIds: Set<string>;
     onNodeClick: (agent: AgentManifest) => void;
     selectedAgentId?: string | null;
+    coreAgentName?: string;
+    onCoreNodeClick?: () => void;
 }
 
-export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgentId }: AgentNodeMapProps): React.JSX.Element {
+export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgentId, coreAgentName = 'Core Orchestrator', onCoreNodeClick }: AgentNodeMapProps): React.JSX.Element {
 
     // Mathematics to distribute agents in a ring around the center Core
     const radius = 140;
@@ -150,8 +152,16 @@ export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgen
 
             {/* Centered Core Orchestrator Node */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto">
-                <Tooltip content={<div className="font-mono text-xs">Core Orchestrator</div>}>
-                    <div className="w-16 h-16 rounded-2xl bg-primary shadow-[0_0_30px_rgba(233,84,32,0.5)] border border-white/20 flex items-center justify-center relative select-none cursor-pointer">
+                <Tooltip content={
+                    <div className="flex flex-col gap-1 items-center pb-0.5">
+                        <span className="font-mono text-xs">{coreAgentName}</span>
+                        {onCoreNodeClick && <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">Click to view Soul</span>}
+                    </div>
+                }>
+                    <div 
+                        onClick={onCoreNodeClick}
+                        className="w-16 h-16 rounded-2xl bg-primary shadow-[0_0_30px_rgba(233,84,32,0.5)] border border-white/20 flex items-center justify-center relative select-none cursor-pointer hover:scale-105 transition-transform"
+                    >
                         <div className="absolute inset-0 rounded-2xl border-2 border-white/30 animate-pulse opacity-40 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]" />
                         <Network size={26} className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
                     </div>
@@ -161,7 +171,7 @@ export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgen
             {/* Distributed Agent Nodes */}
             <div className="absolute inset-0 pointer-events-none">
                 {nodes.map(node => {
-                    const DeptIcon = AGENT_DEPT_ICONS[node.agent.department] ?? AGENT_DEPT_ICONS.Default;
+                    const AgentIcon = getAgentIcon(node.agent);
 
                     return (
                         <div
@@ -195,7 +205,7 @@ export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgen
                                     {node.isActive && (
                                         <div className="absolute inset-0 rounded-full border border-primary animate-ping opacity-30" />
                                     )}
-                                    <DeptIcon size={18} className={`transition-colors duration-300 ${node.isActive ? 'text-primary drop-shadow-[0_0_5px_rgba(233,84,32,0.8)]' : 'text-muted-foreground group-hover/map:text-foreground'}`} />
+                                    <AgentIcon size={18} className={`transition-colors duration-300 ${node.isActive ? 'text-primary drop-shadow-[0_0_5px_rgba(233,84,32,0.8)]' : 'text-muted-foreground group-hover/map:text-foreground'}`} />
                                 </div>
                             </Tooltip>
                         </div>

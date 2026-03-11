@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import { db } from '../db';
 import { getDashboardPayload } from '../repositories/dashboardRepository';
-import { listActivities, listSessionHistory, listTasks } from '../repositories/workspaceRepository';
+import { createWorkspaceTask, listActivities, listSessionHistory, listTasks } from '../repositories/workspaceRepository';
 import { listCapabilities } from '../services/capabilityService';
 import { generateCreativeArtifact } from '../services/creativeStudioService';
 import { addSseClient } from '../services/eventService';
@@ -9,8 +9,31 @@ import { getActivePersona, listPersonas, setActivePersona } from '../services/pe
 import { getOnboardingProfile, saveOnboardingProfile } from '../services/onboardingProfileService';
 import { getUserPreferences, saveUserPreferences } from '../services/preferencesService';
 import { getFeatureFlags } from '../services/featureFlagService';
+import { createClickUpTask, isClickUpConfigured } from '../services/clickupService';
+import { createNotionPage, isNotionConfigured } from '../services/notionService';
+import { createGithubIssue, isGithubConfigured } from '../services/githubService';
 import type { UserPreferencesRecord } from '../types';
 import type { RequireAuth } from './types';
+
+async function executeIntegrationTask(tool: string, workspaceId: string, title: string, description: string): Promise<void> {
+  switch (tool) {
+    case 'Notion':
+      if (!isNotionConfigured(workspaceId)) throw new Error('Notion integration is not configured.');
+      await createNotionPage(workspaceId, { title, content: description });
+      break;
+    case 'ClickUp':
+      if (!isClickUpConfigured(workspaceId)) throw new Error('ClickUp integration is not configured.');
+      await createClickUpTask(workspaceId, { name: title, description });
+      break;
+    case 'GitHub':
+      if (!isGithubConfigured(workspaceId)) throw new Error('GitHub integration is not configured.');
+      await createGithubIssue(workspaceId, { title, body: description });
+      break;
+    case 'Crewmate':
+      // Local workspace task only, no external sync needed
+      break;
+  }
+}
 
 export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth): void {
   app.get('/api/health', (_req: Request, res: Response) => {
@@ -63,6 +86,46 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     const user = requireAuth(req, res);
     if (!user) return;
     res.json(listTasks(user.id));
+  });
+
+  app.post('/api/tasks', async (req: Request, res: Response) => {
+    const user = requireAuth(req, res);
+    if (!user) return;
+
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+    const tool = typeof req.body?.tool === 'string' ? req.body.tool.trim() : '';
+    const priority = typeof req.body?.priority === 'string' ? req.body.priority.trim() : '';
+
+    if (!title) {
+      res.status(400).json({ message: 'title is required' });
+      return;
+    }
+
+    if (!tool) {
+      res.status(400).json({ message: 'tool is required' });
+      return;
+    }
+
+    if (!['Low', 'Medium', 'High'].includes(priority)) {
+      res.status(400).json({ message: 'priority must be Low, Medium, or High' });
+      return;
+    }
+
+    try {
+      await executeIntegrationTask(tool, user.workspaceId, title, description);
+
+      const task = createWorkspaceTask(user.id, {
+        title,
+        description,
+        tool,
+        priority: priority as 'Low' | 'Medium' | 'High',
+      });
+
+      res.status(201).json(task);
+    } catch (error) {
+      res.status(500).json({ message: error instanceof Error ? error.message : `Failed to create task in ${tool}` });
+    }
   });
 
   app.get('/api/activities', (req: Request, res: Response) => {

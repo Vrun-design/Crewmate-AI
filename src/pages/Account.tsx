@@ -20,8 +20,8 @@ import type { AccountPreferences, AccountTab, AccountTabId } from '../components
 
 const DEFAULT_PREFERENCES: AccountPreferences = {
   voiceModel: DEFAULT_LIVE_VOICE,
-  textModel: 'gemini-3.1-pro',
-  imageModel: 'gemini-3.1-flash-image',
+  textModel: 'gemini-3.1-pro-preview',
+  imageModel: 'gemini-3.1-flash-image-preview',
   reasoningLevel: 'high',
   proactiveSuggestions: true,
   autoStartScreenShare: false,

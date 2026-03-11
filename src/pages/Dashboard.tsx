@@ -21,7 +21,17 @@ export function Dashboard() {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [hasAttemptedGuidedSetup, setHasAttemptedGuidedSetup] = useState(false);
   const { data, isLoading, error, refresh } = useDashboard();
-  const { session, isBusy, error: liveSessionError, elapsedLabel, isSessionActive, startSession, endSession, sendMessage } = useLiveSession({
+  const {
+    session,
+    isBusy,
+    error: liveSessionError,
+    elapsedLabel,
+    isSessionActive,
+    isAssistantSpeaking,
+    startSession,
+    endSession,
+    sendMessage,
+  } = useLiveSession({
     initialSession: data?.currentSession ?? null,
     onSessionChange: refresh,
   });
@@ -45,6 +55,7 @@ export function Dashboard() {
   } = useMicrophoneCapture({
     sessionId: session?.id ?? null,
     enabled: isSessionActive,
+    isAssistantSpeaking,
   });
 
   useEffect(() => {

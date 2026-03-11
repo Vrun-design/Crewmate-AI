@@ -5,6 +5,8 @@ export interface FeatureFlags {
   jobTypesV2: boolean;
   slackInbound: boolean;
   approvalGates: boolean;
+  uiNavigator: boolean;
+  researchGrounding: boolean;
 }
 
 export function getFeatureFlags(): FeatureFlags {

@@ -28,6 +28,7 @@ export function Tasks(): React.JSX.Element {
   const { data: standardTasks, isLoading, error } = useWorkspaceCollection(workspaceService.getTasks);
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [agentTasksError, setAgentTasksError] = useState<string | null>(null);
+  const [createdTasks, setCreatedTasks] = useState<Task[]>([]);
   const sseRef = useRef<EventSource | null>(null);
 
   const loadAgentTasks = useCallback(async () => {
@@ -123,13 +124,21 @@ export function Tasks(): React.JSX.Element {
     setIsDrawerOpen(true);
   }
 
+  async function handleCreateStandardTask(input: { title: string; description: string; tool: string; priority: Task['priority'] }): Promise<void> {
+    const createdTask = await workspaceService.createTask(input);
+    setCreatedTasks((previousTasks) => [createdTask, ...previousTasks.filter((task) => task.id !== createdTask.id)]);
+  }
+
+  const allStandardTasks = [...createdTasks, ...standardTasks.filter((task) => !createdTasks.some((createdTask) => createdTask.id === task.id))];
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const filteredStandard = statusFilter === 'all'
-    ? standardTasks
-    : standardTasks.filter((t) => t.status === statusFilter);
+    ? allStandardTasks
+    : allStandardTasks.filter((t) => t.status === statusFilter);
 
   const activeAgentTasks = agentTasks.filter((t) => t.status === 'running' || t.status === 'queued');
-  const inProgressCount = standardTasks.filter((t) => t.status === 'in_progress').length + activeAgentTasks.length;
+  const archivedAgentTasks = agentTasks.filter((t) => t.status === 'completed' || t.status === 'failed');
+  const inProgressCount = allStandardTasks.filter((t) => t.status === 'in_progress').length + activeAgentTasks.length;
 
   const liveAgentTask = selectedAgentTask
     ? agentTasks.find((t) => t.id === selectedAgentTask.id) ?? selectedAgentTask
@@ -140,7 +149,7 @@ export function Tasks(): React.JSX.Element {
       <div className="space-y-6 pb-10">
         <PageHeader
           title="Tasks"
-          description={inProgressCount > 0 ? `${inProgressCount} task${inProgressCount > 1 ? 's' : ''} in progress` : `${standardTasks.length} total tasks`}
+          description={inProgressCount > 0 ? `${inProgressCount} task${inProgressCount > 1 ? 's' : ''} in progress` : `${allStandardTasks.length} total tasks`}
         >
           <Button variant="primary" className="btn-bevel btn-bevel-primary" onClick={handleCreateTask}>
             <Plus size={16} />
@@ -172,9 +181,27 @@ export function Tasks(): React.JSX.Element {
           </div>
         )}
 
+        {archivedAgentTasks.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Bot size={12} className="text-muted-foreground" /> Agent Task History
+            </p>
+            {archivedAgentTasks.map((task) => (
+              <button
+                key={task.id}
+                type="button"
+                className="w-full text-left"
+                onClick={() => handleOpenAgentTask(task)}
+              >
+                <AgentTaskCard task={task} isActive={false} />
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2">
           {STATUS_FILTERS.map(({ value, label }) => {
-            const count = value === 'all' ? standardTasks.length : standardTasks.filter((t) => t.status === value).length;
+            const count = value === 'all' ? allStandardTasks.length : allStandardTasks.filter((t) => t.status === value).length;
             const isActive = statusFilter === value;
             return (
               <button
@@ -221,7 +248,11 @@ export function Tasks(): React.JSX.Element {
         {liveAgentTask ? (
           <AgentTaskCard task={liveAgentTask} isActive />
         ) : (
-          <TaskDrawerContent task={selectedTask} onClose={() => setIsDrawerOpen(false)} />
+          <TaskDrawerContent
+            task={selectedTask}
+            onClose={() => setIsDrawerOpen(false)}
+            onCreateTask={handleCreateStandardTask}
+          />
         )}
       </Drawer>
     </>

@@ -17,6 +17,7 @@ interface UseLiveSessionResult {
   error: string | null;
   elapsedLabel: string;
   isSessionActive: boolean;
+  isAssistantSpeaking: boolean;
   startSession: () => Promise<LiveSession | null>;
   endSession: () => Promise<void>;
   sendMessage: (text: string, sessionIdOverride?: string) => Promise<void>;
@@ -92,6 +93,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsedLabel, setElapsedLabel] = useState('00:00');
+  const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<AudioChunk[]>([]);
   const isPlayingAudioRef = useRef(false);
@@ -148,6 +150,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     if (!session || session.status !== 'live') {
       lastAudioChunkIdRef.current = 0;
       stopPollingRef.current = false;
+      setIsAssistantSpeaking(false);
       return;
     }
 
@@ -165,6 +168,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
 
           lastAudioChunkIdRef.current = chunks[chunks.length - 1].id;
           audioQueueRef.current.push(...chunks);
+          setIsAssistantSpeaking(true);
 
           if (!audioContextRef.current) {
             audioContextRef.current = new window.AudioContext();
@@ -180,9 +184,16 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
                 }
               }
 
-              isPlayingAudioRef.current = false;
+              // Allow physical speaker echo to die out before re-enabling the microphone
+              setTimeout(() => {
+                if (audioContextRef.current) { // Ensure still mounted/active
+                  isPlayingAudioRef.current = false;
+                  setIsAssistantSpeaking(false);
+                }
+              }, 800);
             })().catch((playbackError: unknown) => {
               isPlayingAudioRef.current = false;
+              setIsAssistantSpeaking(false);
               setError(getErrorMessage(playbackError, 'Unable to play live audio response'));
             });
           }
@@ -226,6 +237,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
       stopPollingRef.current = false;
       lastAudioChunkIdRef.current = 0;
       audioQueueRef.current = [];
+      setIsAssistantSpeaking(false);
       await onSessionChange?.();
       return next;
     } catch (startError) {
@@ -248,6 +260,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
       const next = await liveSessionService.end(session.id);
       setSession(next);
       audioQueueRef.current = [];
+      setIsAssistantSpeaking(false);
       await onSessionChange?.();
     } catch (endError) {
       setError(getErrorMessage(endError, 'Unable to end session'));
@@ -281,6 +294,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     error,
     elapsedLabel,
     isSessionActive: session?.status === 'live',
+    isAssistantSpeaking,
     startSession,
     endSession,
     sendMessage,

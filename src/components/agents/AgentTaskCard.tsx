@@ -73,6 +73,17 @@ export function AgentTaskCard({ task, isActive }: AgentTaskCardProps): React.JSX
 
   const renderedResult =
     typeof task.result === 'string' ? task.result.slice(0, 800) : JSON.stringify(task.result, null, 2).slice(0, 800);
+  const uiNavigatorResult = task.result && typeof task.result === 'object'
+    ? task.result as {
+      finalUrl?: string;
+      summary?: string;
+      finalObservation?: { screenshotBase64?: string; screenshotMimeType?: string; elements?: unknown[] };
+    }
+    : null;
+  const screenshotData = uiNavigatorResult?.finalObservation?.screenshotBase64 && uiNavigatorResult.finalObservation.screenshotMimeType
+    ? `data:${uiNavigatorResult.finalObservation.screenshotMimeType};base64,${uiNavigatorResult.finalObservation.screenshotBase64}`
+    : null;
+  const isUiNavigatorTask = task.agentId === 'crewmate-ui_navigator-agent' || task.agentId === 'crewmate-ui-navigator-agent';
 
   return (
     <div className={`rounded-xl border bg-card/50 overflow-hidden transition-all duration-300 ${getCardClass()}`}>
@@ -120,6 +131,23 @@ export function AgentTaskCard({ task, isActive }: AgentTaskCardProps): React.JSX
 
       {expanded && task.status === 'completed' && task.result ? (
         <div className="px-4 pb-4 border-t border-border/50 pt-3">
+          {isUiNavigatorTask && uiNavigatorResult ? (
+            <div className="mb-3 space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+              {screenshotData ? (
+                <img
+                  src={screenshotData}
+                  alt="UI Navigator final screenshot"
+                  className="w-full rounded-lg border border-border/60 object-cover shadow-soft"
+                />
+              ) : null}
+              {uiNavigatorResult.summary ? (
+                <p className="text-xs text-foreground">{uiNavigatorResult.summary}</p>
+              ) : null}
+              {uiNavigatorResult.finalUrl ? (
+                <p className="text-xs text-muted-foreground break-all">{uiNavigatorResult.finalUrl}</p>
+              ) : null}
+            </div>
+          ) : null}
           <pre className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 overflow-auto max-h-48 whitespace-pre-wrap">
             {renderedResult}
             {JSON.stringify(task.result ?? '').length > 800 ? '\n[...truncated]' : ''}

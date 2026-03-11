@@ -11,6 +11,7 @@ export interface ActivityRecord {
 export interface TaskRecord {
   id: string;
   title: string;
+  description?: string | null;
   status: 'completed' | 'in_progress' | 'pending';
   time: string;
   tool: string;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { liveSessionConfig } from '../config/liveSessionConfig';
 import { liveSessionService } from '../services/liveSessionService';
 import { arrayBufferToBase64 } from '../utils/mediaEncoding';
 import type { MicrophoneStatus } from '../types/live';
@@ -9,6 +10,7 @@ const PCM_FLUSH_MS = 250;
 interface UseMicrophoneCaptureOptions {
   sessionId: string | null;
   enabled: boolean;
+  isAssistantSpeaking?: boolean;
 }
 
 interface UseMicrophoneCaptureResult {
@@ -58,9 +60,23 @@ function floatTo16BitPcm(input: Float32Array): Int16Array {
   return output;
 }
 
+function getAudioLevel(input: Float32Array): number {
+  if (input.length === 0) {
+    return 0;
+  }
+
+  let total = 0;
+  for (const sample of input) {
+    total += Math.abs(sample);
+  }
+
+  return total / input.length;
+}
+
 export function useMicrophoneCapture({
   sessionId,
   enabled,
+  isAssistantSpeaking = false,
 }: UseMicrophoneCaptureOptions): UseMicrophoneCaptureResult {
   const [status, setStatus] = useState<MicrophoneStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +85,10 @@ export function useMicrophoneCapture({
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const pcmChunksRef = useRef<Int16Array[]>([]);
   const flushTimerRef = useRef<number | null>(null);
+  const isAssistantSpeakingRef = useRef(isAssistantSpeaking);
+  const speechStartedAtRef = useRef<number | null>(null);
+  const lastSpeechDetectedAtRef = useRef<number | null>(null);
+  const turnClosedRef = useRef(false);
   const isSupported =
     typeof navigator !== 'undefined' &&
     !!navigator.mediaDevices &&
@@ -76,6 +96,13 @@ export function useMicrophoneCapture({
     typeof window !== 'undefined' &&
     typeof window.AudioContext !== 'undefined' &&
     typeof window.AudioWorklet !== 'undefined';
+
+  const resetTurnDetection = useCallback(() => {
+    speechStartedAtRef.current = null;
+    lastSpeechDetectedAtRef.current = null;
+    turnClosedRef.current = false;
+    pcmChunksRef.current = [];
+  }, []);
 
   const flushAudio = useCallback(async (currentSessionId: string) => {
     const chunks = pcmChunksRef.current;
@@ -98,6 +125,35 @@ export function useMicrophoneCapture({
       data: arrayBufferToBase64(merged.buffer),
     });
   }, []);
+
+  const maybeCloseTurn = useCallback(async (currentSessionId: string) => {
+    const speechStartedAt = speechStartedAtRef.current;
+    const lastSpeechDetectedAt = lastSpeechDetectedAtRef.current;
+
+    if (
+      !liveSessionConfig.conservativeTurnTaking ||
+      !speechStartedAt ||
+      !lastSpeechDetectedAt ||
+      turnClosedRef.current
+    ) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - speechStartedAt < liveSessionConfig.minSpeechWindowMs) {
+      return;
+    }
+
+    if (now - lastSpeechDetectedAt < liveSessionConfig.silenceWindowMs) {
+      return;
+    }
+
+    await flushAudio(currentSessionId);
+    await liveSessionService.endAudio(currentSessionId);
+    turnClosedRef.current = true;
+    speechStartedAtRef.current = null;
+    lastSpeechDetectedAtRef.current = null;
+  }, [flushAudio]);
 
   const stopMicrophone = useCallback(async () => {
     const currentSessionId = sessionId;
@@ -126,7 +182,7 @@ export function useMicrophoneCapture({
       await audioContext.close();
     }
 
-    pcmChunksRef.current = [];
+    resetTurnDetection();
 
     if (currentSessionId) {
       try {
@@ -137,7 +193,7 @@ export function useMicrophoneCapture({
     }
 
     setStatus('muted');
-  }, [flushAudio, sessionId]);
+  }, [flushAudio, resetTurnDetection, sessionId]);
 
   const startMicrophone = useCallback(async () => {
     if (!enabled || !sessionId || streamRef.current || !isSupported) {
@@ -170,7 +226,28 @@ export function useMicrophoneCapture({
 
       // Receive raw Float32 chunks from the worklet thread
       workletNode.port.onmessage = (event: MessageEvent<Float32Array>) => {
+        if (isAssistantSpeakingRef.current) {
+          return;
+        }
+
         const rawChunk = event.data;
+        const audioLevel = getAudioLevel(rawChunk);
+        const now = Date.now();
+        const isSpeech = audioLevel >= liveSessionConfig.speechLevelThreshold;
+
+        if (isSpeech) {
+          if (!speechStartedAtRef.current) {
+            speechStartedAtRef.current = now;
+          }
+
+          lastSpeechDetectedAtRef.current = now;
+          turnClosedRef.current = false;
+        }
+
+        if (!isSpeech && !speechStartedAtRef.current) {
+          return;
+        }
+
         const downsampled = downsampleBuffer(rawChunk, audioContext.sampleRate, PCM_SAMPLE_RATE);
         pcmChunksRef.current.push(floatTo16BitPcm(downsampled));
       };
@@ -180,10 +257,16 @@ export function useMicrophoneCapture({
       workletNode.connect(audioContext.destination);
 
       flushTimerRef.current = window.setInterval(() => {
-        void flushAudio(sessionId).catch((captureError: unknown) => {
+        if (isAssistantSpeakingRef.current) {
+          return;
+        }
+
+        void flushAudio(sessionId)
+          .then(() => maybeCloseTurn(sessionId))
+          .catch((captureError: unknown) => {
           setStatus('error');
           setError(captureError instanceof Error ? captureError.message : 'Unable to stream microphone audio.');
-        });
+          });
       }, PCM_FLUSH_MS);
 
       setStatus('recording');
@@ -191,7 +274,7 @@ export function useMicrophoneCapture({
       setStatus('error');
       setError(microphoneError instanceof Error ? microphoneError.message : 'Microphone permission was denied.');
     }
-  }, [enabled, flushAudio, isSupported, sessionId]);
+  }, [enabled, flushAudio, isSupported, maybeCloseTurn, sessionId]);
 
   const toggleMicrophone = useCallback(async () => {
     if (status === 'recording') {
@@ -201,6 +284,13 @@ export function useMicrophoneCapture({
 
     await startMicrophone();
   }, [startMicrophone, status, stopMicrophone]);
+
+  useEffect(() => {
+    isAssistantSpeakingRef.current = isAssistantSpeaking;
+    if (isAssistantSpeaking) {
+      resetTurnDetection();
+    }
+  }, [isAssistantSpeaking, resetTurnDetection]);
 
   useEffect(() => {
     if (!enabled || !sessionId) {

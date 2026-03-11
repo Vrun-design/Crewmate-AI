@@ -37,6 +37,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
+    description TEXT,
     status TEXT NOT NULL,
     time TEXT NOT NULL,
     tool_name TEXT NOT NULL,
@@ -199,6 +200,10 @@ try {
 
 try {
   db.exec(`ALTER TABLE tasks ADD COLUMN user_id TEXT NOT NULL DEFAULT '__system__'`);
+} catch { }
+
+try {
+  db.exec(`ALTER TABLE tasks ADD COLUMN description TEXT`);
 } catch { }
 
 try {

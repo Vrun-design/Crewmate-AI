@@ -1,5 +1,5 @@
 import React from 'react';
-import { AGENT_DEPT_ICONS } from './agentUi';
+import { getAgentIcon } from './agentUi';
 import type { AgentManifest } from './types';
 
 type AgentCardProps = {
@@ -7,12 +7,12 @@ type AgentCardProps = {
 };
 
 export function AgentCard({ agent }: AgentCardProps): React.JSX.Element {
-  const DeptIcon = AGENT_DEPT_ICONS[agent.department] ?? AGENT_DEPT_ICONS.Default;
+  const AgentIcon = getAgentIcon(agent);
 
   return (
     <div className="rounded-xl border border-border bg-card/40 p-4 flex items-start gap-3 hover:border-foreground/20 transition-colors">
       <div className="w-10 h-10 rounded-lg bg-secondary border border-border flex items-center justify-center flex-shrink-0">
-        <DeptIcon size={18} className="text-muted-foreground" />
+        <AgentIcon size={18} className="text-muted-foreground" />
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-0.5">

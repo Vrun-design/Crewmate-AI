@@ -21,6 +21,7 @@ import './clickupService';
 import './githubService';
 import './notionService';
 import './slackService';
+import './workspaceTaskTool';
 import type { AudioChunkRecord, SessionRecord } from '../types';
 import type { RuntimeSession } from './liveGatewayTypes';
 

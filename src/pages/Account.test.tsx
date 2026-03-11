@@ -26,8 +26,8 @@ vi.mock('../hooks/usePreferences', () => ({
   usePreferences: () => ({
     preferences: {
       voiceModel: 'Aoede',
-      textModel: 'gemini-3.1-pro',
-      imageModel: 'gemini-3.1-flash-image',
+      textModel: 'gemini-3.1-pro-preview',
+      imageModel: 'gemini-3.1-flash-image-preview',
       reasoningLevel: 'high',
       proactiveSuggestions: true,
       autoStartScreenShare: false,

@@ -30,9 +30,16 @@ import { terminalRunCommandSkill } from './code/terminal-run-command.skill';
 import {
     browserOpenUrlSkill,
     browserExtractSkill,
+    browserExtractTextSkill,
     browserFillFormSkill,
+    browserClickElementSkill,
+    browserInspectVisibleUiSkill,
+    browserPressKeySkill,
     browserSearchGoogleSkill,
+    browserScrollPageSkill,
     browserScreenshotSkill,
+    browserTypeIntoSkill,
+    browserUiNavigateSkill,
 } from './browser/browser.skills';
 
 // ── Automation Skills ─────────────────────────────────────────────────────────
@@ -71,9 +78,16 @@ const ALL_SKILLS = [
     // Browser
     browserOpenUrlSkill,
     browserExtractSkill,
+    browserExtractTextSkill,
     browserFillFormSkill,
+    browserClickElementSkill,
+    browserInspectVisibleUiSkill,
+    browserPressKeySkill,
     browserSearchGoogleSkill,
+    browserScrollPageSkill,
     browserScreenshotSkill,
+    browserTypeIntoSkill,
+    browserUiNavigateSkill,
     // Automation
     zapierTriggerSkill,
     zapierListSkill,

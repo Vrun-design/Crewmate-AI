@@ -33,7 +33,6 @@ export function Skills() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<(typeof systemSkills)[0] | CustomSkill | null>(null);
-  const [activeStates, setActiveStates] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     void api.get<CustomSkill[]>('/api/custom-skills')
@@ -64,11 +63,6 @@ export function Skills() {
   function handleCreateFinished(skill: CustomSkill) {
     setCustomSkills((prev) => [skill, ...prev]);
     setIsCreateOpen(false);
-  }
-
-  function handleToggleActive(e: React.MouseEvent, id: string) {
-    e.stopPropagation(); // prevent drawer open
-    setActiveStates((prev) => ({ ...prev, [id]: !(prev[id] ?? true) })); // default true
   }
 
   if (isLoading) {
@@ -151,7 +145,6 @@ export function Skills() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map((skill) => {
           const catMeta = CATEGORY_META[skill.category];
-          const isActive = activeStates[skill.id] ?? true;
 
           return (
             <motion.div
@@ -176,25 +169,15 @@ export function Skills() {
                   <div className="min-w-0">
                     <div className="font-semibold text-[14.5px] text-foreground truncate flex items-center gap-2">
                       {skill.name}
-                      {!isActive && <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/50 bg-secondary/50 border border-border px-1.5 py-0.5 rounded">Off</span>}
                     </div>
                     <p className="text-[13px] text-muted-foreground truncate max-w-[180px] sm:max-w-[240px] md:max-w-xs xl:max-w-sm mt-0.5">{skill.description}</p>
                   </div>
                 </div>
 
                 <div className="shrink-0 flex items-center">
-                  <button
-                    type="button"
-                    onClick={(e) => handleToggleActive(e, skill.id)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${isActive ? 'bg-primary' : 'bg-muted-foreground/30'}`}
-                    role="switch"
-                    aria-checked={isActive}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isActive ? 'translate-x-2' : '-translate-x-2'}`}
-                    />
-                  </button>
+                  <span className="rounded-full border border-border bg-secondary px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {skill.category}
+                  </span>
                 </div>
               </div>
             </motion.div>

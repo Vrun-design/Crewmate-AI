@@ -11,11 +11,13 @@ const {
   sendAudioMock,
   getUserMediaMock,
   trackStopMock,
+  workletNodes,
 } = vi.hoisted(() => ({
   endAudioMock: vi.fn(),
   sendAudioMock: vi.fn(),
   getUserMediaMock: vi.fn(),
   trackStopMock: vi.fn(),
+  workletNodes: [] as Array<{ port: { onmessage: ((event: MockAudioWorkletMessageEvent) => void) | null } }>,
 }));
 
 vi.mock('../services/liveSessionService', () => ({
@@ -65,10 +67,15 @@ class MockAudioContext {
   async close(): Promise<void> { }
 }
 
+function emitAudioChunk(level = 0.5): Float32Array {
+  return new Float32Array([level, -level, level, -level]);
+}
+
 describe('useMicrophoneCapture', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    workletNodes.length = 0;
     sendAudioMock.mockResolvedValue({ ok: true });
     endAudioMock.mockResolvedValue({ ok: true });
 
@@ -87,6 +94,7 @@ describe('useMicrophoneCapture', () => {
     vi.stubGlobal('AudioWorkletNode', class {
       port: { onmessage: ((event: MockAudioWorkletMessageEvent) => void) | null } = { onmessage: null };
       constructor() {
+        workletNodes.push(this);
         queueMicrotask(() => {
           this.port.onmessage?.({ data: new Float32Array([0.25, -0.25, 0.5, -0.5]) });
         });
@@ -147,5 +155,52 @@ describe('useMicrophoneCapture', () => {
     expect(trackStopMock).toHaveBeenCalledTimes(1);
     expect(endAudioMock).toHaveBeenCalledWith('SES-302');
     expect(result.current.status).toBe('muted');
+  });
+
+  test('closes the current turn after a short silence window', async () => {
+    const { result } = renderHook(() =>
+      useMicrophoneCapture({
+        sessionId: 'SES-303',
+        enabled: true,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.startMicrophone();
+      await vi.advanceTimersByTimeAsync(1300);
+    });
+
+    expect(sendAudioMock).toHaveBeenCalled();
+    expect(endAudioMock).toHaveBeenCalledWith('SES-303');
+  });
+
+  test('suppresses uploads while the assistant is speaking', async () => {
+    const { result, rerender } = renderHook(
+      ({ isAssistantSpeaking }) =>
+        useMicrophoneCapture({
+          sessionId: 'SES-304',
+          enabled: true,
+          isAssistantSpeaking,
+        }),
+      {
+        initialProps: { isAssistantSpeaking: true },
+      },
+    );
+
+    await act(async () => {
+      await result.current.startMicrophone();
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(sendAudioMock).not.toHaveBeenCalled();
+
+    rerender({ isAssistantSpeaking: false });
+
+    await act(async () => {
+      workletNodes.at(-1)?.port.onmessage?.({ data: emitAudioChunk() });
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(sendAudioMock).toHaveBeenCalled();
   });
 });

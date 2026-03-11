@@ -7,10 +7,18 @@ import {
   CheckCircle2,
   Clock,
   Code2,
+  Compass,
   FlaskConical,
+  HandCoins,
+  Headphones,
+  Lightbulb,
   Mail,
   MessageSquare,
+  Megaphone,
+  PenSquare,
   PenTool,
+  Presentation,
+  ScanSearch,
   Wrench,
   XCircle,
   Zap,
@@ -18,8 +26,11 @@ import {
   Scale,
   Users,
   Package,
+  MonitorUp,
+  Settings2,
 } from 'lucide-react';
 import type { AgentStepType } from './types';
+import type { AgentManifest } from './types';
 
 export function StepIcon({ type }: { type: AgentStepType }): React.JSX.Element {
   const props = { size: 13 };
@@ -81,8 +92,31 @@ export const AGENT_DEPT_ICONS: Record<string, React.ComponentType<{ size?: numbe
   Legal: Scale,
   People: Users,
   Product: Package,
+  Navigation: MonitorUp,
   Default: Bot,
 };
+
+const AGENT_ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  'crewmate-research-agent': ScanSearch,
+  'crewmate-marketing-agent': Megaphone,
+  'crewmate-content-agent': PenSquare,
+  'crewmate-social-agent': Presentation,
+  'crewmate-devops-agent': Settings2,
+  'crewmate-communications-agent': Mail,
+  'crewmate-calendar-agent': Calendar,
+  'crewmate-sales-agent': HandCoins,
+  'crewmate-support-agent': Headphones,
+  'crewmate-hr-agent': Users,
+  'crewmate-product-agent': Lightbulb,
+  'crewmate-finance-agent': LineChart,
+  'crewmate-legal-agent': Scale,
+  'crewmate-data-agent': BarChart2,
+  'crewmate-ui-navigator-agent': Compass,
+};
+
+export function getAgentIcon(agent: Pick<AgentManifest, 'id' | 'department'>): React.ComponentType<{ size?: number; className?: string }> {
+  return AGENT_ICONS[agent.id] ?? AGENT_DEPT_ICONS[agent.department] ?? AGENT_DEPT_ICONS.Default;
+}
 
 export const TASK_STATUS_ICONS = {
   running: { icon: Bot, fallback: Clock },

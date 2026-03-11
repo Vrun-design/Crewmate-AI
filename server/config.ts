@@ -21,6 +21,8 @@ export const serverConfig = {
     jobTypesV2: parseBooleanEnv('FEATURE_JOB_TYPES_V2'),
     slackInbound: parseBooleanEnv('FEATURE_SLACK_INBOUND'),
     approvalGates: parseBooleanEnv('FEATURE_APPROVAL_GATES'),
+    uiNavigator: parseBooleanEnv('FEATURE_UI_NAVIGATOR'),
+    researchGrounding: parseBooleanEnv('FEATURE_RESEARCH_GROUNDING', true),
   },
 
   // ── Model routing ──────────────────────────────────────────────────────────

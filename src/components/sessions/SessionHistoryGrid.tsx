@@ -108,7 +108,7 @@ export function SessionHistoryGrid({ sessions: initialSessions }: SessionHistory
               </div>
             </div>
             <div className="rounded-xl border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
-              Full transcript and memory extractions are stored server-side and linked to this session ID.
+              Semantic memory and high-level summaries are compacted and stored for this session by the memory worker.
             </div>
             <button
               type="button"

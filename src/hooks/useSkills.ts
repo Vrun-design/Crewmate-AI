@@ -20,6 +20,14 @@ export interface SkillRunResult {
     error?: string;
 }
 
+export interface SkillRunRecord {
+    skillId: string;
+    runAt: string;
+    args: Record<string, unknown>;
+    result: SkillRunResult;
+    durationMs: number;
+}
+
 export function useSkills(personaId?: string) {
     const [skills, setSkills] = useState<SkillSummary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -36,9 +44,8 @@ export function useSkills(personaId?: string) {
     const runSkill = useCallback(async (
         skillId: string,
         args: Record<string, unknown>
-    ): Promise<SkillRunResult> => {
-        const result = await api.post<{ result: SkillRunResult }>(`/api/skills/${skillId}/run`, { args });
-        return result.result;
+    ): Promise<SkillRunRecord> => {
+        return api.post<SkillRunRecord>(`/api/skills/${skillId}/run`, { args });
     }, []);
 
     return { skills, isLoading, error, runSkill };
