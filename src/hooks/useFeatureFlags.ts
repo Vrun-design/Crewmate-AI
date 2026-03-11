@@ -7,6 +7,8 @@ const defaultFlags: FeatureFlags = {
   jobTypesV2: false,
   slackInbound: false,
   approvalGates: false,
+  uiNavigator: false,
+  researchGrounding: false,
 };
 
 interface UseFeatureFlagsResult {

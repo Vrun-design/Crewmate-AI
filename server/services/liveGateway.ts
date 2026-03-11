@@ -9,6 +9,7 @@ import { getSession, getSessionUserId, insertTranscriptMessage, updateSessionSta
 import { serverConfig } from '../config';
 import { getUserPreferences } from './preferencesService';
 import { getToolDeclarations } from '../mcp/mcpServer';
+import { getSkillDeclarations } from '../skills/registry';
 import { broadcastEvent } from './eventService';
 import { selectModel } from './modelRouter';
 import { insertActivity } from './activityService';
@@ -21,6 +22,7 @@ import './clickupService';
 import './githubService';
 import './notionService';
 import './slackService';
+import './telegramService';
 import './workspaceTaskTool';
 import type { AudioChunkRecord, SessionRecord } from '../types';
 import type { RuntimeSession } from './liveGatewayTypes';
@@ -64,7 +66,7 @@ export async function startGeminiLiveSession(sessionId: string): Promise<Session
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction,
-          tools: [{ functionDeclarations: getToolDeclarations() }],
+          tools: [{ functionDeclarations: [...getToolDeclarations(), ...getSkillDeclarations()] }],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
           speechConfig: {

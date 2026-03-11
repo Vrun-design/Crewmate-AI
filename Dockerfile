@@ -1,4 +1,4 @@
-### Stage 1 — Build frontend (Vite) + compile server (tsc)
+### Stage 1 — Build frontend assets
 FROM node:20-slim AS builder
 
 WORKDIR /app
@@ -13,10 +13,7 @@ COPY . .
 # Build frontend
 RUN npm run build
 
-# Compile server TypeScript → dist/
-RUN npx tsc -p tsconfig.server.json || npx tsc --skipLibCheck --outDir dist/server --rootDir server server/**/*.ts || true
-
-### Stage 2 — Production image (lean)
+### Stage 2 — Runtime image
 FROM node:20-slim AS runner
 
 # Install chromium deps for Playwright browser skills
@@ -27,9 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Only prod dependencies
+# Runtime keeps tsx available because the server is executed directly from TypeScript.
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --include=dev
 
 # Copy built assets from builder
 COPY --from=builder /app/dist ./dist
@@ -51,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 ENV NODE_ENV=production
 ENV PORT=8787
 
-CMD ["node", "-r", "tsx/cjs", "server/index.ts"]
+CMD ["node", "--import", "tsx", "server/index.ts"]

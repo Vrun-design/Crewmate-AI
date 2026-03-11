@@ -30,7 +30,7 @@ import {
   Settings2,
 } from 'lucide-react';
 import type { AgentStepType } from './types';
-import type { AgentManifest } from './types';
+import type { AgentManifest, AgentTask } from './types';
 
 export function StepIcon({ type }: { type: AgentStepType }): React.JSX.Element {
   const props = { size: 13 };
@@ -118,6 +118,63 @@ export function getAgentIcon(agent: Pick<AgentManifest, 'id' | 'department'>): R
   return AGENT_ICONS[agent.id] ?? AGENT_DEPT_ICONS[agent.department] ?? AGENT_DEPT_ICONS.Default;
 }
 
-export const TASK_STATUS_ICONS = {
-  running: { icon: Bot, fallback: Clock },
+type AgentTaskStatusMeta = {
+  badgeVariant: 'default' | 'success' | 'danger' | 'info';
+  cardClassName: string;
+  iconContainerClassName: string;
+  label: string;
 };
+
+const AGENT_TASK_STATUS_META: Record<AgentTask['status'], AgentTaskStatusMeta> = {
+  queued: {
+    badgeVariant: 'default',
+    cardClassName: 'border-border',
+    iconContainerClassName: 'border-border bg-secondary',
+    label: 'Queued',
+  },
+  running: {
+    badgeVariant: 'info',
+    cardClassName: 'border-blue-500/40 shadow-[0_0_20px_rgba(59,130,246,0.08)]',
+    iconContainerClassName: 'border-blue-500/40 bg-blue-500/10',
+    label: 'Running',
+  },
+  completed: {
+    badgeVariant: 'success',
+    cardClassName: 'border-emerald-500/20',
+    iconContainerClassName: 'border-emerald-500/30 bg-emerald-500/10',
+    label: 'Completed',
+  },
+  failed: {
+    badgeVariant: 'danger',
+    cardClassName: 'border-red-500/20',
+    iconContainerClassName: 'border-red-500/30 bg-red-500/10',
+    label: 'Failed',
+  },
+};
+
+export function getAgentTaskStatusMeta(status: AgentTask['status']): AgentTaskStatusMeta {
+  return AGENT_TASK_STATUS_META[status];
+}
+
+export function getAgentTaskDurationSeconds(task: Pick<AgentTask, 'createdAt' | 'completedAt'>): number | null {
+  if (!task.completedAt) {
+    return null;
+  }
+
+  const durationMs = new Date(task.completedAt).getTime() - new Date(task.createdAt).getTime();
+  return Math.max(0, Math.round(durationMs / 1000));
+}
+
+export function getAgentTaskAgentLabel(agentId: string): string {
+  const normalized = agentId
+    .replace(/^crewmate-/, '')
+    .replace(/-agent$/, '')
+    .replace(/_agent$/, '')
+    .replace(/_/g, '-');
+
+  return normalized
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}

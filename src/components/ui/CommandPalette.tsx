@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Search, LayoutDashboard, MonitorUp, CheckSquare, X, BrainCircuit, PlugZap, User, Bell, Cpu, Bot, Workflow } from 'lucide-react';
+import { Search, LayoutDashboard, MonitorUp, CheckSquare, X, BrainCircuit, PlugZap, User, Bell, Cpu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -23,22 +22,12 @@ const BASE_LINKS: CommandLink[] = [
   { path: '/dashboard', label: 'Dashboard', desc: 'Go to main dashboard', icon: LayoutDashboard, color: 'text-primary', bg: 'bg-primary/10' },
   { path: '/tasks', label: 'Tasks', desc: 'View all tasks', icon: CheckSquare, color: 'text-purple-500', bg: 'bg-purple-500/10' },
   { path: '/sessions', label: 'Sessions', desc: 'Review past sessions', icon: MonitorUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-  { path: '/off-shift', label: 'Off-Shift', desc: 'Queue async work for background execution', icon: Bot, color: 'text-lime-500', bg: 'bg-lime-500/10' },
   { path: '/memory', label: 'Memory Base', desc: 'Manage agent context', icon: BrainCircuit, color: 'text-amber-500', bg: 'bg-amber-500/10' },
   { path: '/skills', label: 'Capabilities', desc: 'Inspect live agent capabilities', icon: Cpu, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
   { path: '/integrations', label: 'Integrations', desc: 'Connect your tools', icon: PlugZap, color: 'text-pink-500', bg: 'bg-pink-500/10' },
   { path: '/account', label: 'Account & Settings', desc: 'Manage profile and preferences', icon: User, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
   { path: '/notifications', label: 'Notifications', desc: 'View all alerts', icon: Bell, color: 'text-rose-500', bg: 'bg-rose-500/10' },
 ];
-
-const OFFSHIFT_INBOX_LINK: CommandLink = {
-  path: '/offshift',
-  label: 'Off-Shift Inbox',
-  desc: 'Track async work from origin to delivery',
-  icon: Workflow,
-  color: 'text-fuchsia-500',
-  bg: 'bg-fuchsia-500/10',
-};
 
 function filterLinks(links: CommandLink[], query: string): CommandLink[] {
   const normalizedQuery = query.trim().toLowerCase();
@@ -55,7 +44,6 @@ function filterLinks(links: CommandLink[], query: string): CommandLink[] {
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps): React.JSX.Element | null {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
-  const { flags } = useFeatureFlags();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,10 +65,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps): React.
     };
   }, [isOpen]);
 
-  const links = flags.offshiftInbox
-    ? [...BASE_LINKS.slice(0, 4), OFFSHIFT_INBOX_LINK, ...BASE_LINKS.slice(4)]
-    : BASE_LINKS;
-  const filteredLinks = filterLinks(links, query);
+  const filteredLinks = filterLinks(BASE_LINKS, query);
 
   const content = (
     <AnimatePresence>

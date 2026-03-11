@@ -7,6 +7,7 @@ import {
 import { isGithubConfigured } from './githubService';
 import { isNotionConfigured } from './notionService';
 import { isSlackConfigured } from './slackService';
+import { isTelegramConfigured } from './telegramService';
 import { isGmailConfigured } from './gmailService';
 import { isCalendarConfigured } from './calendarService';
 import type { IntegrationRecord } from '../types';
@@ -88,6 +89,25 @@ const integrationDefinitions: IntegrationDefinition[] = [
       'Save the bot token and default channel ID from the integrations page.',
     ],
     notes: 'Use one default channel per workspace to keep routing simple and reliable.',
+  },
+  {
+    id: 'telegram',
+    name: 'Telegram',
+    status: 'disconnected',
+    iconName: 'telegram',
+    color: 'text-sky-600 dark:text-sky-400',
+    bgColor: 'bg-sky-500/10 border-sky-500/20',
+    desc: 'Use a Telegram bot as a personal command channel for text, voice notes, and delivery updates.',
+    docsUrl: 'https://core.telegram.org/bots/api',
+    capabilities: ['Receive text commands', 'Transcribe voice notes', 'Send task and job updates back to chat'],
+    requiredKeys: ['botToken', 'defaultChatId', 'webhookSecret'],
+    setupSteps: [
+      'Create a Telegram bot with BotFather and copy the bot token.',
+      'Send a message to the bot once, then save the default chat ID for the chat that should control Crewmate.',
+      'Set a webhook secret token and point Telegram webhook delivery at /api/telegram/webhook/<workspaceId> on your backend.',
+      'Now message the bot with a text command or voice note to trigger work and receive updates there.',
+    ],
+    notes: 'Best suited for a single-owner command channel in this build. Configure one default chat per workspace.',
   },
   {
     id: 'notion',
@@ -172,6 +192,10 @@ function getConnectedStatus(workspaceId: string, integrationId: string): Integra
 
   if (integrationId === 'slack') {
     return isSlackConfigured(workspaceId) ? 'connected' : 'disconnected';
+  }
+
+  if (integrationId === 'telegram') {
+    return isTelegramConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
   if (integrationId === 'notion') {

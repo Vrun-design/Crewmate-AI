@@ -207,6 +207,10 @@ try {
 } catch { }
 
 try {
+  db.exec(`ALTER TABLE tasks ADD COLUMN url TEXT`);
+} catch { }
+
+try {
   db.exec(`ALTER TABLE memory_nodes ADD COLUMN embedding TEXT`);
 } catch { }
 

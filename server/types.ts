@@ -16,6 +16,7 @@ export interface TaskRecord {
   time: string;
   tool: string;
   priority: 'High' | 'Medium' | 'Low';
+  url?: string | null;
 }
 
 export interface IntegrationRecord {
@@ -134,9 +135,9 @@ export interface UserPreferencesRecord {
 
 export type JobType = 'research_brief' | 'daily_digest' | 'workflow_run';
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed';
-export type WorkOriginType = 'delegation' | 'live_session' | 'slack' | 'email' | 'system';
+export type WorkOriginType = 'delegation' | 'live_session' | 'slack' | 'email' | 'telegram' | 'system';
 export type WorkApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
-export type DeliveryChannelType = 'in_app' | 'slack' | 'email' | 'notion' | 'github' | 'clickup';
+export type DeliveryChannelType = 'in_app' | 'slack' | 'email' | 'telegram' | 'notion' | 'github' | 'clickup';
 
 export interface WorkDeliveryRecord {
   channel: DeliveryChannelType;

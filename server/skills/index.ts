@@ -14,6 +14,7 @@ import { slackListChannelsSkill } from './communication/slack-list-channels.skil
 
 // ── Productivity Skills ───────────────────────────────────────────────────────
 import { calendarScheduleSkill, calendarFindFreeTimeSkill, calendarListEventsSkill } from './productivity/calendar.skills';
+import { delegationQueueResearchSkill, delegationQueueWorkflowSkill } from './productivity/delegation.skills';
 import { notionCreatePageSkill } from './productivity/notion-create-page.skill';
 import { notionListPagesSkill } from './productivity/notion-list-pages.skill';
 import { clickupCreateTaskSkill } from './productivity/clickup-create-task.skill';
@@ -62,6 +63,8 @@ const ALL_SKILLS = [
     calendarScheduleSkill,
     calendarFindFreeTimeSkill,
     calendarListEventsSkill,
+    delegationQueueResearchSkill,
+    delegationQueueWorkflowSkill,
     notionCreatePageSkill,
     notionListPagesSkill,
     clickupCreateTaskSkill,

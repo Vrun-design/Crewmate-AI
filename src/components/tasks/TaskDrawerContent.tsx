@@ -112,7 +112,12 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
         </div>
 
         <div className="pt-4 border-t border-border flex gap-3">
-          <Button variant="primary" className="flex-1">
+          <Button 
+            variant="primary" 
+            className="flex-1"
+            onClick={() => task.url ? window.open(task.url, '_blank') : null}
+            disabled={!task.url && task.tool !== 'Crewmate'}
+          >
             Open in {task.tool}
           </Button>
         </div>

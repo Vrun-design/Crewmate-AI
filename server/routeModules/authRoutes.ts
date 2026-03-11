@@ -1,7 +1,38 @@
 import type { Express, Request, Response } from 'express';
+import { serverConfig } from '../config';
 import { buildCalendarAuthUrl, exchangeCalendarCode } from '../services/calendarService';
 import { clearAuthSession, getAuthUser, requestLoginCode, verifyLoginCode } from '../services/authService';
 import { buildGmailAuthUrl, exchangeGmailCode } from '../services/gmailService';
+
+const AUTH_REQUEST_WINDOW_MS = 10 * 60 * 1000;
+const AUTH_REQUEST_MIN_INTERVAL_MS = 30 * 1000;
+const AUTH_REQUEST_MAX_ATTEMPTS = 5;
+const authRequestTracker = new Map<string, number[]>();
+
+function getAuthThrottleKey(email: string, req: Request): string {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  const ip = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0]?.trim() || req.ip || 'unknown';
+  return `${email}:${ip}`;
+}
+
+function isAuthRequestRateLimited(key: string, now: number): boolean {
+  const recentAttempts = (authRequestTracker.get(key) ?? []).filter((timestamp) => now - timestamp < AUTH_REQUEST_WINDOW_MS);
+
+  if (recentAttempts.length >= AUTH_REQUEST_MAX_ATTEMPTS) {
+    authRequestTracker.set(key, recentAttempts);
+    return true;
+  }
+
+  const lastAttemptAt = recentAttempts[recentAttempts.length - 1];
+  if (lastAttemptAt && now - lastAttemptAt < AUTH_REQUEST_MIN_INTERVAL_MS) {
+    authRequestTracker.set(key, recentAttempts);
+    return true;
+  }
+
+  recentAttempts.push(now);
+  authRequestTracker.set(key, recentAttempts);
+  return false;
+}
 
 export function registerAuthRoutes(app: Express): void {
   app.post('/api/auth/request-code', (req: Request, res: Response) => {
@@ -12,7 +43,14 @@ export function registerAuthRoutes(app: Express): void {
       return;
     }
 
-    res.status(201).json(requestLoginCode(email));
+    const now = Date.now();
+    if (isAuthRequestRateLimited(getAuthThrottleKey(email, req), now)) {
+      res.status(429).json({ message: 'Too many verification requests. Please wait before trying again.' });
+      return;
+    }
+
+    const result = requestLoginCode(email);
+    res.status(201).json(serverConfig.exposeDevAuthCode ? result : { email: result.email });
   });
 
   app.post('/api/auth/verify', (req: Request, res: Response) => {

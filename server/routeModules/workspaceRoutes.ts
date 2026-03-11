@@ -15,23 +15,23 @@ import { createGithubIssue, isGithubConfigured } from '../services/githubService
 import type { UserPreferencesRecord } from '../types';
 import type { RequireAuth } from './types';
 
-async function executeIntegrationTask(tool: string, workspaceId: string, title: string, description: string): Promise<void> {
+async function executeIntegrationTask(tool: string, workspaceId: string, title: string, description: string): Promise<string | undefined> {
   switch (tool) {
     case 'Notion':
       if (!isNotionConfigured(workspaceId)) throw new Error('Notion integration is not configured.');
-      await createNotionPage(workspaceId, { title, content: description });
-      break;
+      const notionResult = await createNotionPage(workspaceId, { title, content: description });
+      return notionResult.url;
     case 'ClickUp':
       if (!isClickUpConfigured(workspaceId)) throw new Error('ClickUp integration is not configured.');
-      await createClickUpTask(workspaceId, { name: title, description });
-      break;
+      const clickupResult = await createClickUpTask(workspaceId, { name: title, description });
+      return clickupResult.url;
     case 'GitHub':
       if (!isGithubConfigured(workspaceId)) throw new Error('GitHub integration is not configured.');
-      await createGithubIssue(workspaceId, { title, body: description });
-      break;
+      const githubResult = await createGithubIssue(workspaceId, { title, body: description });
+      return githubResult.url;
     case 'Crewmate':
       // Local workspace task only, no external sync needed
-      break;
+      return undefined;
   }
 }
 
@@ -113,13 +113,14 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     }
 
     try {
-      await executeIntegrationTask(tool, user.workspaceId, title, description);
+      const url = await executeIntegrationTask(tool, user.workspaceId, title, description);
 
       const task = createWorkspaceTask(user.id, {
         title,
         description,
         tool,
         priority: priority as 'Low' | 'Medium' | 'High',
+        url,
       });
 
       res.status(201).json(task);

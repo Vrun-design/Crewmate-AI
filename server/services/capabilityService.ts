@@ -1,12 +1,8 @@
-import { listIntegrationCatalog } from './integrationCatalog';
 import { listTools } from '../mcp/mcpServer';
 import { listDiscoveredAgents } from './agents/agentDiscovery';
 import type { CapabilityRecord } from '../types';
 
 export function listCapabilities(workspaceId: string, userId: string): CapabilityRecord[] {
-  const integrations = listIntegrationCatalog(workspaceId, userId);
-  const connectedIntegrationCount = integrations.filter((integration) => integration.status === 'connected').length;
-
   const mcpCapabilities: CapabilityRecord[] = listTools().map((t) => ({
     id: `mcp - ${t.name} `,
     title: `MCP: ${t.name} `,
@@ -28,13 +24,6 @@ export function listCapabilities(workspaceId: string, userId: string): Capabilit
       id: 'live-screen',
       title: 'Live screen perception',
       description: 'Reads shared screen frames during active Gemini Live sessions.',
-      status: 'live',
-      category: 'perception',
-    },
-    {
-      id: 'live-mic',
-      title: 'Live microphone perception',
-      description: 'Transcribes and reasons over live microphone input in-session.',
       status: 'live',
       category: 'perception',
     },

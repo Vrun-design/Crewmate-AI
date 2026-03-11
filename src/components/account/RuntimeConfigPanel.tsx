@@ -83,7 +83,7 @@ export function RuntimeConfigPanel({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-0.5">
-                <label className="text-sm font-medium text-foreground">Creative Studio (Image)</label>
+                <label className="text-sm font-medium text-foreground">Image Generation</label>
                 <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-500 border border-rose-500/15">VISUAL</span>
               </div>
               <p className="text-xs text-muted-foreground mb-3">Social media images, banners, UI mockups, product visuals.</p>

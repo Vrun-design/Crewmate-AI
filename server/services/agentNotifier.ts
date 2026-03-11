@@ -9,8 +9,41 @@
 import { createNotification } from './notificationService';
 import { getNotificationPrefs } from './notificationPrefsService';
 import type { AgentTask } from './orchestrator';
+import { isTelegramConfigured, postTelegramMessage } from './telegramService';
+import { db } from '../db';
 
 const SLACK_WEBHOOK_TIMEOUT_MS = 8_000;
+
+function getWorkspaceIdForUser(userId: string): string | null {
+    const row = db.prepare('SELECT workspace_id as workspaceId FROM workspace_members WHERE user_id = ? LIMIT 1').get(userId) as { workspaceId: string } | undefined;
+    return row?.workspaceId ?? null;
+}
+
+function buildTaskLink(taskId: string): string {
+    return `${new URL('/agents', 'http://placeholder').pathname}?task=${encodeURIComponent(taskId)}`;
+}
+
+function buildTelegramTaskMessage(task: AgentTask): string {
+    const statusLabel = task.status === 'completed' ? 'Completed' : task.status === 'failed' ? 'Failed' : 'Updated';
+    const lines = [
+        `Crewmate task ${statusLabel}`,
+        task.intent,
+    ];
+
+    if (task.error) {
+        lines.push(`Error: ${task.error}`);
+    }
+
+    if (task.result && typeof task.result === 'object') {
+        const payload = task.result as Record<string, unknown>;
+        if (typeof payload.summary === 'string' && payload.summary.trim()) {
+            lines.push(`Summary: ${payload.summary.trim()}`);
+        }
+    }
+
+    lines.push(`Open: ${new URL(buildTaskLink(task.id), process.env.CORS_ORIGIN ?? 'http://localhost:3000').toString()}`);
+    return lines.join('\n');
+}
 
 // ── In-app notification ───────────────────────────────────────────────────────
 
@@ -134,6 +167,17 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
             await sendSlackWebhook(prefs.slackWebhookUrl, task);
         } catch (err) {
             console.error('[agentNotifier] Slack webhook failed:', err);
+        }
+    }
+
+    const workspaceId = getWorkspaceIdForUser(userId);
+    if (workspaceId && isTelegramConfigured(workspaceId)) {
+        try {
+            await postTelegramMessage(workspaceId, {
+                text: buildTelegramTaskMessage(task),
+            });
+        } catch (err) {
+            console.error('[agentNotifier] Telegram message failed:', err);
         }
     }
 }

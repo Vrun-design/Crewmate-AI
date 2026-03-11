@@ -62,7 +62,7 @@ export function Verify() {
       setDevCode(response.devCode);
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-      setResendMessage('A fresh verification code is ready.');
+      setResendMessage(response.devCode ? 'A fresh verification code is ready.' : 'A fresh verification code was sent.');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Unable to resend code');
     } finally {

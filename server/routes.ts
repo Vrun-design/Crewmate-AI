@@ -3,12 +3,14 @@ import { db } from './db';
 import { getAuthUser } from './services/authService';
 import { registerAgentRoutes } from './routeModules/agentRoutes';
 import { registerAuthRoutes } from './routeModules/authRoutes';
+import { registerCommunicationRoutes } from './routeModules/communicationRoutes';
 import { registerCustomSkillRoutes } from './routeModules/customSkillRoutes';
 import { registerIntegrationRoutes } from './routeModules/integrationRoutes';
 import { registerJobRoutes } from './routeModules/jobRoutes';
 import { registerLiveSessionRoutes } from './routeModules/liveSessionRoutes';
 import { registerMemoryRoutes } from './routeModules/memoryRoutes';
 import { registerNotificationRoutes } from './routeModules/notificationRoutes';
+import { registerTelegramRoutes } from './routeModules/telegramRoutes';
 import { registerWorkspaceRoutes } from './routeModules/workspaceRoutes';
 import type { AuthUserRecord } from './types';
 
@@ -33,6 +35,8 @@ export function registerRoutes(app: Express) {
   registerNotificationRoutes(app, requireAuth);
   registerIntegrationRoutes(app, requireAuth);
   registerJobRoutes(app, requireAuth);
+  registerCommunicationRoutes(app, requireAuth);
+  registerTelegramRoutes(app);
   registerMemoryRoutes(app, requireAuth);
   registerLiveSessionRoutes(app, requireAuth);
   registerAgentRoutes(app, requireAuth);

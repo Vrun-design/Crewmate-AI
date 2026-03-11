@@ -5,6 +5,7 @@ import { listActivities, listSessionHistory, listTasks } from '../repositories/w
 import { insertActivity, insertTask } from './activityService';
 import { createNotionPage, isNotionConfigured } from './notionService';
 import { postSlackMessage, isSlackConfigured } from './slackService';
+import { isTelegramConfigured, postTelegramMessage } from './telegramService';
 import { broadcastEvent } from './eventService';
 import { getTask, orchestrate } from './orchestrator';
 import type { JobRecord, WorkArtifactRecord, WorkDeliveryRecord, WorkHandoffRecord } from '../types';
@@ -30,6 +31,13 @@ interface WorkflowRunPayload {
   intent: string;
   deliverToNotion: boolean;
   notifyInSlack: boolean;
+}
+
+interface JobQueueMetadata {
+  actor?: string;
+  handoffSummary?: string;
+  originRef?: string | null;
+  originType?: JobRecord['originType'];
 }
 
 interface StoredJobRow {
@@ -153,10 +161,15 @@ export function enqueueResearchBriefJob(
   workspaceId: string,
   userId: string,
   payload: ResearchBriefPayload,
+  metadata?: JobQueueMetadata,
 ): JobRecord {
   const now = new Date().toISOString();
   const id = `JOB-${randomUUID()}`;
   const title = payload.topic.trim() || 'Async research brief';
+  const originType = metadata?.originType ?? 'delegation';
+  const originRef = metadata?.originRef ?? null;
+  const actor = metadata?.actor ?? 'user';
+  const handoffSummary = metadata?.handoffSummary ?? 'Queued from Delegations page';
 
   db.prepare(`
     INSERT INTO jobs (
@@ -181,15 +194,16 @@ export function enqueueResearchBriefJob(
       updated_at,
       started_at,
       completed_at
-    ) VALUES (?, ?, ?, 'research_brief', 'queued', ?, ?, NULL, NULL, ?, NULL, '[]', '[]', 'not_required', NULL, NULL, ?, ?, ?, NULL, NULL)
+    ) VALUES (?, ?, ?, 'research_brief', 'queued', ?, ?, NULL, NULL, ?, ?, '[]', '[]', 'not_required', NULL, NULL, ?, ?, ?, NULL, NULL)
   `).run(
     id,
     workspaceId,
     userId,
     title,
     JSON.stringify(payload),
-    'delegation',
-    JSON.stringify([{ at: now, type: 'created', actor: 'user', summary: 'Queued from Delegations page' } satisfies WorkHandoffRecord]),
+    originType,
+    originRef,
+    JSON.stringify([{ at: now, type: 'created', actor, summary: handoffSummary } satisfies WorkHandoffRecord]),
     now,
     now,
   );
@@ -212,14 +226,14 @@ export function enqueueResearchBriefJob(
     createdAt: now,
     updatedAt: now,
     completedAt: null,
-    originType: 'delegation',
-    originRef: null,
+    originType,
+    originRef,
     deliveryChannels: [],
     artifactRefs: [],
     approvalStatus: 'not_required',
     approvalRequestedAt: null,
     approvedAt: null,
-    handoffLog: [{ at: now, type: 'created', actor: 'user', summary: 'Queued from Delegations page' }],
+    handoffLog: [{ at: now, type: 'created', actor, summary: handoffSummary }],
   };
 }
 
@@ -227,10 +241,15 @@ export function enqueueDailyDigestJob(
   workspaceId: string,
   userId: string,
   payload: DailyDigestPayload,
+  metadata?: JobQueueMetadata,
 ): JobRecord {
   const now = new Date().toISOString();
   const id = `JOB-${randomUUID()}`;
   const title = `${payload.timeWindowLabel} digest`;
+  const originType = metadata?.originType ?? 'delegation';
+  const originRef = metadata?.originRef ?? null;
+  const actor = metadata?.actor ?? 'user';
+  const handoffSummary = metadata?.handoffSummary ?? 'Queued a daily digest from Delegations';
 
   db.prepare(`
     INSERT INTO jobs (
@@ -255,15 +274,16 @@ export function enqueueDailyDigestJob(
       updated_at,
       started_at,
       completed_at
-    ) VALUES (?, ?, ?, 'daily_digest', 'queued', ?, ?, NULL, NULL, ?, NULL, '[]', '[]', 'not_required', NULL, NULL, ?, ?, ?, NULL, NULL)
+    ) VALUES (?, ?, ?, 'daily_digest', 'queued', ?, ?, NULL, NULL, ?, ?, '[]', '[]', 'not_required', NULL, NULL, ?, ?, ?, NULL, NULL)
   `).run(
     id,
     workspaceId,
     userId,
     title,
     JSON.stringify(payload),
-    'delegation',
-    JSON.stringify([{ at: now, type: 'created', actor: 'user', summary: 'Queued a daily digest from Delegations' } satisfies WorkHandoffRecord]),
+    originType,
+    originRef,
+    JSON.stringify([{ at: now, type: 'created', actor, summary: handoffSummary } satisfies WorkHandoffRecord]),
     now,
     now,
   );
@@ -287,14 +307,14 @@ export function enqueueDailyDigestJob(
     createdAt: now,
     updatedAt: now,
     completedAt: null,
-    originType: 'delegation',
-    originRef: null,
+    originType,
+    originRef,
     deliveryChannels: [],
     artifactRefs: [],
     approvalStatus: 'not_required',
     approvalRequestedAt: null,
     approvedAt: null,
-    handoffLog: [{ at: now, type: 'created', actor: 'user', summary: 'Queued a daily digest from Delegations' }],
+    handoffLog: [{ at: now, type: 'created', actor, summary: handoffSummary }],
   };
 }
 
@@ -302,10 +322,15 @@ export function enqueueWorkflowRunJob(
   workspaceId: string,
   userId: string,
   payload: WorkflowRunPayload,
+  metadata?: JobQueueMetadata,
 ): JobRecord {
   const now = new Date().toISOString();
   const id = `JOB-${randomUUID()}`;
   const title = payload.title.trim() || 'Off-shift workflow';
+  const originType = metadata?.originType ?? 'delegation';
+  const originRef = metadata?.originRef ?? null;
+  const actor = metadata?.actor ?? 'user';
+  const handoffSummary = metadata?.handoffSummary ?? 'Queued a generic off-shift workflow';
 
   db.prepare(`
     INSERT INTO jobs (
@@ -330,15 +355,16 @@ export function enqueueWorkflowRunJob(
       updated_at,
       started_at,
       completed_at
-    ) VALUES (?, ?, ?, 'workflow_run', 'queued', ?, ?, NULL, NULL, ?, NULL, '[]', '[]', 'not_required', NULL, NULL, ?, ?, ?, NULL, NULL)
+    ) VALUES (?, ?, ?, 'workflow_run', 'queued', ?, ?, NULL, NULL, ?, ?, '[]', '[]', 'not_required', NULL, NULL, ?, ?, ?, NULL, NULL)
   `).run(
     id,
     workspaceId,
     userId,
     title,
     JSON.stringify(payload),
-    'delegation',
-    JSON.stringify([{ at: now, type: 'created', actor: 'user', summary: 'Queued a generic off-shift workflow' } satisfies WorkHandoffRecord]),
+    originType,
+    originRef,
+    JSON.stringify([{ at: now, type: 'created', actor, summary: handoffSummary } satisfies WorkHandoffRecord]),
     now,
     now,
   );
@@ -362,14 +388,14 @@ export function enqueueWorkflowRunJob(
     createdAt: now,
     updatedAt: now,
     completedAt: null,
-    originType: 'delegation',
-    originRef: null,
+    originType,
+    originRef,
     deliveryChannels: [],
     artifactRefs: [],
     approvalStatus: 'not_required',
     approvalRequestedAt: null,
     approvedAt: null,
-    handoffLog: [{ at: now, type: 'created', actor: 'user', summary: 'Queued a generic off-shift workflow' }],
+    handoffLog: [{ at: now, type: 'created', actor, summary: handoffSummary }],
   };
 }
 
@@ -601,6 +627,35 @@ function markJobFinished(
   broadcastEvent(userId, 'job_update', { jobId, status });
 }
 
+async function maybeSendTelegramJobUpdate(
+  workspaceId: string,
+  payload: {
+    artifactUrl?: string | null;
+    jobId: string;
+    status: 'completed' | 'failed';
+    summary: string;
+    title: string;
+  },
+): Promise<void> {
+  if (!isTelegramConfigured(workspaceId)) {
+    return;
+  }
+
+  const statusLabel = payload.status === 'completed' ? 'completed' : 'failed';
+  const lines = [
+    `Crewmate background job ${statusLabel}`,
+    payload.title,
+    payload.summary,
+  ];
+
+  if (payload.artifactUrl) {
+    lines.push(`Artifact: ${payload.artifactUrl}`);
+  }
+
+  lines.push(`Job ID: ${payload.jobId}`);
+  await postTelegramMessage(workspaceId, { text: lines.join('\n') });
+}
+
 async function runResearchBriefJob(job: {
   id: string;
   workspaceId: string;
@@ -692,6 +747,14 @@ async function runResearchBriefJob(job: {
       : `Finished the background brief for "${job.title}".`,
     'research',
   );
+
+  await maybeSendTelegramJobUpdate(job.workspaceId, {
+    artifactUrl: notionUrl,
+    jobId: job.id,
+    status: 'completed',
+    summary: job.payload.goal,
+    title: job.title,
+  });
 }
 
 async function runDailyDigestJob(job: {
@@ -779,6 +842,14 @@ async function runDailyDigestJob(job: {
     'research',
     job.userId,
   );
+
+  await maybeSendTelegramJobUpdate(job.workspaceId, {
+    artifactUrl: notionUrl,
+    jobId: job.id,
+    status: 'completed',
+    summary: digest.summary,
+    title: job.title,
+  });
 }
 
 async function runWorkflowRunJob(job: {
@@ -869,6 +940,14 @@ async function runWorkflowRunJob(job: {
     'research',
     job.userId,
   );
+
+  await maybeSendTelegramJobUpdate(job.workspaceId, {
+    artifactUrl: notionUrl ?? `${process.env.CORS_ORIGIN ?? 'http://localhost:3000'}/agents?task=${encodeURIComponent(orchestration.taskId)}`,
+    jobId: job.id,
+    status: 'completed',
+    summary: resultText.slice(0, 280),
+    title: job.title,
+  });
 }
 
 export async function processPendingJobs(): Promise<void> {
@@ -888,16 +967,17 @@ export async function processPendingJobs(): Promise<void> {
       await runResearchBriefJob(job as typeof job & { payload: ResearchBriefPayload });
     }
   } catch (error) {
+    const summary = 'goal' in job.payload
+      ? job.payload.goal
+      : 'audience' in job.payload
+        ? `Summarize recent work for ${job.payload.audience}`
+        : job.payload.intent;
     markJobFinished(
       job.id,
       job.userId,
       'failed',
       {
-        summary: 'goal' in job.payload
-          ? job.payload.goal
-          : 'audience' in job.payload
-            ? `Summarize recent work for ${job.payload.audience}`
-            : job.payload.intent,
+        summary,
       },
       { errorMessage: error instanceof Error ? error.message : 'Job failed' },
     );
@@ -906,5 +986,11 @@ export async function processPendingJobs(): Promise<void> {
       `Background job "${job.title}" failed: ${error instanceof Error ? error.message : 'unknown error'}.`,
       'note',
     );
+    await maybeSendTelegramJobUpdate(job.workspaceId, {
+      jobId: job.id,
+      status: 'failed',
+      summary: error instanceof Error ? error.message : 'Job failed',
+      title: job.title,
+    });
   }
 }

@@ -58,14 +58,14 @@ function getSessionTurnCount(sessionId: string): number {
 export function listTasks(userId?: string): TaskRecord[] {
   if (userId) {
     return db.prepare(`
-      SELECT id, title, description, status, time, tool_name as tool, priority
+      SELECT id, title, description, status, time, tool_name as tool, priority, url
       FROM tasks
       WHERE user_id = ? OR user_id = '__system__'
       ORDER BY id DESC
     `).all(userId) as TaskRecord[];
   }
   return db.prepare(`
-    SELECT id, title, description, status, time, tool_name as tool, priority
+    SELECT id, title, description, status, time, tool_name as tool, priority, url
     FROM tasks
     ORDER BY id DESC
   `).all() as TaskRecord[];
@@ -77,6 +77,7 @@ interface CreateTaskInput {
   tool: string;
   priority: TaskRecord['priority'];
   status?: TaskRecord['status'];
+  url?: string;
 }
 
 function getTimestampLabel(): string {
@@ -93,12 +94,13 @@ export function createWorkspaceTask(userId: string, input: CreateTaskInput): Tas
     time: getTimestampLabel(),
     tool: input.tool,
     priority: input.priority,
+    url: input.url ?? null,
   };
 
   db.prepare(`
-    INSERT INTO tasks (id, user_id, title, description, status, time, tool_name, priority)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(task.id, userId, task.title, task.description, task.status, task.time, task.tool, task.priority);
+    INSERT INTO tasks (id, user_id, title, description, status, time, tool_name, priority, url)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(task.id, userId, task.title, task.description, task.status, task.time, task.tool, task.priority, task.url);
 
   return task;
 }

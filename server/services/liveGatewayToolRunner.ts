@@ -40,7 +40,7 @@ export async function handleToolCall(runtime: RuntimeSession, message: LiveServe
       const skill = getSkill(skillId);
 
       if (skill) {
-        const runRecord = await runSkill(skillId, { userId, workspaceId }, args);
+        const runRecord = await runSkill(skillId, { userId, workspaceId, sessionId: runtime.id }, args);
         output = runRecord.result;
       } else {
         output = await callTool(call.name, { userId, workspaceId, frameData }, args);

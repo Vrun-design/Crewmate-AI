@@ -1,4 +1,4 @@
-import { ActivityIcon, Calendar, CheckSquare, Command, Mail, Terminal } from 'lucide-react';
+import { ActivityIcon, Calendar, CheckSquare, Command, Mail, Send, Terminal } from 'lucide-react';
 import type { Integration } from '../types';
 
 type IntegrationApiShape = Omit<Integration, 'icon'> & {
@@ -13,10 +13,12 @@ const integrationIcons = {
   clickup: CheckSquare,
   gmail: Mail,
   calendar: Calendar,
+  telegram: Send,
 } as const;
 
 const customLogos: Record<string, string> = {
   slack: '/Slack.svg',
+  telegram: '/Telegram.svg',
   notion: '/Notion.svg',
   github: '/Github.svg',
   linear: '/Linear.svg',

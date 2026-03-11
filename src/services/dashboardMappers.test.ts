@@ -31,6 +31,20 @@ describe('dashboardMappers', () => {
     expect(mapped.logoUrl).toBe('/zapier.svg');
   });
 
+  test('uses the Telegram SVG logo asset for telegram integrations', () => {
+    const mapped = mapIntegration({
+      id: 'telegram',
+      name: 'Telegram',
+      status: 'connected',
+      iconName: 'telegram',
+      color: 'text-sky-600',
+      bgColor: 'bg-sky-500/10',
+      desc: 'Telegram integration',
+    });
+
+    expect(mapped.logoUrl).toBe('/Telegram.svg');
+  });
+
   test('falls back to Terminal for unknown icon names', () => {
     const mapped = mapIntegration({
       id: 'unknown',

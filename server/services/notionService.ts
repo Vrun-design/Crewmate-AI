@@ -43,13 +43,15 @@ export async function createNotionPage(workspaceId: string, input: CreateNotionP
         page_id: config.parentPageId,
       },
       properties: {
-        title: [
-          {
-            text: {
-              content: input.title,
+        title: {
+          title: [
+            {
+              text: {
+                content: input.title,
+              },
             },
-          },
-        ],
+          ],
+        },
       },
       children: input.content
         .split('\n')

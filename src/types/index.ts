@@ -16,6 +16,7 @@ export interface Task {
   time: string;
   tool: string;
   priority: 'High' | 'Medium' | 'Low';
+  url?: string | null;
 }
 
 export interface Integration {
@@ -108,9 +109,9 @@ export interface UserPreferences {
 
 export type JobType = 'research_brief' | 'daily_digest' | 'workflow_run';
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed';
-export type WorkOriginType = 'delegation' | 'live_session' | 'slack' | 'email' | 'system';
+export type WorkOriginType = 'delegation' | 'live_session' | 'slack' | 'email' | 'telegram' | 'system';
 export type WorkApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
-export type DeliveryChannelType = 'in_app' | 'slack' | 'email' | 'notion' | 'github' | 'clickup';
+export type DeliveryChannelType = 'in_app' | 'slack' | 'email' | 'telegram' | 'notion' | 'github' | 'clickup';
 
 export interface WorkDelivery {
   channel: DeliveryChannelType;
@@ -163,6 +164,8 @@ export interface FeatureFlags {
   jobTypesV2: boolean;
   slackInbound: boolean;
   approvalGates: boolean;
+  uiNavigator: boolean;
+  researchGrounding: boolean;
 }
 
 export interface OffshiftWorkItem {

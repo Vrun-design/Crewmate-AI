@@ -14,6 +14,9 @@ function getOriginLabel(originType: WorkOriginType): string {
   if (originType === 'email') {
     return 'Email';
   }
+  if (originType === 'telegram') {
+    return 'Telegram';
+  }
 
   return 'System';
 }

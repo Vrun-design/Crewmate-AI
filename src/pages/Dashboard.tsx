@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Square } from 'lucide-react';
 import { ActiveSessionCard } from '../components/dashboard/ActiveSessionCard';
+import { GmailInboxCard } from '../components/dashboard/GmailInboxCard';
 import { IntegrationsCard } from '../components/dashboard/IntegrationsCard';
 import { RecentActivityCard } from '../components/dashboard/RecentActivityCard';
 import { RecentTasksCard } from '../components/dashboard/RecentTasksCard';
@@ -187,6 +188,7 @@ export function Dashboard() {
         </div>
 
         <div className="space-y-6">
+          <GmailInboxCard />
           <RecentTasksCard tasks={tasks} />
           <IntegrationsCard integrations={integrations} />
         </div>

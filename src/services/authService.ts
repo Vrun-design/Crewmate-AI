@@ -22,7 +22,7 @@ export const authStorage = {
 };
 
 export const authService = {
-  requestCode(email: string): Promise<{email: string; devCode: string}> {
+  requestCode(email: string): Promise<{email: string; devCode?: string}> {
     return api.post('/api/auth/request-code', {email});
   },
   verifyCode(email: string, code: string): Promise<{token: string; user: AuthUser}> {

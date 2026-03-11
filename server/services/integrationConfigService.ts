@@ -17,6 +17,11 @@ const integrationFieldDefinitions: Record<string, IntegrationConfigFieldDefiniti
     { key: 'botToken', label: 'Bot token', placeholder: 'xoxb-...', secret: true, helpText: 'Bot token with chat:write scope.' },
     { key: 'defaultChannelId', label: 'Default channel ID', placeholder: 'C0123456789', secret: false },
   ],
+  telegram: [
+    { key: 'botToken', label: 'Bot token', placeholder: '123456:ABCDEF...', secret: true, helpText: 'Telegram bot token from BotFather.' },
+    { key: 'defaultChatId', label: 'Default chat ID', placeholder: '123456789', secret: false, helpText: 'Only this chat can issue commands and receive updates.' },
+    { key: 'webhookSecret', label: 'Webhook secret token', placeholder: 'random-secret-token', secret: true, helpText: 'Used to verify Telegram webhook requests.' },
+  ],
   notion: [
     { key: 'token', label: 'Internal integration token', placeholder: 'secret_...', secret: true },
     { key: 'parentPageId', label: 'Parent page ID', placeholder: 'parent-page-id', secret: false },
@@ -66,6 +71,11 @@ const envValueMap: Record<string, Record<string, string>> = {
   slack: {
     botToken: serverConfig.slackBotToken,
     defaultChannelId: serverConfig.slackDefaultChannelId,
+  },
+  telegram: {
+    botToken: serverConfig.telegramBotToken,
+    defaultChatId: serverConfig.telegramDefaultChatId,
+    webhookSecret: serverConfig.telegramWebhookSecret,
   },
   notion: {
     token: serverConfig.notionToken,

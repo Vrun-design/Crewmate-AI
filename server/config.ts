@@ -14,6 +14,8 @@ export const serverConfig = {
   requestBodyLimit: process.env.REQUEST_BODY_LIMIT ?? '25mb',
   databasePath: process.env.CREWMATE_DB_PATH ?? 'data/crewmate.db',
   encryptionKey: process.env.CREWMATE_ENCRYPTION_KEY ?? '',
+  exposeDevAuthCode: parseBooleanEnv('AUTH_EXPOSE_DEV_CODE', (process.env.NODE_ENV ?? 'development') !== 'production'),
+  inboundCommandToken: process.env.CREWMATE_COMMAND_TOKEN ?? '',
   geminiApiKey: process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY ?? '',
   allowUnsafeCustomSkillWebhooks: parseBooleanEnv('ALLOW_UNSAFE_CUSTOM_SKILL_WEBHOOKS'),
   featureFlags: {
@@ -49,6 +51,9 @@ export const serverConfig = {
   githubRepoName: process.env.GITHUB_REPO_NAME ?? '',
   slackBotToken: process.env.SLACK_BOT_TOKEN ?? '',
   slackDefaultChannelId: process.env.SLACK_DEFAULT_CHANNEL_ID ?? '',
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
+  telegramDefaultChatId: process.env.TELEGRAM_DEFAULT_CHAT_ID ?? '',
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? '',
   notionToken: process.env.NOTION_TOKEN ?? '',
   notionParentPageId: process.env.NOTION_PARENT_PAGE_ID ?? '',
   clickupToken: process.env.CLICKUP_TOKEN ?? '',

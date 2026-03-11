@@ -8,6 +8,7 @@
  *   - digest:             not yet implemented (Phase 16)
  */
 import { db } from '../db';
+import { decryptJson, encryptJson } from './secretVault';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS notification_prefs (
@@ -37,10 +38,36 @@ const DEFAULTS: Omit<NotificationPrefs, 'userId' | 'updatedAt'> = {
     inAppEnabled: true,
 };
 
+function decodeSlackWebhookUrl(rawValue: unknown): string | undefined {
+    if (!rawValue) {
+        return undefined;
+    }
+
+    const value = String(rawValue);
+
+    try {
+        return decryptJson(value).slackWebhookUrl;
+    } catch {
+        return value;
+    }
+}
+
+function encodeSlackWebhookUrl(value: string | undefined): string | null {
+    if (!value) {
+        return null;
+    }
+
+    try {
+        return encryptJson({ slackWebhookUrl: value });
+    } catch {
+        return value;
+    }
+}
+
 function rowToPrefs(row: Record<string, unknown>): NotificationPrefs {
     return {
         userId: String(row.user_id),
-        slackWebhookUrl: row.slack_webhook_url ? String(row.slack_webhook_url) : undefined,
+        slackWebhookUrl: decodeSlackWebhookUrl(row.slack_webhook_url),
         slackChannelName: row.slack_channel_name ? String(row.slack_channel_name) : undefined,
         notifyOnSuccess: Boolean(row.notify_on_success),
         notifyOnError: Boolean(row.notify_on_error),
@@ -74,7 +101,7 @@ export function saveNotificationPrefs(userId: string, prefs: Partial<Omit<Notifi
             updated_at = excluded.updated_at
     `).run(
         userId,
-        merged.slackWebhookUrl ?? null,
+        encodeSlackWebhookUrl(merged.slackWebhookUrl),
         merged.slackChannelName ?? null,
         merged.notifyOnSuccess ? 1 : 0,
         merged.notifyOnError ? 1 : 0,
