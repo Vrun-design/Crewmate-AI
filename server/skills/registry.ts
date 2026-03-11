@@ -209,15 +209,19 @@ export function listSkillsForUserPersona(userId: string, personaId?: string): Sk
 }
 
 /** Returns Gemini-compatible FunctionDeclaration objects for all skills */
-export function getSkillDeclarations(): Array<{
+export function getSkillDeclarations(options?: { liveOnly?: boolean }): Array<{
     name: string;
     description: string;
-    parameters: Record<string, unknown>;
+    parametersJsonSchema: Record<string, unknown>;
+    behavior?: import('@google/genai').Behavior;
 }> {
-    return listSkills().map((skill) => ({
+    return listSkills()
+        .filter((skill) => !options?.liveOnly || skill.exposeInLiveSession)
+        .map((skill) => ({
         name: skill.id.replace(/\./g, '_'), // Gemini requires no dots in function names
         description: skill.description,
-        parameters: skill.inputSchema as unknown as Record<string, unknown>,
+        parametersJsonSchema: skill.inputSchema as unknown as Record<string, unknown>,
+        behavior: skill.liveFunctionBehavior,
     }));
 }
 

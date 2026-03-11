@@ -41,8 +41,6 @@ export function StepOne({ agentName, setAgentName, voice, setVoice, onNext }: St
                 key={voiceOption.value}
                 onClick={() => {
                   setVoice(voiceOption.value);
-                  const preview = new Audio(`/assets/voices/${voiceOption.value.toLowerCase()}.wav`);
-                  preview.play().catch(e => console.warn('Missing voice preview preview file:', e));
                 }}
                 className={`p-4 rounded-xl border text-left transition-all duration-200 relative overflow-hidden ${voice === voiceOption.value ? 'border-foreground bg-foreground/5 shadow-sm' : 'border-border bg-background/50 hover:border-muted-foreground/50'
                   }`}

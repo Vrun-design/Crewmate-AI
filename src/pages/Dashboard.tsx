@@ -11,6 +11,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { useDashboard } from '../hooks/useDashboard';
 import { useLiveSession } from '../hooks/useLiveSession';
 import { useMicrophoneCapture } from '../hooks/useMicrophoneCapture';
+import { usePreferences } from '../hooks/usePreferences';
 import { useScreenShareCapture } from '../hooks/useScreenShareCapture';
 import { onboardingService } from '../services/onboardingService';
 import { workspaceService } from '../services/workspaceService';
@@ -22,13 +23,13 @@ export function Dashboard() {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [hasAttemptedGuidedSetup, setHasAttemptedGuidedSetup] = useState(false);
   const { data, isLoading, error, refresh } = useDashboard();
+  const { preferences } = usePreferences();
   const {
     session,
     isBusy,
     error: liveSessionError,
     elapsedLabel,
     isSessionActive,
-    isAssistantSpeaking,
     startSession,
     endSession,
     sendMessage,
@@ -51,12 +52,12 @@ export function Dashboard() {
     status: microphoneStatus,
     error: microphoneError,
     isSupported: isMicrophoneSupported,
+    startMicrophone,
     toggleMicrophone,
     stopMicrophone,
   } = useMicrophoneCapture({
     sessionId: session?.id ?? null,
     enabled: isSessionActive,
-    isAssistantSpeaking,
   });
 
   useEffect(() => {
@@ -108,6 +109,22 @@ export function Dashboard() {
       onboardingService.clearPendingGuidedSetup();
     })();
   }, [hasAttemptedGuidedSetup, isBusy, isSessionActive, pendingGuidedSetup, sendMessage, startSession]);
+
+  useEffect(() => {
+    if (!isSessionActive || !isMicrophoneSupported || microphoneStatus !== 'idle') {
+      return;
+    }
+
+    void startMicrophone();
+  }, [isMicrophoneSupported, isSessionActive, microphoneStatus, startMicrophone]);
+
+  useEffect(() => {
+    if (!isSessionActive || !preferences?.autoStartScreenShare || screenShareStatus !== 'idle') {
+      return;
+    }
+
+    void startScreenShare();
+  }, [isSessionActive, preferences?.autoStartScreenShare, screenShareStatus, startScreenShare]);
 
   useEffect(() => {
     if (!session || session.status !== 'ended' || !activeGuidedSetupSession) {

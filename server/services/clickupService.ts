@@ -1,3 +1,4 @@
+import { Behavior } from '@google/genai';
 import { getEffectiveIntegrationConfig } from './integrationConfigService';
 import { registerTool } from '../mcp/mcpServer';
 
@@ -64,6 +65,8 @@ export async function createClickUpTask(workspaceId: string, input: CreateClickU
 registerTool({
   name: 'create_clickup_task',
   description: 'Create a ticket or task in ClickUp when the user asks to log a task, bug, or to-do item.',
+  exposeInLiveSession: true,
+  behavior: Behavior.NON_BLOCKING,
   inputSchema: {
     type: 'object',
     additionalProperties: false,

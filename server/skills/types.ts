@@ -1,3 +1,5 @@
+import type { Behavior } from '@google/genai';
+
 // Skill manifest standard — the typed foundation for all skills in Crewmate
 
 export type SkillCategory =
@@ -58,6 +60,10 @@ export interface Skill {
     inputSchema: JSONSchema;
     /** Which Gemini model tier to use */
     preferredModel?: ModelPreference;
+    /** Whether this skill should be exposed directly to Gemini Live function calling */
+    exposeInLiveSession?: boolean;
+    /** Optional Live API function behavior override */
+    liveFunctionBehavior?: Behavior;
     /** The actual implementation */
     handler: (ctx: SkillRunContext, args: Record<string, unknown>) => Promise<SkillResult>;
 }

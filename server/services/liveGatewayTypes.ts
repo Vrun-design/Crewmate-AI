@@ -17,9 +17,11 @@ export interface RuntimeSession {
   id: string;
   provider: 'gemini-live';
   session: Session;
+  connectionId: string;
   pendingTurn: PendingTurn | null;
   currentAssistantMessageId: string | null;
-  currentAssistantText: string;
+  currentAssistantModelText: string;
+  currentAssistantOutputTranscriptionText: string;
   currentUserTranscriptionMessageId: string | null;
   currentUserTranscriptionText: string;
   lastUserTurnText: string | null;
@@ -27,6 +29,12 @@ export interface RuntimeSession {
   hasAudioContext: boolean;
   audioChunks: AudioChunkRecord[];
   nextAudioChunkId: number;
+  lastAudioChunkSignature: string | null;
+  playbackRevision: number;
+  sessionResumptionHandle: string | null;
+  canResume: boolean;
+  isReconnecting: boolean;
+  lastConsumedClientMessageIndex: string | null;
   lastFrameData: { mimeType: string; data: string } | null;
   lastUserActivityTime: number;
   lastProactiveTime: number | null;

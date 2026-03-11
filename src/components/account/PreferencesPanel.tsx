@@ -33,13 +33,20 @@ export function PreferencesPanel({
             </div>
             <Toggle checked={currentPreferences.proactiveSuggestions} onChange={(value) => void updatePreferences({ proactiveSuggestions: value })} />
           </div>
+          <div className="p-6 flex items-center justify-between gap-4">
+            <div>
+              <div className="text-sm font-medium text-foreground">Auto-start Screen Share</div>
+              <div className="text-xs text-muted-foreground mt-1">Prompt for screen sharing as soon as a live session starts.</div>
+            </div>
+            <Toggle checked={currentPreferences.autoStartScreenShare} onChange={(value) => void updatePreferences({ autoStartScreenShare: value })} />
+          </div>
           <div className="p-6 space-y-3">
             <div className="flex items-start gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-4">
               <ShieldCheck size={16} className="mt-0.5 shrink-0 text-foreground" />
               <div>
                 <div className="text-sm font-medium text-foreground">Capture safeguards</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Screen share and microphone access are always user-initiated in this build. Automatic capture start and sensitive-field redaction are intentionally not exposed as live toggles until the underlying behavior exists.
+                  Microphone capture now starts with the live session for faster voice interaction. Screen share can start automatically if you enable it here. Sensitive-field redaction still is not implemented, so review what is on screen before sharing.
                 </div>
               </div>
             </div>

@@ -56,6 +56,7 @@ describe('useLiveSession', () => {
               queueMicrotask(listener);
             },
             start() {},
+            stop() {},
             buffer: null,
           };
         }

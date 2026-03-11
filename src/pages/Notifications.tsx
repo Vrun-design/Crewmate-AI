@@ -20,6 +20,30 @@ interface NotificationPrefs {
   inAppEnabled: boolean;
 }
 
+function renderNotificationMessage(message: string): React.ReactNode {
+  const urlPattern = /(https?:\/\/[^\s]+)/g;
+  const fullUrlPattern = /^https?:\/\/[^\s]+$/;
+  const parts = message.split(urlPattern);
+
+  return parts.map((part, index) => {
+    if (!fullUrlPattern.test(part)) {
+      return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+    }
+
+    return (
+      <a
+        key={`${part}-${index}`}
+        href={part}
+        target="_blank"
+        rel="noreferrer"
+        className="text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+      >
+        {part}
+      </a>
+    );
+  });
+}
+
 // ── Notification Preferences Panel ────────────────────────────────────────────
 
 function NotificationSettings(): React.JSX.Element {
@@ -280,7 +304,7 @@ export function Notifications(): React.JSX.Element {
                           {notification.time}
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">{notification.message}</p>
+                      <p className="text-sm text-muted-foreground">{renderNotificationMessage(notification.message)}</p>
                     </div>
                     {!notification.read && (
                       <div className="shrink-0 flex items-center">

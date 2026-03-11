@@ -7,6 +7,7 @@
  * Tavily produces LLM-ready summaries, not raw HTML.
  * Set TAVILY_API_KEY env var to enable. DuckDuckGo used when absent/rate-limited.
  */
+import { Behavior } from '@google/genai';
 import type { Skill } from '../types';
 import { selectModel } from '../../services/modelRouter';
 
@@ -202,6 +203,8 @@ export const webSummarizeUrlSkill: Skill = {
         'Read this article for me',
     ],
     preferredModel: 'research',
+    exposeInLiveSession: true,
+    liveFunctionBehavior: Behavior.NON_BLOCKING,
     inputSchema: {
         type: 'object',
         properties: {

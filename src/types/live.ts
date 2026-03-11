@@ -23,6 +23,7 @@ export interface LiveSession {
   endedAt?: string | null;
   transcript: TranscriptMessage[];
   audioChunks?: AudioChunk[];
+  playbackRevision?: number;
   provider?: 'local' | 'gemini-live';
 }
 

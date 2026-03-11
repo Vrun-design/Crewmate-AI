@@ -81,6 +81,7 @@ export interface SessionRecord {
   transcript: TranscriptMessage[];
   provider?: 'local' | 'gemini-live';
   audioChunks?: AudioChunkRecord[];
+  playbackRevision?: number;
 }
 
 export interface AudioChunkRecord {

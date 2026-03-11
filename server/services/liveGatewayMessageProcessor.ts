@@ -3,6 +3,7 @@ import type { LiveServerMessage } from '@google/genai';
 import { db } from '../db';
 import { getSessionUserId, insertTranscriptMessage, updateTranscriptMessage } from '../repositories/sessionRepository';
 import { broadcastEvent } from './eventService';
+import { getAssistantTranscriptText, mergeStreamingText } from './liveGatewayTranscript';
 import { ingestLiveTurnMemory } from './memoryService';
 import { clearPendingTurn, resolvePendingTurn } from './liveGatewayPendingTurn';
 import { handleToolCall } from './liveGatewayToolRunner';
@@ -10,7 +11,8 @@ import type { RuntimeSession } from './liveGatewayTypes';
 
 function maybePersistTurnMemory(runtime: RuntimeSession): void {
   const userId = getSessionUserId(runtime.id);
-  if (!userId || !runtime.lastUserTurnText || !runtime.currentAssistantText.trim()) {
+  const assistantText = getAssistantTranscriptText(runtime);
+  if (!userId || !runtime.lastUserTurnText || !assistantText) {
     return;
   }
 
@@ -22,19 +24,13 @@ function maybePersistTurnMemory(runtime: RuntimeSession): void {
     userId,
     workspaceId: memberRow?.workspaceId,
     userText: runtime.lastUserTurnText,
-    assistantText: runtime.currentAssistantText,
+    assistantText,
   });
 }
 
-function appendAssistantTranscript(runtime: RuntimeSession, nextText: string): void {
-  const normalizedText = nextText.trim();
-  if (!normalizedText) {
-    return;
-  }
-
+function ensureAssistantTranscript(runtime: RuntimeSession): void {
   if (!runtime.currentAssistantMessageId) {
     runtime.currentAssistantMessageId = randomUUID();
-    runtime.currentAssistantText = '';
     insertTranscriptMessage({
       id: runtime.currentAssistantMessageId,
       sessionId: runtime.id,
@@ -43,9 +39,16 @@ function appendAssistantTranscript(runtime: RuntimeSession, nextText: string): v
       status: 'streaming',
     });
   }
+}
 
-  runtime.currentAssistantText = normalizedText;
-  updateTranscriptMessage(runtime.currentAssistantMessageId, runtime.currentAssistantText, 'streaming');
+function syncAssistantTranscript(runtime: RuntimeSession): void {
+  const nextText = getAssistantTranscriptText(runtime);
+  if (!nextText) {
+    return;
+  }
+
+  ensureAssistantTranscript(runtime);
+  updateTranscriptMessage(runtime.currentAssistantMessageId!, nextText, 'streaming');
 
   const userId = getSessionUserId(runtime.id);
   if (userId) {
@@ -63,6 +66,12 @@ function collectAudioChunks(runtime: RuntimeSession, message: LiveServerMessage)
       continue;
     }
 
+    const signature = `${mimeType}:${data.length}:${data.slice(0, 48)}`;
+    if (runtime.lastAudioChunkSignature === signature) {
+      continue;
+    }
+
+    runtime.lastAudioChunkSignature = signature;
     runtime.audioChunks.push({
       id: runtime.nextAudioChunkId++,
       data,
@@ -108,19 +117,38 @@ function handleInputTranscription(runtime: RuntimeSession, message: LiveServerMe
 
 function resetAssistantTurn(runtime: RuntimeSession): void {
   runtime.currentAssistantMessageId = null;
-  runtime.currentAssistantText = '';
+  runtime.currentAssistantModelText = '';
+  runtime.currentAssistantOutputTranscriptionText = '';
+  runtime.lastAudioChunkSignature = null;
+}
+
+function handleInterruptedPlayback(runtime: RuntimeSession): void {
+  runtime.playbackRevision += 1;
+  runtime.audioChunks = [];
+  runtime.nextAudioChunkId = 1;
+  runtime.lastAudioChunkSignature = null;
+
+  const userId = getSessionUserId(runtime.id);
+  if (userId) {
+    broadcastEvent(userId, 'session_update', { sessionId: runtime.id });
+  }
 }
 
 export function handleServerMessage(runtime: RuntimeSession, message: LiveServerMessage): void {
   handleInputTranscription(runtime, message);
 
   if (message.text) {
-    appendAssistantTranscript(runtime, `${runtime.currentAssistantText}${message.text}`);
+    runtime.currentAssistantModelText = mergeStreamingText(runtime.currentAssistantModelText, message.text);
+    syncAssistantTranscript(runtime);
   }
 
   const outputTranscription = message.serverContent?.outputTranscription?.text;
   if (outputTranscription) {
-    appendAssistantTranscript(runtime, outputTranscription);
+    runtime.currentAssistantOutputTranscriptionText = mergeStreamingText(
+      runtime.currentAssistantOutputTranscriptionText,
+      outputTranscription,
+    );
+    syncAssistantTranscript(runtime);
   }
 
   collectAudioChunks(runtime, message);
@@ -129,9 +157,13 @@ export function handleServerMessage(runtime: RuntimeSession, message: LiveServer
     void handleToolCall(runtime, message);
   }
 
+  if (message.serverContent?.interrupted) {
+    handleInterruptedPlayback(runtime);
+  }
+
   if (message.serverContent?.turnComplete || message.serverContent?.generationComplete) {
     if (runtime.currentAssistantMessageId) {
-      updateTranscriptMessage(runtime.currentAssistantMessageId, runtime.currentAssistantText, 'complete');
+      updateTranscriptMessage(runtime.currentAssistantMessageId, getAssistantTranscriptText(runtime), 'complete');
     }
 
     maybePersistTurnMemory(runtime);

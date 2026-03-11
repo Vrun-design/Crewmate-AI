@@ -1,3 +1,4 @@
+import { Behavior } from '@google/genai';
 import { getEffectiveIntegrationConfig } from './integrationConfigService';
 import { registerTool } from '../mcp/mcpServer';
 
@@ -62,6 +63,8 @@ export async function postSlackMessage(workspaceId: string, input: PostSlackMess
 registerTool({
   name: 'post_slack_message',
   description: 'Post a message to a Slack channel when the user asks to send an update, ping the team, or share a status.',
+  exposeInLiveSession: true,
+  behavior: Behavior.NON_BLOCKING,
   inputSchema: {
     type: 'object',
     additionalProperties: false,

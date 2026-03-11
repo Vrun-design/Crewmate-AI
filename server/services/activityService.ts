@@ -9,11 +9,21 @@ function getTimestampLabel(): string {
   return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export function insertActivity(title: string, description: string, type: ActivityType, userId = SYSTEM_USER_ID): void {
+export function insertActivity(
+  title: string,
+  description: string,
+  type: ActivityType,
+  userId = SYSTEM_USER_ID,
+  options?: { notify?: boolean },
+): void {
   db.prepare(`
     INSERT INTO activities (id, user_id, title, description, time, type)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(`ACT-${randomUUID()}`, userId, title, description, getTimestampLabel(), type);
+
+  if (options?.notify === false) {
+    return;
+  }
 
   createNotification(userId, {
     title,

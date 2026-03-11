@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   GoogleGenAI,
-  Modality,
   createUserContent,
+  type LiveServerMessage,
   type Session,
 } from '@google/genai';
 import { getSession, getSessionUserId, insertTranscriptMessage, updateSessionStatus } from '../repositories/sessionRepository';
@@ -13,6 +13,7 @@ import { getSkillDeclarations } from '../skills/registry';
 import { broadcastEvent } from './eventService';
 import { selectModel } from './modelRouter';
 import { insertActivity } from './activityService';
+import { buildLiveConnectConfig } from './liveGatewayConfig';
 import { buildUserSystemInstruction } from './liveGatewayPromptBuilder';
 import { getRuntimeSession, setRuntimeSession, deleteRuntimeSession } from './liveGatewayRuntimeStore';
 import { createPendingTurn, clearPendingTurn } from './liveGatewayPendingTurn';
@@ -39,17 +40,160 @@ function sendInitialGreeting(runtime: RuntimeSession): Promise<SessionRecord> {
   const sessionPromise = createPendingTurn(runtime, 30000, 'Gemini Live greeting timed out.');
 
   runtime.session.sendClientContent({
-    turns: createUserContent(
-      'Introduce yourself as Crewmate in two concise sentences. Mention that you can analyze screens, listen to voice input, and take actions in configured tools.',
-    ),
+    turns: createUserContent('Say: "Hey, how can I help?" Keep it short and natural.'),
     turnComplete: true,
   });
 
   return sessionPromise;
 }
 
-export async function startGeminiLiveSession(sessionId: string): Promise<SessionRecord> {
+function getLiveFunctionDeclarations() {
+  return [
+    ...getToolDeclarations({ liveOnly: true }),
+    ...getSkillDeclarations({ liveOnly: true }),
+  ];
+}
+
+async function connectGeminiSession(
+  sessionId: string,
+  userId: string,
+  preferences: ReturnType<typeof getUserPreferences>,
+  systemInstruction: string,
+  resumptionHandle?: string | null,
+): Promise<{ session: Session; connectionId: string }> {
   const ai = createAiClient();
+  const connectionId = randomUUID();
+
+  const session = await ai.live.connect({
+    model: selectModel('live'),
+    config: buildLiveConnectConfig({
+      systemInstruction,
+      voiceName: preferences.voiceModel,
+      functionDeclarations: getLiveFunctionDeclarations(),
+      resumptionHandle,
+    }),
+    callbacks: {
+      onmessage: (message) => {
+        const current = getRuntimeSession(sessionId);
+        if (!current || current.connectionId !== connectionId) {
+          return;
+        }
+
+        handleLifecycleServerMessage(current, message);
+        handleServerMessage(current, message);
+      },
+      onerror: (event) => {
+        const current = getRuntimeSession(sessionId);
+        if (!current || current.connectionId !== connectionId) {
+          return;
+        }
+
+        const errorMessage = event?.error instanceof Error ? event.error.message : 'Gemini Live connection error.';
+        if (current.canResume && current.sessionResumptionHandle && !current.isReconnecting) {
+          void reconnectGeminiLiveSession(sessionId, `transport_error:${errorMessage}`);
+          return;
+        }
+
+        if (current.pendingTurn) {
+          current.pendingTurn.reject(new Error(errorMessage));
+          clearPendingTurn(current);
+        }
+      },
+      onclose: () => {
+        const current = getRuntimeSession(sessionId);
+        if (!current || current.connectionId !== connectionId) {
+          return;
+        }
+
+        if (current.canResume && current.sessionResumptionHandle && !current.isReconnecting) {
+          void reconnectGeminiLiveSession(sessionId, 'socket_closed');
+          return;
+        }
+
+        if (current.pendingTurn) {
+          current.pendingTurn.reject(new Error('Gemini Live session closed.'));
+          clearPendingTurn(current);
+        }
+      },
+    },
+  });
+
+  return { session, connectionId };
+}
+
+function handleLifecycleServerMessage(runtime: RuntimeSession, message: LiveServerMessage): void {
+  const resumptionUpdate = message.sessionResumptionUpdate;
+  if (resumptionUpdate) {
+    runtime.sessionResumptionHandle = resumptionUpdate.newHandle?.trim() || null;
+    runtime.canResume = Boolean(resumptionUpdate.resumable && runtime.sessionResumptionHandle);
+    runtime.lastConsumedClientMessageIndex = resumptionUpdate.lastConsumedClientMessageIndex?.trim() || null;
+  }
+
+  if (message.goAway && runtime.canResume && runtime.sessionResumptionHandle && !runtime.isReconnecting) {
+    void reconnectGeminiLiveSession(runtime.id, `go_away:${message.goAway.timeLeft ?? 'unknown'}`);
+  }
+}
+
+async function reconnectGeminiLiveSession(sessionId: string, reason: string): Promise<void> {
+  const runtime = getRuntimeSession(sessionId);
+  if (!runtime || !runtime.sessionResumptionHandle || runtime.isReconnecting) {
+    return;
+  }
+
+  const userId = getSessionUserId(sessionId);
+  if (!userId) {
+    return;
+  }
+
+  runtime.isReconnecting = true;
+
+  try {
+    const preferences = getUserPreferences(userId);
+    const systemInstruction = await buildUserSystemInstruction(userId);
+    const previousSession = runtime.session;
+    const { session, connectionId } = await connectGeminiSession(
+      sessionId,
+      userId,
+      preferences,
+      systemInstruction,
+      runtime.sessionResumptionHandle,
+    );
+
+    runtime.session = session;
+    runtime.connectionId = connectionId;
+    runtime.isReconnecting = false;
+    runtime.canResume = false;
+    previousSession.close();
+
+    insertActivity(
+      'Gemini Live resumed',
+      `Recovered the live session after ${reason}.`,
+      'observation',
+      userId,
+      { notify: false },
+    );
+    broadcastEvent(userId, 'session_update', { sessionId });
+  } catch (error) {
+    runtime.isReconnecting = false;
+    runtime.canResume = false;
+    runtime.sessionResumptionHandle = null;
+
+    if (runtime.pendingTurn) {
+      runtime.pendingTurn.reject(error instanceof Error ? error : new Error(String(error)));
+      clearPendingTurn(runtime);
+    }
+
+    insertActivity(
+      'Gemini Live reconnect failed',
+      error instanceof Error ? error.message : String(error),
+      'note',
+      userId,
+      { notify: false },
+    );
+  }
+}
+
+export async function startGeminiLiveSession(sessionId: string): Promise<SessionRecord> {
   const userId = getSessionUserId(sessionId);
   if (!userId) {
     throw new Error('Cannot start a live session without an authenticated user.');
@@ -61,54 +205,22 @@ export async function startGeminiLiveSession(sessionId: string): Promise<Session
 
   const runtime = await new Promise<RuntimeSession>(async (resolve, reject) => {
     try {
-      const session = await ai.live.connect({
-        model: selectModel('live'),
-        config: {
-          responseModalities: [Modality.AUDIO],
-          systemInstruction,
-          tools: [{ functionDeclarations: [...getToolDeclarations(), ...getSkillDeclarations()] }],
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: preferences.voiceModel,
-              },
-            },
-          },
-        },
-        callbacks: {
-          onmessage: (message) => {
-            const current = getRuntimeSession(sessionId);
-            if (current) {
-              handleServerMessage(current, message);
-            }
-          },
-          onerror: (event) => {
-            const current = getRuntimeSession(sessionId);
-            const errorMessage = event?.error instanceof Error ? event.error.message : 'Gemini Live connection error.';
-            if (current?.pendingTurn) {
-              current.pendingTurn.reject(new Error(errorMessage));
-              clearPendingTurn(current);
-            }
-          },
-          onclose: () => {
-            const current = getRuntimeSession(sessionId);
-            if (current?.pendingTurn) {
-              current.pendingTurn.reject(new Error('Gemini Live session closed.'));
-              clearPendingTurn(current);
-            }
-          },
-        },
-      });
+      const { session, connectionId } = await connectGeminiSession(
+        sessionId,
+        userId,
+        preferences,
+        systemInstruction,
+      );
 
       const created: RuntimeSession = {
         id: sessionId,
         provider: 'gemini-live',
         session,
+        connectionId,
         pendingTurn: null,
         currentAssistantMessageId: null,
-        currentAssistantText: '',
+        currentAssistantModelText: '',
+        currentAssistantOutputTranscriptionText: '',
         currentUserTranscriptionMessageId: null,
         currentUserTranscriptionText: '',
         lastUserTurnText: null,
@@ -116,6 +228,12 @@ export async function startGeminiLiveSession(sessionId: string): Promise<Session
         hasAudioContext: false,
         audioChunks: [],
         nextAudioChunkId: 1,
+        lastAudioChunkSignature: null,
+        playbackRevision: 0,
+        sessionResumptionHandle: null,
+        canResume: false,
+        isReconnecting: false,
+        lastConsumedClientMessageIndex: null,
         lastFrameData: null,
         lastUserActivityTime: Date.now(),
         lastProactiveTime: null,
@@ -163,7 +281,12 @@ export async function sendLiveMessage(sessionId: string, text: string): Promise<
   }
 
   if (runtime.pendingTurn) {
-    throw new Error('The live session is still processing the previous turn.');
+    runtime.pendingTurn.reject(new Error('Interrupted by a newer user request.'));
+    clearPendingTurn(runtime);
+    runtime.playbackRevision += 1;
+    runtime.audioChunks = [];
+    runtime.nextAudioChunkId = 1;
+    runtime.lastAudioChunkSignature = null;
   }
 
   runtime.lastUserTurnText = text;
@@ -262,6 +385,7 @@ export function getLiveSessionState(sessionId: string): SessionRecord | null {
       ...session,
       provider: session.provider ?? 'local',
       audioChunks: [],
+      playbackRevision: 0,
     };
   }
 
@@ -269,6 +393,7 @@ export function getLiveSessionState(sessionId: string): SessionRecord | null {
     ...session,
     provider: 'gemini-live',
     audioChunks: runtime ? [...runtime.audioChunks] : [],
+    playbackRevision: runtime.playbackRevision,
   };
 }
 
@@ -296,5 +421,6 @@ export function endGeminiLiveSession(sessionId: string): SessionRecord | null {
   return {
     ...session,
     provider: 'gemini-live',
+    playbackRevision: runtime?.playbackRevision ?? 0,
   };
 }

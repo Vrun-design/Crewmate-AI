@@ -1,3 +1,4 @@
+import { Behavior } from '@google/genai';
 import { getEffectiveIntegrationConfig } from './integrationConfigService';
 import { registerTool } from '../mcp/mcpServer';
 
@@ -94,6 +95,8 @@ export async function createNotionPage(workspaceId: string, input: CreateNotionP
 registerTool({
   name: 'create_notion_page',
   description: 'Create a Notion page when the user asks to save a document, knowledge base article, or meeting notes.',
+  exposeInLiveSession: true,
+  behavior: Behavior.NON_BLOCKING,
   inputSchema: {
     type: 'object',
     additionalProperties: false,

@@ -1,3 +1,4 @@
+import { Behavior } from '@google/genai';
 import { createGeminiClient } from './geminiClient';
 import { getEffectiveIntegrationConfig } from './integrationConfigService';
 import { selectModel } from './modelRouter';
@@ -189,6 +190,8 @@ export async function transcribeTelegramVoiceMessage(
 registerTool({
   name: 'post_telegram_message',
   description: 'Send a message to the configured Telegram chat when the user asks to notify them on Telegram or deliver a result there.',
+  exposeInLiveSession: true,
+  behavior: Behavior.NON_BLOCKING,
   inputSchema: {
     type: 'object',
     additionalProperties: false,

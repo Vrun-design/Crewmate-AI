@@ -11,8 +11,24 @@ declare global {
   }
 }
 
-const CAPTURE_INTERVAL_MS = 4000;
-const VIDEO_READY_TIMEOUT_MS = 1500;
+const CAPTURE_INTERVAL_MS = 1200;
+const VIDEO_READY_TIMEOUT_MS = 3000;
+
+function createFrameSignature(bytes: Uint8Array): string {
+  if (bytes.length === 0) {
+    return 'empty';
+  }
+
+  const sampleCount = 24;
+  const step = Math.max(1, Math.floor(bytes.length / sampleCount));
+  const parts: string[] = [];
+
+  for (let index = 0; index < bytes.length && parts.length < sampleCount; index += step) {
+    parts.push(bytes[index].toString(16).padStart(2, '0'));
+  }
+
+  return `${bytes.length}:${parts.join('')}`;
+}
 
 interface UseScreenShareCaptureOptions {
   sessionId: string | null;
@@ -40,6 +56,7 @@ export function useScreenShareCapture({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const intervalRef = useRef<number | null>(null);
   const uploadInFlightRef = useRef(false);
+  const lastFrameSignatureRef = useRef<string | null>(null);
   const isSupported =
     typeof navigator !== 'undefined' &&
     !!navigator.mediaDevices &&
@@ -92,6 +109,7 @@ export function useScreenShareCapture({
     videoRef.current = null;
     canvasRef.current = null;
     uploadInFlightRef.current = false;
+    lastFrameSignatureRef.current = null;
     setStatus('idle');
   }, []);
 
@@ -131,6 +149,14 @@ export function useScreenShareCapture({
       }
 
       const buffer = await blob.arrayBuffer();
+      const signature = createFrameSignature(new Uint8Array(buffer));
+      if (lastFrameSignatureRef.current === signature) {
+        setStatus('sharing');
+        setError(null);
+        return;
+      }
+
+      lastFrameSignatureRef.current = signature;
       await liveSessionService.sendFrame(sessionId, {
         mimeType: blob.type || 'image/jpeg',
         data: arrayBufferToBase64(buffer),
@@ -174,8 +200,8 @@ export function useScreenShareCapture({
         // Fallback to standard web picker
         stream = await navigator.mediaDevices.getDisplayMedia({
           video: {
-            frameRate: 1,
-            width: { ideal: 1440 },
+            frameRate: 4,
+            width: { ideal: 1280 },
           },
           audio: false,
         });

@@ -7,6 +7,7 @@
  *   2. Slack webhook (if slackWebhookUrl is set in notification prefs)
  */
 import { createNotification } from './notificationService';
+import { buildTaskNotification } from './notificationFormatter';
 import { getNotificationPrefs } from './notificationPrefsService';
 import type { AgentTask } from './orchestrator';
 import { isTelegramConfigured, postTelegramMessage } from './telegramService';
@@ -46,28 +47,6 @@ function buildTelegramTaskMessage(task: AgentTask): string {
 }
 
 // ── In-app notification ───────────────────────────────────────────────────────
-
-function buildInApp(task: AgentTask): {
-    title: string;
-    message: string;
-    type: 'success' | 'info' | 'warning' | 'default';
-} {
-    if (task.status === 'completed') {
-        return {
-            title: `✅ Task complete`,
-            message: `${task.intent.slice(0, 80)}${task.intent.length > 80 ? '…' : ''}`,
-            type: 'success',
-        };
-    }
-    if (task.status === 'failed') {
-        return {
-            title: `❌ Task failed`,
-            message: task.error ? task.error.slice(0, 120) : task.intent.slice(0, 80),
-            type: 'warning',
-        };
-    }
-    return { title: `ℹ️ Task update`, message: task.intent.slice(0, 80), type: 'info' };
-}
 
 // ── Slack Block Kit webhook ───────────────────────────────────────────────────
 
@@ -136,25 +115,31 @@ async function sendSlackWebhook(webhookUrl: string, task: AgentTask): Promise<vo
 // ── Main dispatcher ───────────────────────────────────────────────────────────
 
 export async function notifyTaskComplete(userId: string, task: AgentTask): Promise<void> {
-    // 1. Always create in-app notification
-    try {
-        const inApp = buildInApp(task);
-        createNotification(userId, {
-            title: inApp.title,
-            message: inApp.message,
-            type: inApp.type,
-            sourcePath: `/agents?task=${task.id}`,
-        });
-    } catch (err) {
-        console.error('[agentNotifier] in-app notification failed:', err);
-    }
-
-    // 2. Load user notification preferences
+    // 1. Load user notification preferences
     let prefs;
     try {
         prefs = getNotificationPrefs(userId);
     } catch {
-        return; // no prefs configured → only in-app
+        prefs = {
+            notifyOnSuccess: true,
+            notifyOnError: true,
+            inAppEnabled: true,
+        };
+    }
+
+    // 2. Always create in-app notification unless the user disabled it
+    if (prefs.inAppEnabled) {
+        try {
+            const inApp = buildTaskNotification(task);
+            createNotification(userId, {
+                title: inApp.title,
+                message: inApp.message,
+                type: inApp.type,
+                sourcePath: `/agents?task=${task.id}`,
+            });
+        } catch (err) {
+            console.error('[agentNotifier] in-app notification failed:', err);
+        }
     }
 
     // 3. Check per-event toggles

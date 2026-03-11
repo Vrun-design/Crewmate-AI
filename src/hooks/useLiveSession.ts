@@ -4,7 +4,7 @@ import { liveSessionService } from '../services/liveSessionService';
 import { useLiveEvents } from './useLiveEvents';
 import type { AudioChunk, LiveSession } from '../types/live';
 
-const AUDIO_POLL_MS = 300;
+const AUDIO_POLL_MS = 200;
 
 interface UseLiveSessionOptions {
   initialSession: LiveSession | null;
@@ -40,7 +40,12 @@ function mergeSessionState(
     return currentSession;
   }
 
+  if (!currentSession || currentSession.id !== initialSession.id) {
+    return initialSession;
+  }
+
   return {
+    ...currentSession,
     ...initialSession,
     provider: initialSession.provider ?? currentSession?.provider,
   };
@@ -64,11 +69,7 @@ function getSampleRate(mimeType: string): number {
   return match ? Number.parseInt(match[1], 10) : 24000;
 }
 
-async function playAudioChunk(audioContext: AudioContext, chunk: AudioChunk): Promise<void> {
-  if (audioContext.state === 'suspended') {
-    await audioContext.resume();
-  }
-
+function createAudioBuffer(audioContext: AudioContext, chunk: AudioChunk): AudioBuffer {
   const pcmBytes = decodeBase64(chunk.data);
   const pcm = new Int16Array(pcmBytes);
   const sampleRate = getSampleRate(chunk.mimeType);
@@ -79,13 +80,19 @@ async function playAudioChunk(audioContext: AudioContext, chunk: AudioChunk): Pr
     channel[index] = pcm[index] / 0x8000;
   }
 
-  await new Promise<void>((resolve) => {
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContext.destination);
-    source.addEventListener('ended', () => resolve(), { once: true });
-    source.start();
-  });
+  return buffer;
+}
+
+function stopAudioSource(source: AudioBufferSourceNode | null): void {
+  if (!source) {
+    return;
+  }
+
+  try {
+    source.stop();
+  } catch {
+    // Ignore stop races during interruption and teardown.
+  }
 }
 
 export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessionOptions): UseLiveSessionResult {
@@ -96,9 +103,19 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
   const [isAssistantSpeaking, setIsAssistantSpeaking] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioQueueRef = useRef<AudioChunk[]>([]);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const isPlayingAudioRef = useRef(false);
   const lastAudioChunkIdRef = useRef(0);
+  const lastPlaybackRevisionRef = useRef(0);
   const stopPollingRef = useRef(false);
+
+  const interruptPlayback = useCallback(() => {
+    audioQueueRef.current = [];
+    stopAudioSource(currentSourceRef.current);
+    currentSourceRef.current = null;
+    isPlayingAudioRef.current = false;
+    setIsAssistantSpeaking(false);
+  }, []);
 
   useEffect(() => {
     setSession((currentSession) => mergeSessionState(initialSession, currentSession));
@@ -149,9 +166,17 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
   useEffect(() => {
     if (!session || session.status !== 'live') {
       lastAudioChunkIdRef.current = 0;
+      lastPlaybackRevisionRef.current = 0;
       stopPollingRef.current = false;
-      setIsAssistantSpeaking(false);
+      interruptPlayback();
       return;
+    }
+
+    const nextPlaybackRevision = session.playbackRevision ?? 0;
+    if (nextPlaybackRevision !== lastPlaybackRevisionRef.current) {
+      lastPlaybackRevisionRef.current = nextPlaybackRevision;
+      lastAudioChunkIdRef.current = 0;
+      interruptPlayback();
     }
 
     const audioInterval = window.setInterval(() => {
@@ -173,6 +198,9 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
           if (!audioContextRef.current) {
             audioContextRef.current = new window.AudioContext();
           }
+          if (audioContextRef.current.state === 'suspended') {
+            void audioContextRef.current.resume();
+          }
 
           if (!isPlayingAudioRef.current && audioContextRef.current) {
             isPlayingAudioRef.current = true;
@@ -180,17 +208,30 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
               while (audioQueueRef.current.length > 0 && audioContextRef.current) {
                 const nextChunk = audioQueueRef.current.shift();
                 if (nextChunk) {
-                  await playAudioChunk(audioContextRef.current, nextChunk);
+                  await new Promise<void>((resolve) => {
+                    const audioContext = audioContextRef.current!;
+                    const source = audioContext.createBufferSource();
+                    const buffer = createAudioBuffer(audioContext, nextChunk);
+                    currentSourceRef.current = source;
+                    source.buffer = buffer;
+                    source.connect(audioContext.destination);
+                    source.addEventListener('ended', () => {
+                      if (currentSourceRef.current === source) {
+                        currentSourceRef.current = null;
+                      }
+                      resolve();
+                    }, { once: true });
+                    source.start();
+                  });
                 }
               }
 
-              // Allow physical speaker echo to die out before re-enabling the microphone
-              setTimeout(() => {
-                if (audioContextRef.current) { // Ensure still mounted/active
+              window.setTimeout(() => {
+                if (audioContextRef.current && !currentSourceRef.current) {
                   isPlayingAudioRef.current = false;
                   setIsAssistantSpeaking(false);
                 }
-              }, 800);
+              }, 120);
             })().catch((playbackError: unknown) => {
               isPlayingAudioRef.current = false;
               setIsAssistantSpeaking(false);
@@ -209,12 +250,14 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     return () => {
       window.clearInterval(audioInterval);
     };
-  }, [session]);
+  }, [interruptPlayback, session]);
 
   useEffect(() => {
     return () => {
       const audioContext = audioContextRef.current;
       audioContextRef.current = null;
+      stopAudioSource(currentSourceRef.current);
+      currentSourceRef.current = null;
       if (audioContext) {
         void audioContext.close();
       }
@@ -236,6 +279,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
       setSession(next);
       stopPollingRef.current = false;
       lastAudioChunkIdRef.current = 0;
+      lastPlaybackRevisionRef.current = next.playbackRevision ?? 0;
       audioQueueRef.current = [];
       setIsAssistantSpeaking(false);
       await onSessionChange?.();
@@ -259,8 +303,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     try {
       const next = await liveSessionService.end(session.id);
       setSession(next);
-      audioQueueRef.current = [];
-      setIsAssistantSpeaking(false);
+      interruptPlayback();
       await onSessionChange?.();
     } catch (endError) {
       setError(getErrorMessage(endError, 'Unable to end session'));

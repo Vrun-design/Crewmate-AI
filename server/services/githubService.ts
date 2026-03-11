@@ -1,3 +1,4 @@
+import { Behavior } from '@google/genai';
 import { getEffectiveIntegrationConfig } from './integrationConfigService';
 import { registerTool } from '../mcp/mcpServer';
 
@@ -72,6 +73,8 @@ export async function createGithubIssue(workspaceId: string, input: CreateGithub
 registerTool({
   name: 'create_github_issue',
   description: 'Create a GitHub issue when the user explicitly asks to file, log, or create an issue for an engineering problem.',
+  exposeInLiveSession: true,
+  behavior: Behavior.NON_BLOCKING,
   inputSchema: {
     type: 'object',
     additionalProperties: false,

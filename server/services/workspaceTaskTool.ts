@@ -1,9 +1,12 @@
+import { Behavior } from '@google/genai';
 import { registerTool } from '../mcp/mcpServer';
 import { createWorkspaceTask } from '../repositories/workspaceRepository';
 
 registerTool({
   name: 'create_workspace_task',
   description: 'Create a local task in the Crewmate workspace. Use this when the user asks to create a task, add a todo, or track an item but does NOT specify an external tool like ClickUp or Jira.',
+  exposeInLiveSession: true,
+  behavior: Behavior.NON_BLOCKING,
   inputSchema: {
     type: 'object',
     additionalProperties: false,

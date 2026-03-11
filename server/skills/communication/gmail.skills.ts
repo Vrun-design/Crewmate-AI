@@ -1,6 +1,7 @@
 /**
  * Gmail Skills — updated to use real gmailService (Phase 3)
  */
+import { Behavior } from '@google/genai';
 import type { Skill } from '../types';
 import { sendGmail, draftGmail, readGmailInbox } from '../../services/gmailService';
 
@@ -18,6 +19,8 @@ export const gmailSendSkill: Skill = {
         'Email the team about this',
     ],
     preferredModel: 'quick',
+    exposeInLiveSession: true,
+    liveFunctionBehavior: Behavior.NON_BLOCKING,
     inputSchema: {
         type: 'object',
         properties: {
@@ -57,6 +60,8 @@ export const gmailDraftSkill: Skill = {
         'Write an email draft',
     ],
     preferredModel: 'quick',
+    exposeInLiveSession: true,
+    liveFunctionBehavior: Behavior.NON_BLOCKING,
     inputSchema: {
         type: 'object',
         properties: {
@@ -95,6 +100,7 @@ export const gmailReadInboxSkill: Skill = {
         'What needs a reply?',
     ],
     preferredModel: 'quick',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {

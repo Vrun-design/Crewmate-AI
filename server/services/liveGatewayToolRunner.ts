@@ -3,6 +3,8 @@ import { db } from '../db';
 import { getSessionUserId } from '../repositories/sessionRepository';
 import { callTool } from '../mcp/mcpServer';
 import { insertActivity } from './activityService';
+import { createNotification } from './notificationService';
+import { buildToolExecutionNotification } from './notificationFormatter';
 import type { RuntimeSession } from './liveGatewayTypes';
 
 function getToolErrorMessage(error: unknown): string {
@@ -46,7 +48,16 @@ export async function handleToolCall(runtime: RuntimeSession, message: LiveServe
         output = await callTool(call.name, { userId, workspaceId, frameData }, args);
       }
 
-      insertActivity(`Executed ${call.name}`, 'Tool call executed successfully.', 'action', userId);
+      insertActivity(`Executed ${call.name}`, 'Tool call executed successfully.', 'action', userId, { notify: false });
+      const notification = buildToolExecutionNotification(call.name, output);
+      if (notification) {
+        createNotification(userId, {
+          title: notification.title,
+          message: notification.message,
+          type: notification.type,
+          sourcePath: '/notifications',
+        });
+      }
       functionResponses.push({
         id: call.id,
         name: call.name,

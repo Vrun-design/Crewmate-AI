@@ -1,4 +1,4 @@
-import type { FunctionDeclaration } from '@google/genai';
+import type { Behavior, FunctionDeclaration } from '@google/genai';
 
 export interface McpToolContext {
     userId: string;
@@ -10,6 +10,8 @@ export interface McpTool {
     name: string;
     description: string;
     inputSchema: object;
+    exposeInLiveSession?: boolean;
+    behavior?: Behavior;
     handler: (context: McpToolContext, args: Record<string, unknown>) => Promise<unknown>;
 }
 
@@ -23,11 +25,14 @@ export function listTools(): McpTool[] {
     return [...registry.values()];
 }
 
-export function getToolDeclarations(): FunctionDeclaration[] {
-    return listTools().map((t) => ({
+export function getToolDeclarations(options?: { liveOnly?: boolean }): FunctionDeclaration[] {
+    return listTools()
+        .filter((tool) => !options?.liveOnly || tool.exposeInLiveSession)
+        .map((t) => ({
         name: t.name,
         description: t.description,
         parametersJsonSchema: t.inputSchema as unknown as FunctionDeclaration['parametersJsonSchema'],
+        behavior: t.behavior,
     }));
 }
 
