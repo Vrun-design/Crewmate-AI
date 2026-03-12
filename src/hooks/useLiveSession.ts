@@ -108,6 +108,8 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
   const lastAudioChunkIdRef = useRef(0);
   const lastPlaybackRevisionRef = useRef(0);
   const stopPollingRef = useRef(false);
+  const isAudioPollingRef = useRef(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const interruptPlayback = useCallback(() => {
     audioQueueRef.current = [];
@@ -138,21 +140,27 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
 
   const refreshSession = useCallback(() => {
     if (!session?.id) return;
-    void liveSessionService
-      .getSession(session.id)
-      .then((nextSession) => {
-        stopPollingRef.current = false;
-        setSession((currentSession) => ({
-          ...nextSession,
-          provider: nextSession.provider ?? currentSession?.provider,
-        }));
-      })
-      .catch((pollError: unknown) => {
-        if (pollError instanceof ApiError && pollError.status === 404) {
-          stopPollingRef.current = true;
-          setError('Live session polling route is unavailable. Restart `npm run dev:server` and start a new session.');
-        }
-      });
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      void liveSessionService
+        .getSession(session.id)
+        .then((nextSession) => {
+          stopPollingRef.current = false;
+          setSession((currentSession) => ({
+            ...nextSession,
+            provider: nextSession.provider ?? currentSession?.provider,
+          }));
+        })
+        .catch((pollError: unknown) => {
+          if (pollError instanceof ApiError && pollError.status === 404) {
+            stopPollingRef.current = true;
+            setError('Live session polling route is unavailable. Restart `npm run dev:server` and start a new session.');
+          }
+        });
+    }, 300);
   }, [session?.id]);
 
   useLiveEvents({
@@ -163,8 +171,12 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     }
   });
 
+  const sessionId = session?.id;
+  const sessionStatus = session?.status;
+  const sessionPlaybackRevision = session?.playbackRevision;
+
   useEffect(() => {
-    if (!session || session.status !== 'live') {
+    if (!sessionId || sessionStatus !== 'live') {
       lastAudioChunkIdRef.current = 0;
       lastPlaybackRevisionRef.current = 0;
       stopPollingRef.current = false;
@@ -172,7 +184,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
       return;
     }
 
-    const nextPlaybackRevision = session.playbackRevision ?? 0;
+    const nextPlaybackRevision = sessionPlaybackRevision ?? 0;
     if (nextPlaybackRevision !== lastPlaybackRevisionRef.current) {
       lastPlaybackRevisionRef.current = nextPlaybackRevision;
       lastAudioChunkIdRef.current = 0;
@@ -180,13 +192,17 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     }
 
     const audioInterval = window.setInterval(() => {
-      if (stopPollingRef.current) {
+      if (stopPollingRef.current || isAudioPollingRef.current) {
         return;
       }
 
+      isAudioPollingRef.current = true;
+
       void liveSessionService
-        .getAudioChunks(session.id, lastAudioChunkIdRef.current)
+        .getAudioChunks(sessionId, lastAudioChunkIdRef.current)
         .then((chunks) => {
+          isAudioPollingRef.current = false;
+
           if (chunks.length === 0) {
             return;
           }
@@ -240,6 +256,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
           }
         })
         .catch((pollError: unknown) => {
+          isAudioPollingRef.current = false;
           if (pollError instanceof ApiError && pollError.status === 404) {
             stopPollingRef.current = true;
             setError('Live audio route is unavailable. Restart `npm run dev:server` and start a new session.');
@@ -250,7 +267,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     return () => {
       window.clearInterval(audioInterval);
     };
-  }, [interruptPlayback, session]);
+  }, [interruptPlayback, sessionId, sessionStatus, sessionPlaybackRevision]);
 
   useEffect(() => {
     return () => {
