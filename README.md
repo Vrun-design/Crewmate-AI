@@ -60,7 +60,11 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 
 ## 🏗️ Architecture
 
-### System Overview
+![Crewmate AI — System Architecture](public/architecture.png)
+
+> **A2A Discoverable:** Crewmate exposes `/.well-known/agent.json` per Google's Agent-to-Agent protocol. Any A2A-compliant agent can discover Crewmate's 14 agents, skills, and API endpoints automatically.
+
+### System Overview — Detailed Flow
 
 ```mermaid
 flowchart TD

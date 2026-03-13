@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import { db } from './db';
-import { registerAgentRoutes } from './routeModules/agentRoutes';
+import { registerAgentRoutes, registerA2ADiscovery } from './routeModules/agentRoutes';
 import { registerAuthRoutes } from './routeModules/authRoutes';
 import { registerCommunicationRoutes } from './routeModules/communicationRoutes';
 import { registerIntegrationRoutes } from './routeModules/integrationRoutes';
@@ -22,6 +22,7 @@ function requireAuth(req: Request, res: Response): AuthUserRecord | null {
 }
 
 export function registerRoutes(app: Express) {
+  registerA2ADiscovery(app); // Public A2A discovery — no auth required
   registerAuthRoutes(app);
   registerWorkspaceRoutes(app, requireAuth);
   registerNotificationRoutes(app, requireAuth);

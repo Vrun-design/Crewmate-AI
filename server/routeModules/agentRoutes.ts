@@ -3,8 +3,60 @@ import { db } from '../db';
 import { AGENT_MANIFESTS, cancelTask, getTask, listTasks as listAgentTasks, orchestrate, subscribeToTask } from '../services/orchestrator';
 import { createErrorResponse, logServerError } from '../services/runtimeLogger';
 import { getSkillRunHistory, listSkillsForUser, runSkill } from '../skills/registry';
+import { serverConfig } from '../config';
 import type { RequireAuth } from './types';
 
+/**
+ * Registers the public A2A agent discovery endpoint.
+ * GET /.well-known/agent.json — no auth required (public discovery, like robots.txt)
+ * Follows Google's Agent-to-Agent (A2A) protocol spec so external agents
+ * can discover Crewmate's capabilities and endpoint addresses.
+ */
+export function registerA2ADiscovery(app: Express): void {
+  app.get('/.well-known/agent.json', (_req: Request, res: Response) => {
+    const baseUrl = serverConfig.publicWebAppUrl?.replace(/\/$/, '') ?? '';
+
+    res.json({
+      id: 'crewmate-ai',
+      name: 'Crewmate AI',
+      description:
+        'Always-on AI workforce: real-time Gemini Live sessions with audio/vision, ' +
+        '14 specialist agents (research, content, product, HR, legal, data, UI navigator, and more), ' +
+        'durable memory, Google Workspace integration, and cross-app automation.',
+      version: '1.0.0',
+      protocol: 'a2a/1.0',
+      url: baseUrl,
+      capabilities: [
+        'gemini-live-audio',
+        'gemini-live-vision',
+        'screen-perception',
+        'ui-navigation',
+        'research',
+        'content-generation',
+        'google-workspace',
+        'memory',
+        'task-orchestration',
+        'slack',
+        'notion',
+        'clickup',
+      ],
+      endpoints: {
+        orchestrate: `${baseUrl}/api/orchestrate`,
+        tasks: `${baseUrl}/api/agents/tasks`,
+        agents: `${baseUrl}/api/agents`,
+        skills: `${baseUrl}/api/skills`,
+        liveSession: `${baseUrl}/api/live-session`,
+      },
+      agents: AGENT_MANIFESTS.map((m) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+      })),
+      hostedOn: 'Google Cloud Run',
+      contact: 'https://github.com/Vrun-design/Crewmate-AI',
+    });
+  });
+}
 
 export function registerAgentRoutes(app: Express, requireAuth: RequireAuth): void {
   app.get('/api/skills', (req: Request, res: Response) => {

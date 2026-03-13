@@ -14,7 +14,15 @@ function buildWorkspaceConnectUrl(connectUrl: string, redirectPath: string): str
   return `${base}${connectUrl}${separator}redirectPath=${encodeURIComponent(redirectPath)}`;
 }
 
-export function Login() {
+function getSubmitLabel(isFirebaseMode: boolean, isLoading: boolean): string {
+  if (isLoading) {
+    return 'Sending link...';
+  }
+
+  return isFirebaseMode ? 'Send magic link' : 'Continue with Email';
+}
+
+export function Login(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,12 +35,36 @@ export function Login() {
     void firebaseAuthService.signOut().catch(() => undefined);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) return;
-    setIsLoading(true);
+  function clearFeedback(): void {
     setError(null);
     setMessage(null);
+  }
+
+  async function maybeRedirectToWorkspaceConnect(): Promise<boolean> {
+    try {
+      const integrations = await integrationsService.getIntegrations();
+      const googleWorkspace = integrations.find((integration) => integration.id === 'google-workspace');
+      const isConnected = googleWorkspace?.status === 'connected';
+
+      if (!isConnected && googleWorkspace?.connectUrl) {
+        window.location.href = buildWorkspaceConnectUrl(googleWorkspace.connectUrl, '/dashboard');
+        return true;
+      }
+    } catch {
+      // Fall back to the dashboard if integration discovery fails.
+    }
+
+    return false;
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (!email) {
+      return;
+    }
+
+    setIsLoading(true);
+    clearFeedback();
 
     try {
       if (isFirebaseMode) {
@@ -49,12 +81,11 @@ export function Login() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const handleGoogleSignIn = async () => {
+  async function handleGoogleSignIn(): Promise<void> {
     setIsLoading(true);
-    setError(null);
-    setMessage(null);
+    clearFeedback();
 
     try {
       const firebaseUser = await firebaseAuthService.signInWithGoogle();
@@ -62,19 +93,9 @@ export function Login() {
       authStorage.saveSession(token, firebaseUser.email ?? '');
       onboardingFlowService.markComplete();
 
-      // Check if Google Workspace is already connected.
-      // If not, redirect straight into the workspace OAuth flow so the user
-      // connects in one seamless step — no separate onboarding screen needed.
-      try {
-        const integrations = await integrationsService.getIntegrations();
-        const gws = integrations.find((i) => i.id === 'google-workspace');
-        const isConnected = gws?.status === 'connected';
-        if (!isConnected && gws?.connectUrl) {
-          window.location.href = buildWorkspaceConnectUrl(gws.connectUrl, '/dashboard');
-          return;
-        }
-      } catch {
-        // If the check fails for any reason, fall through to dashboard gracefully.
+      const redirectedToWorkspaceConnect = await maybeRedirectToWorkspaceConnect();
+      if (redirectedToWorkspaceConnect) {
+        return;
       }
 
       navigate('/dashboard');
@@ -83,7 +104,7 @@ export function Login() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center items-center p-4 selection:bg-foreground/10 relative overflow-hidden">
@@ -137,7 +158,7 @@ export function Login() {
               />
             </div>
             <Button variant="primary" className="w-full justify-center py-5 text-sm font-medium shadow-[0_1px_2px_rgba(0,0,0,0.1)]" disabled={isLoading}>
-              {isLoading ? 'Sending link...' : isFirebaseMode ? 'Send magic link' : 'Continue with Email'}
+              {getSubmitLabel(isFirebaseMode, isLoading)}
             </Button>
             {error ? <div className="text-sm text-red-500">{error}</div> : null}
             {message ? (
