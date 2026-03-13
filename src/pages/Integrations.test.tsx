@@ -1,11 +1,12 @@
 import React from 'react';
-import {fireEvent, render, screen} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {vi} from 'vitest';
 import {describe, expect, test} from 'vitest';
 import {Integrations} from './Integrations';
 
-const {refreshMock, integrationConfigMock} = vi.hoisted(() => ({
+const {refreshMock, integrationConfigMock, startOAuthConnectionMock} = vi.hoisted(() => ({
   refreshMock: vi.fn(),
+  startOAuthConnectionMock: vi.fn(),
   integrationConfigMock: {
     integrationId: 'google-workspace',
     configuredVia: 'vault' as const,
@@ -68,6 +69,12 @@ vi.mock('../hooks/useIntegrationConfig', () => ({
   }),
 }));
 
+vi.mock('../services/integrationsService', () => ({
+  integrationsService: {
+    startOAuthConnection: startOAuthConnectionMock,
+  },
+}));
+
 describe('Integrations', () => {
   test('adds bottom padding to the page shell', () => {
     const {container} = render(<Integrations />);
@@ -83,5 +90,22 @@ describe('Integrations', () => {
     expect(screen.getByText('Configure Google Workspace')).toBeInTheDocument();
     expect(screen.getByText(/Connected as/i)).toBeInTheDocument();
     expect(screen.getByText('Default calendar ID')).toBeInTheDocument();
+  });
+
+  test('starts OAuth connection through the authenticated integrations service', async () => {
+    startOAuthConnectionMock.mockResolvedValue({ redirectUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=test' });
+    const assignMock = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { assign: assignMock },
+      writable: true,
+    });
+
+    render(<Integrations />);
+    fireEvent.click(screen.getByRole('button', {name: /configure|connect/i}));
+    fireEvent.click(screen.getByRole('button', {name: /reconnect google workspace/i}));
+
+    await waitFor(() => {
+      expect(startOAuthConnectionMock).toHaveBeenCalledWith('google-workspace', '/integrations');
+    });
   });
 });

@@ -7,6 +7,9 @@ export const integrationsService = {
     const payload = await api.get<Integration[]>('/api/integrations');
     return payload.map(mapIntegration);
   },
+  startOAuthConnection(integrationId: string, redirectPath = '/integrations'): Promise<{redirectUrl: string}> {
+    return api.get(`/api/integrations/${integrationId}/connect?redirectPath=${encodeURIComponent(redirectPath)}&responseMode=json`);
+  },
   getConfig(integrationId: string): Promise<IntegrationConfigState> {
     return api.get(`/api/integrations/${integrationId}/config`);
   },

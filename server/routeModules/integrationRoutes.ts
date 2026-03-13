@@ -42,6 +42,19 @@ function isOAuthConfigIntegration(integrationId: string): boolean {
         || integrationId === 'clickup';
 }
 
+function wantsJsonRedirect(req: Request): boolean {
+    return req.query.responseMode === 'json';
+}
+
+function respondWithRedirect(req: Request, res: Response, redirectUrl: string): void {
+    if (wantsJsonRedirect(req)) {
+        res.json({ redirectUrl });
+        return;
+    }
+
+    res.redirect(302, redirectUrl);
+}
+
 export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth): void {
     app.get('/api/integrations', (req: Request, res: Response) => {
         const user = requireAuth(req, res);
@@ -133,7 +146,7 @@ export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth
                 userId: user.id,
                 redirectPath: typeof req.query.redirectPath === 'string' ? req.query.redirectPath : '/integrations',
             });
-            res.redirect(302, redirectUrl);
+            respondWithRedirect(req, res, redirectUrl);
         } catch (err: unknown) {
             res.status(400).json({ message: err instanceof Error ? err.message : 'Unable to start Google Workspace connection' });
         }
@@ -187,7 +200,7 @@ export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth
                 });
             }
 
-            res.redirect(302, redirectUrl);
+            respondWithRedirect(req, res, redirectUrl);
         } catch (err: unknown) {
             res.status(400).json({ message: err instanceof Error ? err.message : `Unable to start ${integrationId} connection` });
         }

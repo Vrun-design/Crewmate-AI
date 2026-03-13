@@ -47,6 +47,8 @@ export const serverConfig = {
   geminiLiveModel: process.env.GEMINI_LIVE_MODEL ?? 'gemini-2.5-flash-native-audio-preview-12-2025',
   // Quick tasks — orchestration, routing, skill calls
   geminiTextModel: process.env.GEMINI_TEXT_MODEL ?? 'gemini-3.1-flash-lite-preview',
+  // Browser automation / Stagehand planning
+  geminiBrowserModel: process.env.GEMINI_BROWSER_MODEL ?? process.env.STAGEHAND_MODEL ?? 'google/gemini-2.5-flash',
   // Deep research + content generation
   geminiResearchModel: process.env.GEMINI_RESEARCH_MODEL ?? 'gemini-3.1-pro-preview',
   // Multi-agent orchestration (intent classification, task routing)

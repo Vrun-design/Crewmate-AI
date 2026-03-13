@@ -46,12 +46,12 @@ export function listTasks(userId?: string): TaskRecord[] {
       SELECT ${TASK_SELECT_COLUMNS}
       FROM tasks
       WHERE user_id = ? OR user_id = '__system__'
-      ORDER BY id DESC
+      ORDER BY rowid DESC
     `
     : `
       SELECT ${TASK_SELECT_COLUMNS}
       FROM tasks
-      ORDER BY id DESC
+      ORDER BY rowid DESC
     `;
   const rows = userId
     ? db.prepare(query).all(userId) as TaskRow[]

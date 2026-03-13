@@ -11,6 +11,7 @@
  * so browserEngine.ts and browser.skills.ts are untouched.
  */
 import { Stagehand } from '@browserbasehq/stagehand';
+import { serverConfig } from '../../config';
 import type { UiExecutionResult, UiNavigatorRunResult } from './uiNavigatorTypes';
 
 interface StagehandExecutorOptions {
@@ -24,9 +25,12 @@ interface StagehandActResult {
   actionDescription: string;
 }
 
-/** Gemini model used for Stagehand's planning. Uses same GOOGLE_API_KEY as rest of the app. */
-const STAGEHAND_MODEL = 'gemini-2.0-flash';
 const COMPLETION_HINTS = ['done', 'completed', 'finished', 'no action'];
+
+function getStagehandModel(): string {
+  const configuredModel = serverConfig.geminiBrowserModel.trim();
+  return configuredModel.includes('/') ? configuredModel : `google/${configuredModel}`;
+}
 
 function buildSummary(intent: string, steps: UiExecutionResult[], finalUrl: string): string {
   const successCount = steps.filter((s) => s.status === 'completed').length;
@@ -78,7 +82,7 @@ export async function executeWithStagehand(
 
   const stagehand = new Stagehand({
     env: 'LOCAL',
-    model: STAGEHAND_MODEL,
+    model: getStagehandModel(),
     verbose: 0,
     disablePino: true,
     localBrowserLaunchOptions: {

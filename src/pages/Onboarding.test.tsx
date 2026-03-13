@@ -1,10 +1,13 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Onboarding } from './Onboarding';
 
-const refreshMock = vi.fn();
+const { refreshMock, startOAuthConnectionMock } = vi.hoisted(() => ({
+  refreshMock: vi.fn(),
+  startOAuthConnectionMock: vi.fn(),
+}));
 
 vi.mock('../hooks/useIntegrations', () => ({
   useIntegrations: () => ({
@@ -24,6 +27,12 @@ vi.mock('../hooks/useIntegrations', () => ({
     error: null,
     refresh: refreshMock,
   }),
+}));
+
+vi.mock('../services/integrationsService', () => ({
+  integrationsService: {
+    startOAuthConnection: startOAuthConnectionMock,
+  },
 }));
 
 describe('Onboarding', () => {
@@ -54,5 +63,26 @@ describe('Onboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }));
 
     expect(window.localStorage.getItem('crewmate_onboarding_complete')).toBe('true');
+  });
+
+  test('starts Google Workspace OAuth through the authenticated integrations service', async () => {
+    startOAuthConnectionMock.mockResolvedValue({ redirectUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=test' });
+    const assignMock = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { assign: assignMock },
+      writable: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <Onboarding />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Google Workspace' }));
+
+    await waitFor(() => {
+      expect(startOAuthConnectionMock).toHaveBeenCalledWith('google-workspace', '/onboarding');
+    });
   });
 });

@@ -8,12 +8,6 @@ import { firebaseAuthService } from '../../services/firebaseAuth';
 import { onboardingFlowService } from '../../services/onboardingFlowService';
 import { integrationsService } from '../../services/integrationsService';
 
-function buildWorkspaceConnectUrl(connectUrl: string, redirectPath: string): string {
-  const base = import.meta.env.VITE_API_URL ?? '';
-  const separator = connectUrl.includes('?') ? '&' : '?';
-  return `${base}${connectUrl}${separator}redirectPath=${encodeURIComponent(redirectPath)}`;
-}
-
 function getSubmitLabel(isFirebaseMode: boolean, isLoading: boolean): string {
   if (isLoading) {
     return 'Sending link...';
@@ -46,8 +40,9 @@ export function Login(): React.JSX.Element {
       const googleWorkspace = integrations.find((integration) => integration.id === 'google-workspace');
       const isConnected = googleWorkspace?.status === 'connected';
 
-      if (!isConnected && googleWorkspace?.connectUrl) {
-        window.location.href = buildWorkspaceConnectUrl(googleWorkspace.connectUrl, '/dashboard');
+      if (!isConnected && googleWorkspace) {
+        const { redirectUrl } = await integrationsService.startOAuthConnection(googleWorkspace.id, '/dashboard');
+        window.location.assign(redirectUrl);
         return true;
       }
     } catch {

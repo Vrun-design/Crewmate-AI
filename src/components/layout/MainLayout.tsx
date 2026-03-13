@@ -7,7 +7,6 @@ import { applyTheme, getInitialTheme } from '../../services/themeService';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { ScreenSharePiP } from '../ui/ScreenSharePiP';
-import { BrowserSessionPiP } from '../ui/BrowserSessionPiP';
 import { MiniSessionBar } from '../ui/MiniSessionBar';
 import { useLiveSessionContext } from '../../contexts/LiveSessionContext';
 
@@ -103,7 +102,6 @@ export function MainLayout() {
           onOpenOverlay={() => setIsOverlayOpen(true)}
         />
       )}
-      <BrowserSessionPiP />
       <MiniSessionBar />
     </div>
   );

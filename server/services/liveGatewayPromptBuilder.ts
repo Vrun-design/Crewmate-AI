@@ -42,6 +42,8 @@ const GOOGLE_WORKSPACE_APPENDIX = `
 
 ## Google Workspace
 - If Google Workspace is connected, prefer create-or-draft flows for Docs, Sheets, Slides, Gmail drafts, Drive, and Calendar.
+- When creating a new Doc, Sheet, or Slides deck that should already contain content, pass the content in the create call itself ("content", "rows", or "slides") instead of creating an empty file first.
+- If a follow-up edit is still needed, reuse the exact file ID returned by the create step or the visible Google URL on screen. Do not invent placeholder IDs.
 - Gmail send and attendee-impacting calendar actions always require explicit confirmation first.
 - If the user asks for a Google Workspace action and it is not connected, say specifically: "Google Workspace isn't connected yet — you can connect it in Integrations. Want me to open that for you?"`;
 

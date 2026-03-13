@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useIntegrations } from '../hooks/useIntegrations';
+import { integrationsService } from '../services/integrationsService';
 import { onboardingFlowService } from '../services/onboardingFlowService';
 
 const GOOGLE_CAPABILITIES = [
@@ -15,19 +16,12 @@ const GOOGLE_CAPABILITIES = [
   { label: 'Create Drive folders', icon: FolderOpen },
 ];
 
-function buildConnectHref(connectUrl?: string): string {
-  if (!connectUrl) {
-    return '/integrations';
-  }
-
-  const separator = connectUrl.includes('?') ? '&' : '?';
-  return `${import.meta.env.VITE_API_URL ?? ''}${connectUrl}${separator}redirectPath=${encodeURIComponent('/onboarding')}`;
-}
-
 export function Onboarding(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const { integrations, isLoading, error, refresh } = useIntegrations();
+  const [connectError, setConnectError] = React.useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = React.useState(false);
 
   const googleWorkspace = useMemo(
     () => integrations.find((integration) => integration.id === 'google-workspace') ?? null,
@@ -53,6 +47,25 @@ export function Onboarding(): React.JSX.Element {
     navigate('/dashboard');
   }
 
+  async function handleConnectGoogleWorkspace(): Promise<void> {
+    if (!googleWorkspace) {
+      navigate('/integrations');
+      return;
+    }
+
+    setConnectError(null);
+    setIsConnecting(true);
+
+    try {
+      const { redirectUrl } = await integrationsService.startOAuthConnection(googleWorkspace.id, '/onboarding');
+      window.location.assign(redirectUrl);
+    } catch (loadError) {
+      setConnectError(loadError instanceof Error ? loadError.message : 'Unable to start Google Workspace connection');
+    } finally {
+      setIsConnecting(false);
+    }
+  }
+
   return (
     <div className="space-y-8 pb-10">
       <PageHeader
@@ -66,6 +79,12 @@ export function Onboarding(): React.JSX.Element {
           <Button variant="secondary" className="ml-3" onClick={() => void refresh()}>
             Retry
           </Button>
+        </div>
+      ) : null}
+
+      {connectError ? (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
+          {connectError}
         </div>
       ) : null}
 
@@ -111,11 +130,9 @@ export function Onboarding(): React.JSX.Element {
                 <ArrowRight size={16} className="ml-2" />
               </Button>
             ) : (
-              <a href={buildConnectHref(googleWorkspace?.connectUrl)}>
-                <Button variant="primary" disabled={isLoading || !googleWorkspace}>
-                  Connect Google Workspace
-                </Button>
-              </a>
+              <Button variant="primary" disabled={isLoading || !googleWorkspace || isConnecting} onClick={() => void handleConnectGoogleWorkspace()}>
+                {isConnecting ? 'Opening Google...' : 'Connect Google Workspace'}
+              </Button>
             )}
             <Button variant="secondary" onClick={handleSkip}>
               Skip for now

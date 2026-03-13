@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowUpRight, Check, ExternalLink, Settings, Shield, Trash2 } from 'lucide-react';
 import { useIntegrationConfig } from '../../hooks/useIntegrationConfig';
+import { integrationsService } from '../../services/integrationsService';
 import { Button } from '../ui/Button';
 import type { Integration } from '../../types';
 import { IntegrationLogo } from './IntegrationLogo';
@@ -26,6 +27,8 @@ export function IntegrationDrawerContent({
   const capabilities = integration.capabilities ?? [];
   const { config, isLoading, isSaving, error, saveConfig, clearConfig } = useIntegrationConfig(integration.id, true);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     if (!config) return;
@@ -41,9 +44,6 @@ export function IntegrationDrawerContent({
   const isOAuth = Boolean(integration.connectUrl);
   const oauthConnection = config?.connection;
   const isGoogleWorkspace = integration.id === 'google-workspace';
-  const connectHref = isOAuth
-    ? `${import.meta.env.VITE_API_URL ?? ''}${integration.connectUrl}${integration.connectUrl?.includes('?') ? '&' : '?'}redirectPath=${encodeURIComponent('/integrations')}`
-    : '';
 
   async function handleSave(): Promise<void> {
     await saveConfig(formValues);
@@ -53,6 +53,20 @@ export function IntegrationDrawerContent({
   async function handleDisconnect(): Promise<void> {
     await clearConfig();
     onSaved();
+  }
+
+  async function handleOAuthConnect(): Promise<void> {
+    setConnectError(null);
+    setIsConnecting(true);
+
+    try {
+      const { redirectUrl } = await integrationsService.startOAuthConnection(integration.id, '/integrations');
+      window.location.assign(redirectUrl);
+    } catch (connectLoadError) {
+      setConnectError(connectLoadError instanceof Error ? connectLoadError.message : `Unable to start ${integration.name} connection`);
+    } finally {
+      setIsConnecting(false);
+    }
   }
 
   return (
@@ -81,6 +95,12 @@ export function IntegrationDrawerContent({
       {error ? (
         <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-lg text-sm text-muted-foreground">
           {error}
+        </div>
+      ) : null}
+
+      {connectError ? (
+        <div className="p-4 border border-amber-500/20 bg-amber-500/5 rounded-lg text-sm text-muted-foreground">
+          {connectError}
         </div>
       ) : null}
 
@@ -157,16 +177,18 @@ export function IntegrationDrawerContent({
                     </div>
                   </div>
                 ) : null}
-              <a
-                href={connectHref}
-                className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-accent hover:border-foreground/30"
+              <button
+                type="button"
+                onClick={() => void handleOAuthConnect()}
+                disabled={isConnecting}
+                className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-accent hover:border-foreground/30 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isGoogleWorkspace ? (
                   <img src={GOOGLE_LOGO_URL} alt="Google" className="w-5 h-5" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 ) : null}
-                {getOAuthButtonLabel(integration.name, true)}
+                {isConnecting ? 'Opening Google...' : getOAuthButtonLabel(integration.name, true)}
                 <ExternalLink size={14} className="text-muted-foreground ml-auto" />
-              </a>
+              </button>
             </div>
           ) : config ? (
             <div className="space-y-4">
@@ -298,9 +320,11 @@ export function IntegrationDrawerContent({
           {/* OAuth path — big Google button */}
           {isOAuth ? (
             <div className="pt-4 border-t border-border space-y-3">
-              <a
-                href={connectHref}
-                className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-foreground/30 hover:shadow-sm"
+              <button
+                type="button"
+                onClick={() => void handleOAuthConnect()}
+                disabled={isConnecting}
+                className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-foreground/30 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isGoogleWorkspace ? (
                   <img
@@ -310,9 +334,9 @@ export function IntegrationDrawerContent({
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : null}
-                {getOAuthButtonLabel(integration.name, false)}
+                {isConnecting ? 'Opening Google...' : getOAuthButtonLabel(integration.name, false)}
                 <ExternalLink size={14} className="text-muted-foreground ml-auto" />
-              </a>
+              </button>
               {isGoogleWorkspace ? (
                 <div className="rounded-lg border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
                   One connection unlocks Gmail, Drive, Docs, Sheets, Slides, and Calendar. Gmail send and calendar invites still require confirmation before side effects.

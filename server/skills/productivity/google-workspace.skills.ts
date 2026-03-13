@@ -3,6 +3,7 @@ import { parseStringMatrixArgument, requireExplicitApproval } from '../framework
 import { createCalendarEvent, listCalendarEvents } from '../../services/calendarService';
 import { createGoogleDocument, appendToGoogleDocument } from '../../services/docsService';
 import { createDriveFolder, searchDriveFiles } from '../../services/driveService';
+import { resolveGoogleResourceId } from '../../services/googleResourceResolver';
 import { createGmailDraft, searchGmailMessages, sendGmailMessage } from '../../services/gmailService';
 import { createGoogleSpreadsheet, appendSpreadsheetRows } from '../../services/sheetsService';
 import { createGooglePresentation, addSlidesToPresentation } from '../../services/slidesService';
@@ -46,19 +47,6 @@ function parseSlides(value: unknown): Array<{ title: string; body?: string }> {
       body: String(item ?? ''),
     };
   });
-}
-
-function getGoogleResourceId(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function getScreenContextId(screenContext: unknown, pattern: RegExp): string {
-  if (typeof screenContext !== 'string') {
-    return '';
-  }
-
-  const match = screenContext.match(pattern);
-  return match?.[1] ?? '';
 }
 
 const googleBaseFields = {
@@ -180,11 +168,17 @@ export const googleGmailSearchSkill: Skill = {
 export const googleDocsCreateDocumentSkill: Skill = {
   id: 'google.docs-create-document',
   name: 'Create Google Doc',
-  description: 'Create a Google Doc and optionally seed it with content.',
+  description: 'Create a Google Doc and immediately populate it when content is provided.',
   version: '1.0.0',
   category: 'productivity',
   requiresIntegration: ['google-workspace'],
   triggerPhrases: ['Create a Google Doc', 'Save this as a doc', 'Write this into Docs'],
+  usageExamples: [
+    'Create a Google Doc called Q2 Launch Brief and add the summary inside it',
+    'Make a Google Doc for meeting notes and put this outline in it',
+  ],
+  invokingMessage: 'Creating the Google Doc and filling in the first draft.',
+  invokedMessage: 'Google Doc created and ready.',
   preferredModel: 'quick',
   executionMode: 'delegated',
   latencyClass: 'slow',
@@ -217,11 +211,17 @@ export const googleDocsCreateDocumentSkill: Skill = {
 export const googleDocsAppendContentSkill: Skill = {
   id: 'google.docs-append-content',
   name: 'Append Google Doc Content',
-  description: 'Append text content to an existing Google Doc.',
+  description: 'Append text content to an existing Google Doc, using a doc ID, visible URL, or document title.',
   version: '1.0.0',
   category: 'productivity',
   requiresIntegration: ['google-workspace'],
   triggerPhrases: ['Append to the doc', 'Add this to Google Docs'],
+  usageExamples: [
+    'Add this section to the Google Doc that is open on screen',
+    'Append this research summary to the Google Doc named Product Notes',
+  ],
+  invokingMessage: 'Adding the new content to Google Docs.',
+  invokedMessage: 'Google Doc updated.',
   preferredModel: 'quick',
   executionMode: 'delegated',
   latencyClass: 'slow',
@@ -230,21 +230,25 @@ export const googleDocsAppendContentSkill: Skill = {
   inputSchema: {
     type: 'object',
     properties: {
-      documentId: { type: 'string', description: 'Google Document ID. Extract from the URL: /document/d/DOCUMENT_ID/edit' },
+      documentId: { type: 'string', description: 'Google Document ID or full Google Docs URL.' },
+      documentTitle: { type: 'string', description: 'Optional document title fallback if the ID is missing.' },
       content: { type: 'string', description: 'Text to append.' },
       screenContext: { type: 'string', description: 'Optional: pass the visible URL from screen if the user is looking at a doc. The skill will extract the document ID automatically.' },
     },
     required: ['content'],
   },
   handler: async (ctx, args) => {
-    let documentId = getGoogleResourceId(args.documentId);
-    if (!documentId) {
-      documentId = getScreenContextId(args.screenContext, /\/document\/d\/([a-zA-Z0-9_-]+)/);
-    }
-
-    if (!documentId) {
-      throw new Error('documentId is required. Provide the Google Doc ID (from the URL: /document/d/DOCUMENT_ID/edit) or share your screen while looking at the doc.');
-    }
+    const documentId = await resolveGoogleResourceId({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      explicitId: args.documentId,
+      screenContext: args.screenContext,
+      title: args.documentTitle,
+      urlPattern: /\/document\/d\/([a-zA-Z0-9_-]+)/,
+      mimeType: 'application/vnd.google-apps.document',
+      label: 'documentId',
+      recentCreateSkillId: 'google.docs-create-document',
+    });
     const result = await appendToGoogleDocument(ctx.workspaceId, {
       documentId,
       content: String(args.content ?? ''),
@@ -260,11 +264,17 @@ export const googleDocsAppendContentSkill: Skill = {
 export const googleSheetsCreateSpreadsheetSkill: Skill = {
   id: 'google.sheets-create-spreadsheet',
   name: 'Create Google Sheet',
-  description: 'Create a Google Sheet and optionally populate initial rows.',
+  description: 'Create a Google Sheet and immediately populate it when rows are provided.',
   version: '1.0.0',
   category: 'productivity',
   requiresIntegration: ['google-workspace'],
   triggerPhrases: ['Create a Google Sheet', 'Make a spreadsheet', 'Create a leads sheet'],
+  usageExamples: [
+    'Create a Google Sheet called Top 10 NSE Stocks Analysis and add the table rows',
+    'Make a spreadsheet for leads and include headers plus the first records',
+  ],
+  invokingMessage: 'Creating the Google Sheet and preparing the rows.',
+  invokedMessage: 'Google Sheet created and ready.',
   preferredModel: 'quick',
   executionMode: 'delegated',
   latencyClass: 'slow',
@@ -305,11 +315,17 @@ export const googleSheetsCreateSpreadsheetSkill: Skill = {
 export const googleSheetsAppendRowsSkill: Skill = {
   id: 'google.sheets-append-rows',
   name: 'Append Google Sheet Rows',
-  description: 'Append rows into an existing Google Sheet.',
+  description: 'Append rows into an existing Google Sheet, using a spreadsheet ID, visible URL, or sheet title.',
   version: '1.0.0',
   category: 'productivity',
   requiresIntegration: ['google-workspace'],
   triggerPhrases: ['Append rows to the sheet', 'Add these rows to Sheets'],
+  usageExamples: [
+    'Add these rows to the Google Sheet that is open on screen',
+    'Append this data to the sheet named Weekly KPI Tracker',
+  ],
+  invokingMessage: 'Appending rows to Google Sheets.',
+  invokedMessage: 'Google Sheet updated.',
   preferredModel: 'quick',
   executionMode: 'delegated',
   latencyClass: 'slow',
@@ -318,7 +334,8 @@ export const googleSheetsAppendRowsSkill: Skill = {
   inputSchema: {
     type: 'object',
     properties: {
-      spreadsheetId: { type: 'string', description: 'Spreadsheet ID. Extract from the URL: /spreadsheets/d/SPREADSHEET_ID/edit' },
+      spreadsheetId: { type: 'string', description: 'Spreadsheet ID or full Google Sheets URL.' },
+      spreadsheetTitle: { type: 'string', description: 'Optional spreadsheet title fallback if the ID is missing.' },
       rows: {
         type: 'array',
         description: '2D array of rows to append.',
@@ -334,14 +351,17 @@ export const googleSheetsAppendRowsSkill: Skill = {
     required: ['rows'],
   },
   handler: async (ctx, args) => {
-    let spreadsheetId = getGoogleResourceId(args.spreadsheetId);
-    if (!spreadsheetId) {
-      spreadsheetId = getScreenContextId(args.screenContext, /\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-    }
-
-    if (!spreadsheetId) {
-      throw new Error('spreadsheetId is required. Provide the Google Sheets ID (from the URL: /spreadsheets/d/SPREADSHEET_ID/edit) or share your screen while looking at the sheet.');
-    }
+    const spreadsheetId = await resolveGoogleResourceId({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      explicitId: args.spreadsheetId,
+      screenContext: args.screenContext,
+      title: args.spreadsheetTitle,
+      urlPattern: /\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/,
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      label: 'spreadsheetId',
+      recentCreateSkillId: 'google.sheets-create-spreadsheet',
+    });
     const result = await appendSpreadsheetRows(ctx.workspaceId, {
       spreadsheetId,
       rows: parseRows(args.rows),
@@ -358,11 +378,17 @@ export const googleSheetsAppendRowsSkill: Skill = {
 export const googleSlidesCreatePresentationSkill: Skill = {
   id: 'google.slides-create-presentation',
   name: 'Create Google Slides Presentation',
-  description: 'Create a Google Slides presentation from a title and optional outline.',
+  description: 'Create a Google Slides presentation and immediately populate it when slides are provided.',
   version: '1.0.0',
   category: 'productivity',
   requiresIntegration: ['google-workspace'],
   triggerPhrases: ['Create a Slides deck', 'Make a presentation', 'Build a pitch deck'],
+  usageExamples: [
+    'Create a Slides deck called Top 10 NSE Stocks Analysis with one slide per stock',
+    'Make a presentation for the quarterly review and include the outline as slides',
+  ],
+  invokingMessage: 'Creating the Slides deck and building the first slides.',
+  invokedMessage: 'Google Slides deck created and ready.',
   preferredModel: 'quick',
   executionMode: 'delegated',
   latencyClass: 'slow',
@@ -407,11 +433,17 @@ export const googleSlidesCreatePresentationSkill: Skill = {
 export const googleSlidesAddSlidesSkill: Skill = {
   id: 'google.slides-add-slides',
   name: 'Add Slides To Presentation',
-  description: 'Append slides to an existing Google Slides presentation.',
+  description: 'Append slides to an existing Google Slides presentation, using a presentation ID, visible URL, or deck title.',
   version: '1.0.0',
   category: 'productivity',
   requiresIntegration: ['google-workspace'],
   triggerPhrases: ['Add slides to the deck', 'Append slides to the presentation'],
+  usageExamples: [
+    'Add these slides to the presentation that is open on screen',
+    'Append two slides to the deck named Board Update',
+  ],
+  invokingMessage: 'Adding slides to the presentation.',
+  invokedMessage: 'Slides added to the deck.',
   preferredModel: 'quick',
   executionMode: 'delegated',
   latencyClass: 'slow',
@@ -420,7 +452,8 @@ export const googleSlidesAddSlidesSkill: Skill = {
   inputSchema: {
     type: 'object',
     properties: {
-      presentationId: { type: 'string', description: 'Presentation ID. Extract from the URL: /presentation/d/PRESENTATION_ID/edit' },
+      presentationId: { type: 'string', description: 'Presentation ID or full Google Slides URL.' },
+      presentationTitle: { type: 'string', description: 'Optional presentation title fallback if the ID is missing.' },
       slides: {
         type: 'array',
         description: 'Slide objects with title/body.',
@@ -439,14 +472,17 @@ export const googleSlidesAddSlidesSkill: Skill = {
     required: ['slides'],
   },
   handler: async (ctx, args) => {
-    let presentationId = getGoogleResourceId(args.presentationId);
-    if (!presentationId) {
-      presentationId = getScreenContextId(args.screenContext, /\/presentation\/d\/([a-zA-Z0-9_-]+)/);
-    }
-
-    if (!presentationId) {
-      throw new Error('presentationId is required. Provide the Google Slides ID or share your screen while looking at the presentation.');
-    }
+    const presentationId = await resolveGoogleResourceId({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      explicitId: args.presentationId,
+      screenContext: args.screenContext,
+      title: args.presentationTitle,
+      urlPattern: /\/presentation\/d\/([a-zA-Z0-9_-]+)/,
+      mimeType: 'application/vnd.google-apps.presentation',
+      label: 'presentationId',
+      recentCreateSkillId: 'google.slides-create-presentation',
+    });
     const result = await addSlidesToPresentation(ctx.workspaceId, {
       presentationId,
       slides: parseSlides(args.slides),
@@ -462,11 +498,17 @@ export const googleSlidesAddSlidesSkill: Skill = {
 export const googleDriveSearchFilesSkill: Skill = {
   id: 'google.drive-search-files',
   name: 'Search Google Drive Files',
-  description: 'Search files in Google Drive.',
+  description: 'Search files in Google Drive by filename or title text.',
   version: '1.0.0',
   category: 'productivity',
   requiresIntegration: ['google-workspace'],
   triggerPhrases: ['Search Drive', 'Find a Google file'],
+  usageExamples: [
+    'Find the Google Sheet named Top 10 NSE Stocks Analysis',
+    'Search Drive for files with Board Update in the title',
+  ],
+  invokingMessage: 'Searching Google Drive for the right file.',
+  invokedMessage: 'Google Drive search complete.',
   preferredModel: 'quick',
   executionMode: 'delegated',
   latencyClass: 'slow',

@@ -60,7 +60,7 @@ function buildErrorSpokenResponse(errorMessage: string, skillId?: string): strin
   if (lower.includes('not connected') || lower.includes('no token') || lower.includes('unauthorized') || lower.includes('401')) {
     const integrationName = skillId?.split('.')?.[0] ?? 'that integration';
     const displayName = integrationName.charAt(0).toUpperCase() + integrationName.slice(1);
-    return `That didn't work — ${displayName} isn't connected yet. You can hook it up in Integrations settings. Want me to remind you?`;
+    return `That didn't work — ${displayName} isn't connected yet. You can connect it in Integrations. Want me to open that for you?`;
   }
 
   // Rate limit
@@ -76,6 +76,10 @@ function buildErrorSpokenResponse(errorMessage: string, skillId?: string): strin
   // Permission denied
   if (lower.includes('403') || lower.includes('forbidden') || lower.includes('permission')) {
     return `I don't have permission to do that — you may need to reconnect the integration with broader access.`;
+  }
+
+  if (lower.includes('requested entity was not found')) {
+    return `I couldn't find the exact Google file to update. If you open it on screen or give me the exact file name, I can try again.`;
   }
 
   // Unknown skill

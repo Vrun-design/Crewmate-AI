@@ -59,11 +59,22 @@ export async function addSlidesToPresentation(workspaceId: string, input: {
           objectId: slideId,
           insertionIndex: index + 1,
           slideLayoutReference: { predefinedLayout: 'TITLE_AND_BODY' },
+          placeholderIdMappings: [
+            {
+              layoutPlaceholder: { type: 'TITLE', index: 0 },
+              objectId: titleBoxId,
+            },
+            {
+              layoutPlaceholder: { type: 'BODY', index: 0 },
+              objectId: bodyBoxId,
+            },
+          ],
         },
       },
       {
         insertText: {
           objectId: titleBoxId,
+          insertionIndex: 0,
           text: slide.title,
         },
       },
@@ -71,6 +82,7 @@ export async function addSlidesToPresentation(workspaceId: string, input: {
         ? [{
           insertText: {
             objectId: bodyBoxId,
+            insertionIndex: 0,
             text: slide.body,
           },
         }]
