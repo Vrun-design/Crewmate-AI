@@ -1,5 +1,6 @@
-import {useEffect, useState} from 'react';
+import {useState} from 'react';
 import {preferencesService} from '../services/preferencesService';
+import {useAsyncResource} from './useAsyncResource';
 import type {UserPreferences} from '../types';
 
 interface UsePreferencesResult {
@@ -10,37 +11,21 @@ interface UsePreferencesResult {
   savePreferences: (preferences: UserPreferences) => Promise<void>;
 }
 
-export function usePreferences(): UsePreferencesResult {
-  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+export function usePreferences(enabled = true): UsePreferencesResult {
+  const {
+    data: preferences,
+    isLoading,
+    error,
+    refresh,
+    setData: setPreferences,
+    setError,
+  } = useAsyncResource<UserPreferences | null>({
+    enabled,
+    initialData: null,
+    load: preferencesService.get,
+    loadErrorMessage: 'Unable to load preferences',
+  });
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    preferencesService
-      .get()
-      .then((nextPreferences) => {
-        if (isMounted) {
-          setPreferences(nextPreferences);
-        }
-      })
-      .catch((loadError) => {
-        if (isMounted) {
-          setError(loadError instanceof Error ? loadError.message : 'Unable to load preferences');
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   async function savePreferences(nextPreferences: UserPreferences): Promise<void> {
     setIsSaving(true);

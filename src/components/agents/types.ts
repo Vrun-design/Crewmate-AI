@@ -2,6 +2,7 @@ export type AgentStepType = 'routing' | 'thinking' | 'skill_call' | 'skill_resul
 
 export interface AgentStepEvent {
   taskId: string;
+  taskRunId?: string;
   stepIndex: number;
   type: AgentStepType;
   timestamp: string;
@@ -14,9 +15,14 @@ export interface AgentStepEvent {
 
 export interface AgentTask {
   id: string;
+  taskId?: string;
   agentId: string;
+  routeType?: 'inline_answer' | 'inline_skill' | 'delegated_skill' | 'delegated_agent';
+  delegatedSkillId?: string;
+  originType?: 'app' | 'live_session' | 'command';
+  originRef?: string;
   intent: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   result?: unknown;
   error?: string;
   steps?: AgentStepEvent[];

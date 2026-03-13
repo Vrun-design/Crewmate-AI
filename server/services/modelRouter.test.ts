@@ -70,7 +70,7 @@ describe('modelRouter', () => {
 
         it('returns low for simple short prompts', () => {
             expect(determineComplexity('send a Slack message')).toBe('low');
-            expect(determineComplexity('create a GitHub issue')).toBe('low');
+            expect(determineComplexity('create a ClickUp task')).toBe('low');
         });
     });
 });

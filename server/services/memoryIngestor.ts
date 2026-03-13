@@ -1,180 +1,240 @@
-/**
- * Memory Ingestor — Phase 8
- *
- * Multi-source memory ingestion pipeline. Reads from:
- *   - Live session transcripts (already handled by ingestLiveTurnMemory)
- *   - Skill run outputs (tool results worth remembering)
- *   - Agent task results (research briefs, content drafts)
- *   - Manual notes (user-created annotations)
- *
- * Each memory is tagged with persona, source, and timestamp.
- * Embeddings are computed asynchronously for semantic retrieval.
- */
-import { db } from '../db';
-import { ingestMemoryNode } from './memoryService';
-import type { MemoryNodeRecord } from '../types';
+import {
+  ingestArtifactMemory,
+  ingestKnowledgeMemory,
+  ingestMemoryRecord,
+  searchMemoryRecords,
+  type MemoryKind,
+  type MemorySourceType,
+} from './memoryService';
 
-export type MemorySource = 'live_turn' | 'skill_run' | 'agent_task' | 'manual' | 'integration';
+export type MemorySource = MemorySourceType;
 
 export interface IngestOptions {
-    userId: string;
-    workspaceId?: string;
-    title: string;
-    content: string;
-    source: MemorySource;
-    personaId?: string;
-    tags?: string[];
-    type?: MemoryNodeRecord['type'];
+  userId: string;
+  workspaceId?: string;
+  title: string;
+  content: string;
+  source: MemorySource;
+  tags?: string[];
+  type?: 'document' | 'preference' | 'integration' | 'core';
 }
 
-/**
- * Ingest a memory from any source with persona tagging and source metadata.
- * Returns the new memory node ID.
- */
 export function ingestFromSource(opts: IngestOptions): string {
-    const tagPrefix = opts.tags?.length ? `[${opts.tags.join(', ')}] ` : '';
-    const personaTag = opts.personaId ? `[persona:${opts.personaId}] ` : '';
-    const sourceTag = `[source:${opts.source}]`;
+  const metadata = opts.tags?.length ? { tags: opts.tags } : undefined;
+  const kind: MemoryKind = opts.type === 'integration' ? 'artifact' : 'knowledge';
 
-    const searchText = `${personaTag}${tagPrefix}${sourceTag}\n\n${opts.content}`;
-
-    return ingestMemoryNode({
-        userId: opts.userId,
-        workspaceId: opts.workspaceId,
-        title: opts.title.slice(0, 120),
-        type: opts.type ?? 'core',
-        tokens: `${Math.max(1, Math.ceil(opts.content.length / 4 / 1000)).toFixed(1)}k`,
-        searchText,
-        personaId: opts.personaId,
-        source: opts.source,
-    });
+  return ingestMemoryRecord({
+    userId: opts.userId,
+    workspaceId: opts.workspaceId,
+    kind,
+    sourceType: opts.source,
+    title: opts.title,
+    summary: opts.content.slice(0, 280),
+    contentText: opts.content,
+    metadata,
+  });
 }
 
-/**
- * Ingest a skill run result that's worth remembering.
- * Only meaningful results (not error runs) are persisted.
- */
 export function ingestSkillResult(opts: {
-    userId: string;
-    workspaceId?: string;
-    skillId: string;
-    skillName: string;
-    output: unknown;
-    personaId?: string;
+  userId: string;
+  workspaceId?: string;
+  skillId: string;
+  skillName: string;
+  output: unknown;
+  taskId?: string;
+  taskRunId?: string;
+  sessionId?: string;
+  originType?: string;
+  originRef?: string;
 }): string | null {
-    const text = typeof opts.output === 'string'
-        ? opts.output
-        : (opts.output as { message?: string })?.message
-        ?? JSON.stringify(opts.output, null, 2);
+  const text = typeof opts.output === 'string'
+    ? opts.output
+    : (opts.output as { message?: string })?.message ?? JSON.stringify(opts.output, null, 2);
 
-    if (!text || text.length < 20) return null;
+  if (!text || text.length < 20) {
+    return null;
+  }
 
-    return ingestFromSource({
-        userId: opts.userId,
-        workspaceId: opts.workspaceId,
-        title: `${opts.skillName} result`,
-        content: text.slice(0, 3000),
-        source: 'skill_run',
-        personaId: opts.personaId,
-        tags: [opts.skillId],
-        type: 'core',
-    });
+  const metadata = {
+    skillId: opts.skillId,
+    taskId: opts.taskId ?? null,
+    taskRunId: opts.taskRunId ?? null,
+    sessionId: opts.sessionId ?? null,
+    originType: opts.originType ?? null,
+    originRef: opts.originRef ?? null,
+  };
+
+  maybeIngestArtifactFromOutput({
+    userId: opts.userId,
+    workspaceId: opts.workspaceId,
+    output: opts.output,
+    metadata,
+  });
+
+  return ingestKnowledgeMemory({
+    userId: opts.userId,
+    workspaceId: opts.workspaceId,
+    title: `${opts.skillName} result`,
+    summary: text.slice(0, 280),
+    contentText: text.slice(0, 3000),
+    sourceType: 'skill_run',
+    metadata,
+  });
 }
 
-/**
- * Ingest an agent task result (research briefs, content, etc.)
- */
 export function ingestAgentResult(opts: {
-    userId: string;
-    workspaceId?: string;
-    agentId: string;
-    intent: string;
-    result: unknown;
-    personaId?: string;
+  userId: string;
+  workspaceId?: string;
+  agentId: string;
+  intent: string;
+  result: unknown;
+  taskId?: string;
+  sessionId?: string;
+  originType?: string;
+  originRef?: string;
 }): string | null {
-    const text = typeof opts.result === 'string'
-        ? opts.result
-        : JSON.stringify(opts.result, null, 2);
+  const text = typeof opts.result === 'string'
+    ? opts.result
+    : JSON.stringify(opts.result, null, 2);
 
-    if (!text || text.length < 20) return null;
+  if (!text || text.length < 20) {
+    return null;
+  }
 
-    return ingestFromSource({
-        userId: opts.userId,
-        workspaceId: opts.workspaceId,
-        title: `Agent: ${opts.intent.slice(0, 80)}`,
-        content: text.slice(0, 4000),
-        source: 'agent_task',
-        personaId: opts.personaId,
-        tags: [opts.agentId.replace('crewmate-', '')],
-        type: 'preference',
+  const metadata = {
+    agentId: opts.agentId,
+    taskId: opts.taskId ?? null,
+    sessionId: opts.sessionId ?? null,
+    originType: opts.originType ?? null,
+    originRef: opts.originRef ?? null,
+  };
+
+  maybeIngestArtifactFromOutput({
+    userId: opts.userId,
+    workspaceId: opts.workspaceId,
+    output: opts.result,
+    metadata,
+  });
+
+  return ingestKnowledgeMemory({
+    userId: opts.userId,
+    workspaceId: opts.workspaceId,
+    title: `Agent result: ${opts.intent.slice(0, 80)}`,
+    summary: text.slice(0, 280),
+    contentText: text.slice(0, 4000),
+    sourceType: 'agent_task',
+    metadata,
+  });
+}
+
+export function ingestArtifactLink(opts: {
+  userId: string;
+  workspaceId?: string;
+  title: string;
+  url: string;
+  provider: string;
+  summary?: string;
+  metadata?: Record<string, unknown>;
+}): string {
+  return ingestArtifactMemory({
+    userId: opts.userId,
+    workspaceId: opts.workspaceId,
+    title: opts.title,
+    url: opts.url,
+    sourceType: 'integration',
+    summary: opts.summary,
+    metadata: { provider: opts.provider, ...(opts.metadata ?? {}) },
+  });
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function getString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function maybeIngestArtifactFromOutput(opts: {
+  userId: string;
+  workspaceId?: string;
+  output: unknown;
+  metadata: Record<string, unknown>;
+}): string | null {
+  const payload = asRecord(opts.output);
+  const nested = asRecord(payload?.output);
+  const target = nested ?? payload;
+  if (!target) {
+    return null;
+  }
+
+  const notionTitle = getString(target.title);
+  const notionUrl = getString(target.url);
+  if (notionTitle && notionUrl?.includes('notion.so')) {
+    return ingestArtifactMemory({
+      userId: opts.userId,
+      workspaceId: opts.workspaceId,
+      title: notionTitle,
+      url: notionUrl,
+      summary: `Notion artifact created by Crewmate`,
+      metadata: { provider: 'Notion', ...opts.metadata },
     });
-}
+  }
 
-/**
- * List memories filtered by persona and/or source.
- */
-export function listMemoriesByPersonaForUser(userId: string, personaId: string, limit = 50): MemoryNodeRecord[] {
-    return db.prepare(`
-    SELECT id, title, type, tokens, last_synced as lastSynced, active
-    FROM memory_nodes
-    WHERE user_id = ? AND persona_id = ? AND active = 1
-    ORDER BY rowid DESC
-    LIMIT ?
-  `).all(userId, personaId, limit).map((row) => ({
-        ...row,
-        active: Boolean((row as { active: number }).active),
-    })) as MemoryNodeRecord[];
-}
+  const clickupName = getString(target.name);
+  const clickupUrl = getString(target.url);
+  if (clickupName && clickupUrl?.includes('clickup.com')) {
+    return ingestArtifactMemory({
+      userId: opts.userId,
+      workspaceId: opts.workspaceId,
+      title: clickupName,
+      url: clickupUrl,
+      summary: `ClickUp task created by Crewmate`,
+      metadata: { provider: 'ClickUp', ...opts.metadata },
+    });
+  }
 
-/**
- * List memories timeline (for the new MemoryBase UI).
- */
-export function listMemoryTimeline(opts: {
-    userId: string;
-    limit?: number;
-    personaId?: string;
-    source?: MemorySource;
-    searchQuery?: string;
-}): Array<MemoryNodeRecord & { personaId?: string; source?: string; createdAt?: string }> {
-    const wheres: string[] = ['user_id = ?'];
-    const params: unknown[] = [opts.userId];
+  const workspaceTask = asRecord(target.task);
+  const taskTitle = getString(workspaceTask?.title);
+  if (taskTitle) {
+    return ingestArtifactMemory({
+      userId: opts.userId,
+      workspaceId: opts.workspaceId,
+      title: taskTitle,
+      summary: 'Workspace task created by Crewmate',
+      metadata: { provider: 'Crewmate', ...opts.metadata },
+    });
+  }
 
-    if (opts.personaId) {
-        wheres.push('persona_id = ?');
-        params.push(opts.personaId);
-    }
-    if (opts.source) {
-        wheres.push('source = ?');
-        params.push(opts.source);
-    }
-    if (opts.searchQuery) {
-        wheres.push('(title LIKE ? OR search_text LIKE ?)');
-        params.push(`%${opts.searchQuery}%`, `%${opts.searchQuery}%`);
-    }
+  const screenshotPublicUrl = getString(target.publicUrl);
+  const screenshotTitle = getString(target.title) ?? getString(target.caption) ?? 'Captured screenshot';
+  if (screenshotPublicUrl?.includes('/api/artifacts/screenshots/')) {
+    return ingestArtifactMemory({
+      userId: opts.userId,
+      workspaceId: opts.workspaceId,
+      title: screenshotTitle,
+      url: screenshotPublicUrl,
+      summary: 'Screenshot artifact captured by Crewmate',
+      metadata: { provider: 'Screenshot', ...opts.metadata },
+    });
+  }
 
-    params.push(opts.limit ?? 50);
+  const screenshotRecord = asRecord(target.screenshot);
+  const screenshotRecordUrl = getString(screenshotRecord?.publicUrl);
+  if (screenshotRecordUrl) {
+    return ingestArtifactMemory({
+      userId: opts.userId,
+      workspaceId: opts.workspaceId,
+      title: getString(screenshotRecord?.title) ?? 'Captured screenshot',
+      url: screenshotRecordUrl,
+      summary: 'Screenshot artifact used by Crewmate',
+      metadata: { provider: 'Screenshot', ...opts.metadata },
+    });
+  }
 
-    const rows = db.prepare(`
-    SELECT id, title, type, tokens, last_synced as lastSynced, active, persona_id, source, created_at
-    FROM memory_nodes
-    WHERE ${wheres.join(' AND ')}
-    ORDER BY rowid DESC
-    LIMIT ?
-  `).all(...params) as Array<{
-        id: string; title: string; type: string; tokens: string;
-        lastSynced: string; active: number; persona_id?: string;
-        source?: string; created_at?: string;
-    }>;
-
-    return rows.map((row) => ({
-        id: row.id,
-        title: row.title,
-        type: row.type as MemoryNodeRecord['type'],
-        tokens: row.tokens,
-        lastSynced: row.lastSynced,
-        active: Boolean(row.active),
-        personaId: row.persona_id,
-        source: row.source,
-        createdAt: row.created_at,
-    }));
+  return null;
 }

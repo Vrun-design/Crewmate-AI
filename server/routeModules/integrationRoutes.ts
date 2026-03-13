@@ -5,9 +5,42 @@ import {
     saveIntegrationConfig,
 } from '../services/integrationConfigService';
 import { listIntegrationCatalog } from '../services/integrationCatalog';
-import { buildCalendarAuthUrl, exchangeCalendarCode } from '../services/calendarService';
-import { buildGmailAuthUrl, exchangeGmailCode, isGmailConfigured, readGmailInbox } from '../services/gmailService';
+import {
+    createGoogleWorkspaceConnectUrl,
+    deleteGoogleWorkspaceConfig,
+    finalizeGoogleWorkspaceOAuthCallback,
+    getGoogleWorkspaceConfigState,
+    saveGoogleWorkspaceDefaults,
+} from '../services/googleWorkspaceService';
+import {
+    createSlackConnectUrl,
+    deleteSlackConfig,
+    finalizeSlackOAuthCallback,
+    getSlackConfigState,
+    saveSlackDefaults,
+} from '../services/slackService';
+import {
+    createNotionConnectUrl,
+    deleteNotionConfig,
+    finalizeNotionOAuthCallback,
+    getNotionConfigState,
+    saveNotionDefaults,
+} from '../services/notionService';
+import {
+    createClickUpConnectUrl,
+    deleteClickUpConfig,
+    finalizeClickUpOAuthCallback,
+    getClickUpConfigState,
+    saveClickUpDefaults,
+} from '../services/clickupService';
 import type { RequireAuth } from './types';
+
+function isOAuthConfigIntegration(integrationId: string): boolean {
+    return integrationId === 'google-workspace'
+        || integrationId === 'slack'
+        || integrationId === 'notion'
+        || integrationId === 'clickup';
+}
 
 export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth): void {
     app.get('/api/integrations', (req: Request, res: Response) => {
@@ -19,6 +52,22 @@ export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth
     app.get('/api/integrations/:integrationId/config', (req: Request, res: Response) => {
         const user = requireAuth(req, res);
         if (!user) return;
+        if (req.params.integrationId === 'google-workspace') {
+            res.json(getGoogleWorkspaceConfigState(user.workspaceId));
+            return;
+        }
+        if (req.params.integrationId === 'slack') {
+            res.json(getSlackConfigState(user.workspaceId));
+            return;
+        }
+        if (req.params.integrationId === 'notion') {
+            res.json(getNotionConfigState(user.workspaceId));
+            return;
+        }
+        if (req.params.integrationId === 'clickup') {
+            res.json(getClickUpConfigState(user.workspaceId));
+            return;
+        }
         res.json(getIntegrationConfigState(user.workspaceId, req.params.integrationId));
     });
 
@@ -26,6 +75,22 @@ export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth
         const user = requireAuth(req, res);
         if (!user) return;
         try {
+            if (req.params.integrationId === 'google-workspace') {
+                res.json(saveGoogleWorkspaceDefaults(user.workspaceId, req.body?.values ?? {}));
+                return;
+            }
+            if (req.params.integrationId === 'slack') {
+                res.json(saveSlackDefaults(user.workspaceId, req.body?.values ?? {}));
+                return;
+            }
+            if (req.params.integrationId === 'notion') {
+                res.json(saveNotionDefaults(user.workspaceId, req.body?.values ?? {}));
+                return;
+            }
+            if (req.params.integrationId === 'clickup') {
+                res.json(saveClickUpDefaults(user.workspaceId, req.body?.values ?? {}));
+                return;
+            }
             res.json(saveIntegrationConfig(user.workspaceId, req.params.integrationId, req.body?.values ?? {}));
         } catch (err: unknown) {
             res.status(400).json({ message: err instanceof Error ? err.message : 'Invalid configuration' });
@@ -35,64 +100,125 @@ export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth
     app.delete('/api/integrations/:integrationId/config', (req: Request, res: Response) => {
         const user = requireAuth(req, res);
         if (!user) return;
+        if (req.params.integrationId === 'google-workspace') {
+            deleteGoogleWorkspaceConfig(user.workspaceId);
+            res.json({ success: true });
+            return;
+        }
+        if (req.params.integrationId === 'slack') {
+            deleteSlackConfig(user.workspaceId);
+            res.json({ success: true });
+            return;
+        }
+        if (req.params.integrationId === 'notion') {
+            deleteNotionConfig(user.workspaceId);
+            res.json({ success: true });
+            return;
+        }
+        if (req.params.integrationId === 'clickup') {
+            deleteClickUpConfig(user.workspaceId);
+            res.json({ success: true });
+            return;
+        }
         deleteIntegrationConfig(user.workspaceId, req.params.integrationId);
         res.json({ success: true });
     });
 
-    // Gmail OAuth
-    app.get('/api/auth/gmail', (req: Request, res: Response) => {
+    app.get('/api/integrations/google-workspace/connect', (req: Request, res: Response) => {
         const user = requireAuth(req, res);
         if (!user) return;
-        res.redirect(buildGmailAuthUrl(user.workspaceId));
-    });
-
-    app.get('/api/auth/gmail/callback', async (req: Request, res: Response) => {
-        const code = String(req.query.code ?? '');
-        const state = String(req.query.state ?? '');
-        if (!code) { res.status(400).send('Missing code'); return; }
         try {
-            await exchangeGmailCode(state, code);
-            res.redirect('/?integration=gmail&status=connected');
-        } catch (err) {
-            res.status(500).send(`Gmail OAuth failed: ${String(err)}`);
+            const redirectUrl = createGoogleWorkspaceConnectUrl({
+                workspaceId: user.workspaceId,
+                userId: user.id,
+                redirectPath: typeof req.query.redirectPath === 'string' ? req.query.redirectPath : '/integrations',
+            });
+            res.redirect(302, redirectUrl);
+        } catch (err: unknown) {
+            res.status(400).json({ message: err instanceof Error ? err.message : 'Unable to start Google Workspace connection' });
         }
     });
 
-    app.get('/api/gmail/inbox', async (req: Request, res: Response) => {
-        const user = requireAuth(req, res);
-        if (!user) return;
-        const maxResults = Number.parseInt(String(req.query.maxResults ?? '5'), 10);
-
-        if (!isGmailConfigured(user.workspaceId)) {
-            res.json({ isConnected: false, messages: [] });
+    app.get('/api/integrations/google-workspace/callback', async (req: Request, res: Response) => {
+        const code = typeof req.query.code === 'string' ? req.query.code : '';
+        const state = typeof req.query.state === 'string' ? req.query.state : '';
+        if (!code || !state) {
+            res.status(400).json({ message: 'Missing Google OAuth callback parameters.' });
             return;
         }
 
         try {
-            const messages = await readGmailInbox(user.workspaceId, { maxResults });
-            res.json({ isConnected: true, messages });
-        } catch (err) {
-            console.error('[Gmail inbox]', err);
-            res.json({ isConnected: true, messages: [], error: String(err) });
+            const result = await finalizeGoogleWorkspaceOAuthCallback({ code, state });
+            res.redirect(302, result.redirectUrl);
+        } catch (err: unknown) {
+            res.status(400).json({ message: err instanceof Error ? err.message : 'Unable to complete Google Workspace connection' });
         }
     });
 
-    // Calendar OAuth
-    app.get('/api/auth/calendar', (req: Request, res: Response) => {
+    app.get('/api/integrations/:integrationId/connect', (req: Request, res: Response) => {
+        const integrationId = req.params.integrationId;
+        if (!isOAuthConfigIntegration(integrationId) || integrationId === 'google-workspace') {
+            res.status(404).json({ message: 'Unknown integration connect route.' });
+            return;
+        }
+
         const user = requireAuth(req, res);
         if (!user) return;
-        res.redirect(buildCalendarAuthUrl(user.workspaceId));
+
+        try {
+            let redirectUrl = '';
+            if (integrationId === 'slack') {
+                redirectUrl = createSlackConnectUrl({
+                    workspaceId: user.workspaceId,
+                    userId: user.id,
+                    redirectPath: typeof req.query.redirectPath === 'string' ? req.query.redirectPath : '/integrations',
+                });
+            } else if (integrationId === 'notion') {
+                redirectUrl = createNotionConnectUrl({
+                    workspaceId: user.workspaceId,
+                    userId: user.id,
+                    redirectPath: typeof req.query.redirectPath === 'string' ? req.query.redirectPath : '/integrations',
+                });
+            } else if (integrationId === 'clickup') {
+                redirectUrl = createClickUpConnectUrl({
+                    workspaceId: user.workspaceId,
+                    userId: user.id,
+                    redirectPath: typeof req.query.redirectPath === 'string' ? req.query.redirectPath : '/integrations',
+                });
+            }
+
+            res.redirect(302, redirectUrl);
+        } catch (err: unknown) {
+            res.status(400).json({ message: err instanceof Error ? err.message : `Unable to start ${integrationId} connection` });
+        }
     });
 
-    app.get('/api/auth/calendar/callback', async (req: Request, res: Response) => {
-        const code = String(req.query.code ?? '');
-        const state = String(req.query.state ?? '');
-        if (!code) { res.status(400).send('Missing code'); return; }
+    app.get('/api/integrations/:integrationId/callback', async (req: Request, res: Response) => {
+        const integrationId = req.params.integrationId;
+        if (!isOAuthConfigIntegration(integrationId) || integrationId === 'google-workspace') {
+            res.status(404).json({ message: 'Unknown integration callback route.' });
+            return;
+        }
+
+        const code = typeof req.query.code === 'string' ? req.query.code : '';
+        const state = typeof req.query.state === 'string' ? req.query.state : '';
+        if (!code || !state) {
+            res.status(400).json({ message: 'Missing OAuth callback parameters.' });
+            return;
+        }
+
         try {
-            await exchangeCalendarCode(state, code);
-            res.redirect('/?integration=calendar&status=connected');
-        } catch (err) {
-            res.status(500).send(`Calendar OAuth failed: ${String(err)}`);
+            let redirectUrl = '';
+            if (integrationId === 'slack') {
+                redirectUrl = await finalizeSlackOAuthCallback({ code, state });
+            } else if (integrationId === 'notion') {
+                redirectUrl = await finalizeNotionOAuthCallback({ code, state });
+            } else if (integrationId === 'clickup') {
+                redirectUrl = await finalizeClickUpOAuthCallback({ code, state });
+            }
+            res.redirect(302, redirectUrl);
+        } catch (err: unknown) {
+            res.status(400).json({ message: err instanceof Error ? err.message : `Unable to complete ${integrationId} connection` });
         }
     });
 }

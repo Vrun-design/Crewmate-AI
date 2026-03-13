@@ -4,7 +4,7 @@ import type { AgentTask } from './orchestrator';
 type NotificationVisualType = 'success' | 'info' | 'warning' | 'default';
 
 interface ArtifactDescriptor {
-  kind: 'notion' | 'github' | 'clickup' | 'workspace' | 'generic';
+  kind: 'notion' | 'clickup' | 'workspace' | 'generic';
   label: string;
   url?: string;
 }
@@ -58,15 +58,10 @@ function getArtifactFromResult(result: unknown): ArtifactDescriptor | null {
   const url = getString(payload.url);
   const title = getString(payload.title);
   const name = getString(payload.name);
-  const issueNumber = getNumber(payload.issueNumber);
   const task = asRecord(payload.task);
 
   if (title && url?.includes('notion.so')) {
     return { kind: 'notion', label: title, url };
-  }
-
-  if (title && issueNumber !== null && url) {
-    return { kind: 'github', label: `#${issueNumber} ${title}`, url };
   }
 
   if (name && url?.includes('clickup.com')) {
@@ -118,8 +113,6 @@ function buildArtifactTitle(kind: ArtifactDescriptor['kind']): string {
   switch (kind) {
     case 'notion':
       return 'Notion page created';
-    case 'github':
-      return 'GitHub issue created';
     case 'clickup':
       return 'ClickUp task created';
     case 'workspace':

@@ -1,4 +1,4 @@
-import { ActivityIcon, Calendar, CheckSquare, Command, Mail, Send, Terminal } from 'lucide-react';
+import { ActivityIcon, CheckSquare, Command, Terminal } from 'lucide-react';
 import type { Integration } from '../types';
 
 type IntegrationApiShape = Omit<Integration, 'icon'> & {
@@ -8,25 +8,18 @@ type IntegrationApiShape = Omit<Integration, 'icon'> & {
 const integrationIcons = {
   slack: ActivityIcon,
   notion: Terminal,
-  github: Terminal,
   linear: Command,
   clickup: CheckSquare,
-  gmail: Mail,
-  calendar: Calendar,
-  telegram: Send,
+  'google-workspace': Command,
 } as const;
 
 const customLogos: Record<string, string> = {
   slack: '/Slack.svg',
-  telegram: '/Telegram.svg',
   notion: '/Notion.svg',
-  github: '/Github.svg',
   linear: '/Linear.svg',
   clickup: '/Clikcup.svg',
   figma: '/Figma.svg',
-  gmail: '/Google.svg',
-  calendar: '/Google.svg',
-  zapier: '/zapier.svg',
+  'google-workspace': '/Google.svg',
 };
 
 export function mapIntegration(integration: IntegrationApiShape): Integration {

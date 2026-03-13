@@ -7,10 +7,12 @@ export interface SkillSummary {
     description: string;
     version: string;
     category: string;
-    personas: string[];
     requiresIntegration: string[];
     triggerPhrases: string[];
     preferredModel?: string;
+    executionMode?: string;
+    latencyClass?: string;
+    sideEffectLevel?: string;
 }
 
 export interface SkillRunResult {
@@ -28,18 +30,17 @@ export interface SkillRunRecord {
     durationMs: number;
 }
 
-export function useSkills(personaId?: string) {
+export function useSkills() {
     const [skills, setSkills] = useState<SkillSummary[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const url = personaId ? `/api/skills?persona=${personaId}` : '/api/skills';
-        api.get<SkillSummary[]>(url)
+        api.get<SkillSummary[]>('/api/skills')
             .then((data) => setSkills(data))
             .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load skills'))
             .finally(() => setIsLoading(false));
-    }, [personaId]);
+    }, []);
 
     const runSkill = useCallback(async (
         skillId: string,

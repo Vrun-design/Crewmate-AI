@@ -1,18 +1,41 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Brain, Search, RefreshCw, Zap, BookOpen, Star, WandSparkles, Plus, Link as LinkIcon, FileText, Loader2, Upload
+  Brain, Clock3, FileText, Link as LinkIcon, Loader2, Plus, RefreshCw, Search, Sparkles, ExternalLink, Activity, Trash2, AlertTriangle
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
-import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 import { Drawer } from '../components/ui/Drawer';
+import { Select } from '../components/ui/Select';
 import { api } from '../lib/api';
-import type { MemoryNode } from '../types';
+import { getUserFacingErrorMessage } from '../utils/errorHandling';
 
-interface MemoryNodeExtended extends MemoryNode {
-  personaId?: string;
-  source?: string;
-  createdAt?: string;
+type MemoryKind = 'session' | 'knowledge' | 'artifact';
+type MemorySource = 'live_turn' | 'skill_run' | 'agent_task' | 'manual' | 'integration' | 'meeting' | 'system';
+
+interface MemoryRecord {
+  id: string;
+  kind: MemoryKind;
+  sourceType: MemorySource;
+  title: string;
+  summary?: string | null;
+  contentText?: string | null;
+  artifactUrl?: string | null;
+  tokens: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface MemoryOverview {
+  recentContext: MemoryRecord[];
+  knowledge: MemoryRecord[];
+  artifacts: MemoryRecord[];
+  totals: {
+    recentContext: number;
+    knowledge: number;
+    artifacts: number;
+    active: number;
+  };
 }
 
 const SOURCE_OPTIONS = [
@@ -20,251 +43,170 @@ const SOURCE_OPTIONS = [
   { value: 'live_turn', label: 'Live Sessions' },
   { value: 'skill_run', label: 'Skill Runs' },
   { value: 'agent_task', label: 'Agent Tasks' },
-  { value: 'manual', label: 'Manual Notes' },
+  { value: 'integration', label: 'Integrations' },
+  { value: 'manual', label: 'Manual' },
 ];
 
-const MEMORY_STATS = [
-  { label: 'Total Memories', icon: Brain, color: 'text-primary' },
-  { label: 'Active', icon: Zap, color: 'text-emerald-500' },
-  { label: 'Context', icon: WandSparkles, color: 'text-violet-500' },
+const KIND_META: Record<MemoryKind, { label: string; icon: typeof Clock3; colorClass: string }> = {
+  session: { label: 'Context', icon: Clock3, colorClass: 'text-blue-500 bg-blue-500/10' },
+  knowledge: { label: 'Knowledge', icon: Brain, colorClass: 'text-purple-500 bg-purple-500/10' },
+  artifact: { label: 'Artifact', icon: LinkIcon, colorClass: 'text-emerald-500 bg-emerald-500/10' },
+};
+
+const EMPTY_TOTALS = { recentContext: 0, knowledge: 0, artifacts: 0, active: 0 };
+const TAB_OPTIONS: Array<{ id: TabFilter; label: string }> = [
+  { id: 'all', label: 'All Memory' },
+  { id: 'session', label: 'Context' },
+  { id: 'knowledge', label: 'Knowledge' },
+  { id: 'artifact', label: 'Artifacts' },
+];
+const TOP_STATS = [
+  { label: 'Active Memories', key: 'active', icon: Activity, color: 'text-emerald-500' },
+  { label: 'Recent Context', key: 'recentContext', icon: Clock3, color: 'text-blue-500' },
+  { label: 'Knowledge Base', key: 'knowledge', icon: Brain, color: 'text-purple-500' },
+  { label: 'Linked Artifacts', key: 'artifacts', icon: LinkIcon, color: 'text-amber-500' },
 ] as const;
 
-function useMemoryNodes(searchQuery: string, personaFilter: string, sourceFilter: string) {
-  const [nodes, setNodes] = useState<MemoryNodeExtended[]>([]);
+function getRecordPreview(record: MemoryRecord): string {
+  return record.summary || record.contentText || 'No preview available';
+}
+
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffHours = (now.getTime() - date.getTime()) / 3600000;
+    if (diffHours < 1) return `${Math.max(1, Math.floor(diffHours * 60))}m ago`;
+    if (diffHours < 24) return `${Math.floor(diffHours)}h ago`;
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+function useMemoryOverview(searchQuery: string, sourceFilter: string) {
+  const [overview, setOverview] = useState<MemoryOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchNodes = useCallback(async (q: string, persona: string, source: string) => {
+  const fetchOverview = useCallback(async (q: string, source: string) => {
     setIsLoading(true);
-
     try {
       const params = new URLSearchParams();
-      if (q) {
-        params.set('q', q);
-      }
-      if (persona) {
-        params.set('personaId', persona);
-      }
-      if (source) {
-        params.set('source', source);
-      }
-
-      const data = await api.get<MemoryNodeExtended[]>(`/api/memory?${params.toString()}`);
-      setNodes(data ?? []);
-    } catch {
-      setNodes([]);
+      if (q) params.set('q', q);
+      if (source) params.set('source', source);
+      const data = await api.get<MemoryOverview>(`/api/memory?${params.toString()}`);
+      setOverview(data);
+      setError(null);
+    } catch (loadError) {
+      setOverview(null);
+      setError(getUserFacingErrorMessage(loadError, 'Unable to load memory right now'));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      void fetchNodes(searchQuery, personaFilter, sourceFilter);
-    }, 300);
-
+      void fetchOverview(searchQuery, sourceFilter);
+    }, 250);
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [fetchNodes, personaFilter, searchQuery, sourceFilter]);
+  }, [fetchOverview, searchQuery, sourceFilter]);
 
-  const refresh = useCallback(() => {
-    void fetchNodes(searchQuery, personaFilter, sourceFilter);
-  }, [fetchNodes, personaFilter, searchQuery, sourceFilter]);
+  const refresh = useCallback(() => void fetchOverview(searchQuery, sourceFilter), [fetchOverview, searchQuery, sourceFilter]);
 
-  return { nodes, isLoading, refresh };
+  return { overview, isLoading, error, refresh };
 }
 
-const SOURCE_STYLES: Record<string, { label: string; className: string }> = {
-  live_turn: { label: 'Live', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
-  skill_run: { label: 'Skill', className: 'bg-green-500/10 text-green-500 border-green-500/20' },
-  agent_task: { label: 'Agent', className: 'bg-violet-500/10 text-violet-500 border-violet-500/20' },
-  manual: { label: 'Manual', className: 'bg-amber-500/10 text-amber-500 border-amber-500/20' },
-  integration: { label: 'Integration', className: 'bg-primary/10 text-primary border-primary/20' },
-};
-
-const TYPE_ICON: Record<string, React.ReactNode> = {
-  core: <Brain size={12} className="text-blue-400" />,
-  preference: <Star size={12} className="text-amber-400" />,
-  skill: <Zap size={12} className="text-green-400" />,
-  document: <BookOpen size={12} className="text-purple-400" />,
-  persona: <WandSparkles size={12} className="text-pink-400" />,
-};
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) {
-    return '';
-  }
-
-  try {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffHours = (now.getTime() - date.getTime()) / 3600000;
-
-    if (diffHours < 1) {
-      return `${Math.floor(diffHours * 60)}m ago`;
-    }
-    if (diffHours < 24) {
-      return `${Math.floor(diffHours)}h ago`;
-    }
-    if (diffHours < 168) {
-      return date.toLocaleDateString([], { weekday: 'short' });
-    }
-
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  } catch {
-    return '';
-  }
-}
-
-interface MemoryCardProps {
-  node: MemoryNodeExtended;
-  onToggle: (id: string, current: boolean) => void;
-}
-
-function MemoryCard({ node, onToggle }: MemoryCardProps): React.JSX.Element {
-  const sourceStyle = SOURCE_STYLES[node.source ?? 'live_turn'] ?? SOURCE_STYLES.live_turn;
-
-  return (
-    <div
-      className={`group rounded-xl border p-4 transition-all ${node.active
-        ? 'border-border bg-card hover:border-foreground/20'
-        : 'border-border/40 bg-card/40 opacity-50'
-        }`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 shrink-0">
-          {TYPE_ICON[node.type] ?? <Brain size={12} className="text-muted-foreground" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-foreground leading-snug">{node.title}</p>
-          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${sourceStyle.className}`}>
-              {sourceStyle.label}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground capitalize">
-              {node.type}
-            </span>
-            {node.personaId && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary">
-                {node.personaId}
-              </span>
-            )}
-            <span className="text-[10px] text-muted-foreground">{node.tokens}</span>
-            <span className="text-[10px] text-muted-foreground ml-auto">{formatDate(node.createdAt)}</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => onToggle(node.id, node.active)}
-          className={`mt-0.5 h-4 w-8 shrink-0 rounded-full transition-colors ${node.active ? 'bg-primary' : 'border border-border bg-secondary'}`}
-          title={node.active ? 'Deactivate' : 'Activate'}
-        >
-          <div className={`mx-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform ${node.active ? 'translate-x-4' : 'translate-x-0'}`} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function getTokenCountLabel(nodes: MemoryNodeExtended[]): string {
-  const totalTokens = nodes.reduce((sum, node) => {
-    const normalizedValue = parseFloat(node.tokens?.replace('k', '') ?? '0');
-    return sum + (Number.isNaN(normalizedValue) ? 0 : normalizedValue);
-  }, 0);
-
-  return `${totalTokens.toFixed(1)}k`;
-}
+type TabFilter = 'all' | MemoryKind;
 
 export function MemoryBase(): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
-  const [personaFilter, setPersonaFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
-  const { nodes, isLoading, refresh } = useMemoryNodes(searchQuery, personaFilter, sourceFilter);
-
-  // Add Memory State
+  const [activeTab, setActiveTab] = useState<TabFilter>('all');
+  
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [addTab, setAddTab] = useState<'note' | 'links' | 'files'>('note');
-  const [addTitle, setAddTitle] = useState('');
-  const [addContent, setAddContent] = useState('');
-  const [addFiles, setAddFiles] = useState<File[]>([]);
+  const [createKind, setCreateKind] = useState<'knowledge' | 'artifact'>('knowledge');
+  const [title, setTitle] = useState('');
+  const [summary, setSummary] = useState('');
+  const [url, setUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [selectedRecord, setSelectedRecord] = useState<MemoryRecord | null>(null);
 
-  async function handleAddSubmit() {
-    if (isSubmitting) return;
-    if (addTab !== 'files' && !addTitle.trim() && !addContent.trim()) return;
-    if (addTab === 'files' && addFiles.length === 0) return;
+  const { overview, isLoading, error, refresh } = useMemoryOverview(searchQuery, sourceFilter);
 
+  async function handleToggle(id: string, currentActive: boolean, event?: React.MouseEvent) {
+    event?.stopPropagation();
+    try {
+      await api.patch(`/api/memory/${id}`, { active: !currentActive });
+      if (selectedRecord?.id === id) {
+        setSelectedRecord({ ...selectedRecord, active: !currentActive });
+      }
+      await refresh();
+    } catch (toggleError) {
+      console.error('Unable to update memory state', toggleError);
+    }
+  }
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  async function handleDelete(id: string) {
+    try {
+      await api.delete(`/api/memory/${id}`);
+      setSelectedRecord(null);
+      setConfirmDeleteId(null);
+      await refresh();
+    } catch (deleteError) {
+      console.error('Unable to delete memory record', deleteError);
+    }
+  }
+
+  async function handleSubmit() {
+    if (isSubmitting || !title.trim()) return;
     setIsSubmitting(true);
     try {
-      if (addTab === 'files') {
-        await Promise.all(
-          addFiles.map((f) =>
-            api.post('/api/memory/ingest', {
-              title: addTitle.trim() ? `${addTitle.trim()} - ${f.name}` : f.name,
-              type: 'document',
-            })
-          )
-        );
-      } else if (addTab === 'links') {
-        const urls = addContent.split('\n').map((u) => u.trim()).filter(Boolean);
-        if (urls.length === 0 && addTitle.trim()) {
-          await api.post('/api/memory/ingest', { title: addTitle.trim(), type: 'document' });
-        } else {
-          await Promise.all(
-            urls.map((url) =>
-              api.post('/api/memory/ingest', {
-                title: addTitle.trim() ? `${addTitle.trim()} (${url})` : url,
-                type: 'document',
-              })
-            )
-          );
-        }
-      } else {
-        await api.post('/api/memory/ingest', {
-          title: addTitle.trim() + (addContent.trim() ? `\n\n${addContent.trim()}` : ''),
-          type: 'manual',
-        });
-      }
-
+      await api.post('/api/memory/ingest', {
+        title: title.trim(),
+        kind: createKind,
+        type: createKind === 'artifact' ? 'integration' : 'preference',
+        searchText: summary.trim(),
+        url: createKind === 'artifact' ? url.trim() : '',
+      });
+      setTitle('');
+      setSummary('');
+      setUrl('');
       setIsAddOpen(false);
-      setAddTitle('');
-      setAddContent('');
-      setAddFiles([]);
-      refresh();
-    } catch {
-      // Ignored for now
+      await refresh();
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function handleToggle(id: string, currentActive: boolean) {
-    try {
-      await api.patch(`/api/memory/${id}`, { active: !currentActive });
-      refresh();
-    } catch {
-    }
-  }
+  const totals = overview?.totals ?? EMPTY_TOTALS;
 
-  const activeCount = nodes.filter((n) => n.active).length;
-  const statValues = {
-    'Total Memories': nodes.length,
-    Active: activeCount,
-    Context: getTokenCountLabel(nodes),
-  };
+  const flattenedRecords = useMemo(() => {
+    if (!overview) return [];
+    let all = [...overview.recentContext, ...overview.knowledge, ...overview.artifacts];
+    if (activeTab !== 'all') {
+      all = all.filter((record) => record.kind === activeTab);
+    }
+    return all.sort((firstRecord, secondRecord) => (
+      new Date(secondRecord.updatedAt || secondRecord.createdAt).getTime()
+      - new Date(firstRecord.updatedAt || firstRecord.createdAt).getTime()
+    ));
+  }, [overview, activeTab]);
 
   return (
     <div className="space-y-6 pb-10">
       <PageHeader
-        title="Memory Base"
-        description="Persistent agent memory — semantic search, persona awareness, and timeline view."
+        title="Memory"
+        description="Persistent context, durable knowledge, and artifacts that Crewmate can recall automatically."
       >
         <Button variant="primary" className="btn-bevel btn-bevel-primary" onClick={() => setIsAddOpen(true)}>
           <Plus size={16} />
@@ -272,148 +214,354 @@ export function MemoryBase(): React.JSX.Element {
         </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-3 gap-4">
-        {MEMORY_STATS.map(({ label, icon: Icon, color }) => (
-          <div key={label} className="rounded-2xl border border-border bg-card p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-secondary border border-border flex items-center justify-center">
-              <Icon size={16} className={color} />
+      {/* Top Metrics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {TOP_STATS.map((stat) => (
+          <div key={stat.key} className="rounded-2xl border border-border bg-card p-5 flex items-center gap-4 transition-all hover:border-border/80">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary ${stat.color}`}>
+              <stat.icon size={20} />
             </div>
             <div>
-              <div className="text-xl font-bold text-foreground">{statValues[label]}</div>
-              <div className="text-xs text-muted-foreground">{label}</div>
+              <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{stat.label}</div>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-3xl font-bold tracking-tight text-foreground">{totals[stat.key]}</span>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="rounded-2xl border border-border bg-card p-4 flex flex-wrap gap-3">
-        <div className="flex-1 min-w-48 relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search memory…"
-            className="w-full pl-8 pr-3 py-2 rounded-xl border border-border bg-secondary text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
-          />
-        </div>
-
-        <Select
-          value={sourceFilter}
-          onChange={setSourceFilter}
-          options={SOURCE_OPTIONS}
-          placeholder="All Sources"
-        />
-
-        <button
-          type="button"
-          onClick={refresh}
-          className="p-2 rounded-xl border border-border bg-secondary hover:bg-card transition-colors text-muted-foreground hover:text-foreground"
-          title="Refresh"
-        >
-          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-        </button>
-      </div>
-
-      {isLoading && nodes.length === 0 ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-secondary animate-pulse border border-border" />
-          ))}
-        </div>
-      ) : nodes.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card flex flex-col items-center justify-center py-16 gap-3">
-          <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center">
-            <Brain size={20} className="text-muted-foreground" />
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        {error ? (
+          <div className="border-b border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>{error}</span>
+              <Button variant="secondary" onClick={refresh}>Retry</Button>
+            </div>
           </div>
-          <p className="text-sm font-medium text-foreground">No memories yet</p>
-          <p className="text-xs text-muted-foreground">Start a live session to build your first memory nodes</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {nodes.map((node) => (
-            <MemoryCard key={node.id} node={node} onToggle={(id, cur) => void handleToggle(id, cur)} />
-          ))}
-        </div>
-      )}
+        ) : null}
 
-      <div className="flex flex-wrap items-center gap-3 pt-2">
-        <span className="text-xs text-muted-foreground">Sources:</span>
-        {Object.entries(SOURCE_STYLES).map(([key, { label, className }]) => (
-          <span key={key} className={`text-[10px] px-2 py-0.5 rounded-full border ${className}`}>{label}</span>
-        ))}
-      </div>
-
-      <Drawer isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add to Memory">
-        <div className="space-y-5">
-          <div className="flex bg-secondary p-1 rounded-lg">
-            {(['note', 'links', 'files'] as const).map((tab) => (
+        {/* Filters Top Bar */}
+        <div className="border-b border-border p-4 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-secondary/30">
+          
+          {/* Segmented Tabs */}
+          <div className="flex bg-secondary p-1 rounded-xl border border-border">
+            {TAB_OPTIONS.map((tab) => (
               <button
-                key={tab}
-                type="button"
-                onClick={() => setAddTab(tab)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${addTab === tab ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-                  }`}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabFilter)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === tab.id 
+                    ? 'bg-background text-foreground shadow-sm ring-1 ring-border' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                }`}
               >
-                {tab === 'note' && <FileText size={14} />}
-                {tab === 'links' && <LinkIcon size={14} />}
-                {tab === 'files' && <Upload size={14} />}
-                <span className="capitalize">{tab}</span>
+                {tab.label}
               </button>
             ))}
           </div>
 
+          <div className="flex gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search memories..."
+                className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="w-40">
+              <Select value={sourceFilter} onChange={setSourceFilter} options={SOURCE_OPTIONS} placeholder="All Sources" />
+            </div>
+            <button
+              type="button"
+              onClick={refresh}
+              className="flex items-center justify-center rounded-xl border border-border bg-background px-3 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              title="Refresh table"
+            >
+              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+
+        {/* Data Table */}
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-secondary/50 border-b border-border text-muted-foreground">
+              <tr>
+                <th className="font-medium px-6 py-3 w-10 text-center">Type</th>
+                <th className="font-medium px-6 py-3">Title & Source</th>
+                <th className="font-medium px-6 py-3 w-full hidden md:table-cell">Preview</th>
+                <th className="font-medium px-6 py-3 text-right">
+                  <span title="Approximate token size. Larger values consume more context in live sessions.">Size</span>
+                </th>
+                <th className="font-medium px-6 py-3 text-right">Updated</th>
+                <th className="font-medium px-6 py-3 text-right">Active</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50">
+              {isLoading && flattenedRecords.length === 0 ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4"><div className="h-4 w-4 bg-border rounded-full mx-auto" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-48 bg-border rounded" /></td>
+                    <td className="px-6 py-4 hidden md:table-cell"><div className="h-4 w-full max-w-md bg-border rounded" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-12 bg-border rounded ml-auto" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-16 bg-border rounded ml-auto" /></td>
+                    <td className="px-6 py-4"><div className="h-4 w-8 bg-border rounded-full ml-auto" /></td>
+                  </tr>
+                ))
+              ) : flattenedRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-20 text-center text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <Brain className="h-10 w-10 opacity-20" />
+                        <p>No memories found matching your criteria.</p>
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setSourceFilter('');
+                            setActiveTab('all');
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      </div>
+                    </td>
+                </tr>
+              ) : (
+                flattenedRecords.map((record) => {
+                  const meta = KIND_META[record.kind];
+                  const Icon = meta.icon;
+                  return (
+                    <tr 
+                      key={record.id} 
+                      onClick={() => setSelectedRecord(record)}
+                      className={`group cursor-pointer transition-colors hover:bg-secondary/40 ${!record.active ? 'opacity-50 hover:opacity-100 grayscale hover:grayscale-0' : ''}`}
+                    >
+                      <td className="px-6 py-4 text-center align-middle">
+                        <div className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg ${meta.colorClass}`}>
+                          <Icon size={14} />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 max-w-[200px] truncate">
+                        <div className="font-medium text-foreground truncate">{record.title}</div>
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5 inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 border border-border/50">
+                          {record.sourceType.replace('_', ' ')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 hidden max-w-[300px] truncate text-muted-foreground md:table-cell">
+                        {getRecordPreview(record)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="inline-flex rounded-full bg-secondary border border-border/50 px-2 py-0.5 text-xs text-muted-foreground">
+                          {record.tokens}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-muted-foreground tabular-nums">
+                        {formatDate(record.updatedAt || record.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 text-right align-middle">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggle(record.id, record.active, e)}
+                          className={`inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${record.active ? 'bg-primary' : 'bg-secondary border-border/50'}`}
+                        >
+                          <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${record.active ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Deep-Dive Details Drawer */}
+      <Drawer isOpen={!!selectedRecord} onClose={() => setSelectedRecord(null)} title="Memory Details">
+        {selectedRecord && (
+          <div className="space-y-6">
+            
+            {/* Header Block */}
+            <div className="space-y-3 pb-6 border-b border-border/50">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-secondary border border-border text-foreground`}>
+                  {(() => {
+                    const SelectedIcon = KIND_META[selectedRecord.kind].icon;
+                    return <SelectedIcon size={18} />;
+                  })()}
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-foreground leading-tight">{selectedRecord.title}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="inline-flex items-center gap-1 rounded bg-secondary border border-border px-2 py-0.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      {selectedRecord.sourceType.replace('_', ' ')}
+                    </span>
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock3 size={10} /> {formatDate(selectedRecord.createdAt)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-border bg-secondary/50 p-4">
+                <div className="text-xs text-muted-foreground mb-1">Status</div>
+                <div className="flex items-center justify-between">
+                  <span className={`text-sm font-medium ${selectedRecord.active ? 'text-primary' : 'text-muted-foreground'}`}>
+                    {selectedRecord.active ? 'Active' : 'Inactive'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleToggle(selectedRecord.id, selectedRecord.active)}
+                    className={`inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full transition-colors ${selectedRecord.active ? 'bg-primary' : 'bg-secondary border border-border'}`}
+                  >
+                    <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${selectedRecord.active ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border bg-secondary/50 p-4">
+                <div className="text-xs text-muted-foreground mb-1" title="Approximate token size. Larger values consume more context in live sessions.">Size (tokens)</div>
+                <div className="text-sm font-medium text-foreground">{selectedRecord.tokens}</div>
+              </div>
+            </div>
+
+            {/* Content Payload */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-foreground">Content</h4>
+              <div className="rounded-xl border border-border bg-card p-5">
+                <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                  {selectedRecord.summary || selectedRecord.contentText || 'No content available.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Artifact Link Button */}
+            {selectedRecord.artifactUrl && (
+              <div className="pt-2">
+                <a
+                  href={selectedRecord.artifactUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors py-3 px-4 text-sm font-medium"
+                >
+                  Open External Artifact
+                  <ExternalLink size={16} />
+                </a>
+              </div>
+            )}
+
+            {/* Delete */}
+            <div className="pt-2 border-t border-border/50">
+              {confirmDeleteId === selectedRecord.id ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-destructive font-medium">
+                    <AlertTriangle size={15} />
+                    Permanently delete this memory?
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(selectedRecord.id)}
+                      className="flex-1 rounded-lg bg-destructive text-destructive-foreground py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+                    >
+                      Yes, delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="flex-1 rounded-lg border border-border bg-secondary py-2 text-sm font-medium hover:bg-muted transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(selectedRecord.id)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 text-destructive py-2.5 text-sm font-medium hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  Delete Memory
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* Add Memory Drawer */}
+      <Drawer isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Add Manual Memory">
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-2 rounded-lg bg-secondary p-1 border border-border">
+            <button
+              type="button"
+              onClick={() => setCreateKind('knowledge')}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-all ${createKind === 'knowledge' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <span className="inline-flex items-center gap-2"><Sparkles size={14} /> Knowledge</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateKind('artifact')}
+              className={`rounded-md px-3 py-2 text-sm font-medium transition-all ${createKind === 'artifact' ? 'bg-background text-foreground shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <span className="inline-flex items-center gap-2"><LinkIcon size={14} /> Artifact</span>
+            </button>
+          </div>
+
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">
-              {addTab === 'links' ? 'Group Title (Optional)' : addTab === 'files' ? 'Batch Title (Optional)' : 'Note Title'}
-            </label>
+            <label className="text-sm font-medium text-foreground">Title</label>
             <input
               type="text"
-              value={addTitle}
-              onChange={(e) => setAddTitle(e.target.value)}
-              placeholder={addTab === 'links' ? 'e.g., References' : addTab === 'files' ? 'e.g., Q3 Planning' : 'e.g., User feedback'}
-              className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder={createKind === 'artifact' ? 'Q1 Revenue Model' : 'User prefers dark mode'}
+              className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground">
-              {addTab === 'links' ? 'URLs (one per line)' : addTab === 'files' ? 'Upload Files' : 'Content (optional)'}
-            </label>
-            {addTab === 'files' ? (
-              <input
-                type="file"
-                multiple
-                onChange={(e) => setAddFiles(Array.from(e.target.files ?? []))}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-              />
-            ) : addTab === 'links' ? (
-              <textarea
-                value={addContent}
-                onChange={(e) => setAddContent(e.target.value)}
-                placeholder="https://...&#10;https://..."
-                rows={5}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground resize-none"
-              />
-            ) : (
-              <textarea
-                value={addContent}
-                onChange={(e) => setAddContent(e.target.value)}
-                placeholder="Write your note..."
-                rows={5}
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground resize-none"
-              />
-            )}
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-foreground">{createKind === 'artifact' ? 'Context' : 'Summary'}</label>
+              <span className={`text-xs ${summary.length > 400 ? 'text-amber-500' : 'text-muted-foreground'}`}>{summary.length}/500</span>
+            </div>
+            <textarea
+              value={summary}
+              onChange={(event) => setSummary(event.target.value)}
+              rows={5}
+              maxLength={500}
+              placeholder={createKind === 'artifact'
+                ? 'Why this artifact matters and how to find it.'
+                : 'Write the exact fact or decision you want Crewmate to recall permanently. Aim for 1–3 sentences.'}
+              className="w-full resize-none rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
           </div>
 
-          <div className="pt-4 flex gap-3">
-            <Button
-              variant="primary"
-              className="flex-1"
-              onClick={() => void handleAddSubmit()}
-              disabled={isSubmitting || (addTab === 'files' ? addFiles.length === 0 : !addTitle.trim() && !addContent.trim())}
-            >
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Save Memory'}
+          {createKind === 'artifact' && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">URL</label>
+              <input
+                type="url"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://docs.google.com/..."
+                className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4 border-t border-border/50">
+            <Button variant="primary" className="flex-1" onClick={() => void handleSubmit()} disabled={isSubmitting || !title.trim()}>
+              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Save Core Memory'}
             </Button>
             <Button variant="secondary" className="flex-1" onClick={() => setIsAddOpen(false)} disabled={isSubmitting}>
               Cancel

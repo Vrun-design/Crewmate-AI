@@ -13,6 +13,9 @@ export type SkillCategory =
     | 'automation';
 
 export type ModelPreference = 'quick' | 'research' | 'orchestration' | 'creative';
+export type SkillExecutionMode = 'inline' | 'delegated' | 'either';
+export type SkillLatencyClass = 'quick' | 'slow';
+export type SkillSideEffectLevel = 'none' | 'low' | 'high';
 
 export interface JSONSchema {
     type: 'object';
@@ -35,12 +38,16 @@ export interface SkillResult {
 export interface SkillRunContext {
     userId: string;
     workspaceId: string;
+    taskTitle?: string;
     sessionId?: string;
-    personaId?: string;
+    taskId?: string;
+    taskRunId?: string;
+    originType?: 'app' | 'live_session' | 'command' | 'slack' | 'email' | 'system';
+    originRef?: string;
 }
 
 export interface Skill {
-    /** Unique dot-namespaced ID: e.g. "github.create-issue" */
+    /** Unique dot-namespaced ID: e.g. "notion.create-page" */
     id: string;
     /** Human-readable name */
     name: string;
@@ -50,8 +57,6 @@ export interface Skill {
     version: string;
     /** Category for filtering */
     category: SkillCategory;
-    /** Which persona IDs enable this skill by default */
-    personas: string[];
     /** Integration IDs required: ["github"] */
     requiresIntegration: string[];
     /** Short example trigger phrases shown in UI */
@@ -60,6 +65,12 @@ export interface Skill {
     inputSchema: JSONSchema;
     /** Which Gemini model tier to use */
     preferredModel?: ModelPreference;
+    /** Whether this skill should run inline, be delegated, or support either path */
+    executionMode?: SkillExecutionMode;
+    /** Expected latency / interaction cost for runtime policy decisions */
+    latencyClass?: SkillLatencyClass;
+    /** Helps live mode decide whether explicit delegation is safer */
+    sideEffectLevel?: SkillSideEffectLevel;
     /** Whether this skill should be exposed directly to Gemini Live function calling */
     exposeInLiveSession?: boolean;
     /** Optional Live API function behavior override */

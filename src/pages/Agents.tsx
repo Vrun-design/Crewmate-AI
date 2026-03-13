@@ -2,59 +2,114 @@ import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AgentDrawerContent } from '../components/agents/AgentDrawerContent';
 import { AgentNodeMap } from '../components/agents/AgentNodeMap';
-import type { AgentManifest } from '../components/agents/types';
+import type { AgentManifest, AgentTask } from '../components/agents/types';
 import { Drawer } from '../components/ui/Drawer';
 import { PageHeader } from '../components/ui/PageHeader';
+import { Button } from '../components/ui/Button';
 import { api } from '../lib/api';
 import { onboardingService, type OnboardingProfile } from '../services/onboardingService';
 import { SoulDrawerContent } from '../components/agents/SoulDrawerContent';
+import { getUserFacingErrorMessage } from '../utils/errorHandling';
 
 export function Agents(): React.JSX.Element {
-    const [agents, setAgents] = useState<AgentManifest[]>([]);
-    const [agentsError, setAgentsError] = useState<string | null>(null);
-    const [selectedAgent, setSelectedAgent] = useState<AgentManifest | null>(null);
-    const [profile, setProfile] = useState<OnboardingProfile | null>(null);
-    const [isSoulDrawerOpen, setIsSoulDrawerOpen] = useState(false);
+  const [agents, setAgents] = useState<AgentManifest[]>([]);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<AgentManifest | null>(null);
+  const [profile, setProfile] = useState<OnboardingProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(true);
+  const [isSoulDrawerOpen, setIsSoulDrawerOpen] = useState(false);
+  const [activeAgentIds, setActiveAgentIds] = useState<Set<string>>(new Set());
 
-    useEffect(() => {
-        void api.get<AgentManifest[]>('/api/agents')
-            .then((data) => {
-                setAgents(data ?? []);
-                setAgentsError(null);
-            })
-            .catch((loadError) => {
-                setAgents([]);
-                setAgentsError(loadError instanceof Error ? loadError.message : 'Unable to load crew agents');
-            });
+  async function loadAgents(): Promise<void> {
+    setIsLoadingAgents(true);
+    try {
+      const data = await api.get<AgentManifest[]>('/api/agents');
+      setAgents(data ?? []);
+      setAgentsError(null);
+    } catch (loadError) {
+      setAgents([]);
+      setAgentsError(getUserFacingErrorMessage(loadError, 'Unable to load the crew network'));
+    } finally {
+      setIsLoadingAgents(false);
+    }
+  }
 
-        void onboardingService.getProfile().then(setProfile);
-    }, []);
+  async function loadProfile(): Promise<void> {
+    try {
+      setProfile(await onboardingService.getProfile());
+      setProfileError(null);
+    } catch (loadError) {
+      setProfile(null);
+      setProfileError(getUserFacingErrorMessage(loadError, 'Unable to load Crewmate identity settings'));
+    }
+  }
 
-    const description = `Your ${agents.length} specialized crew agents are ready. Click any node in the topology map to inspect their capabilities.`;
+  async function loadActiveAgents(): Promise<void> {
+    try {
+      const tasks = await api.get<AgentTask[]>('/api/agents/tasks');
+      const runningAgentIds = new Set(
+        (tasks ?? [])
+          .filter((task) => task.status === 'running' || task.status === 'queued')
+          .map((task) => task.agentId)
+          .filter(Boolean),
+      );
+      setActiveAgentIds(runningAgentIds);
+    } catch {
+      // Non-fatal — node map will just show all nodes as idle
+    }
+  }
 
-    return (
-        <div className="space-y-6 pb-10">
-            <PageHeader title="Crew Network" description={description} />
+  useEffect(() => {
+    void loadAgents();
+    void loadProfile();
+    void loadActiveAgents();
+
+    const interval = setInterval(() => void loadActiveAgents(), 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const description = `Your ${agents.length} crew specialists are ready. Click any node to inspect capabilities and routing roles.`;
+
+  return (
+    <div className="space-y-6 pb-10">
+      <PageHeader title="Crew Network" description={description} />
 
             {agentsError ? (
                 <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                    {agentsError}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span>{agentsError}</span>
+                        <Button variant="secondary" onClick={() => void loadAgents()}>Retry</Button>
+                    </div>
+                </div>
+            ) : null}
+
+            {profileError ? (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span>{profileError}</span>
+                        <Button variant="secondary" onClick={() => void loadProfile()}>Retry identity load</Button>
+                    </div>
                 </div>
             ) : null}
 
             <div className="mt-4">
-                {agents.length === 0 ? (
+                {isLoadingAgents ? (
                     <div className="text-center py-16 text-muted-foreground w-full border border-border rounded-xl bg-card">
                         <Loader2 size={24} className="mx-auto mb-3 animate-spin opacity-40" />
-                        <p className="text-sm">Initializing geometric node mapping...</p>
+                        <p className="text-sm">Loading the crew network...</p>
+                    </div>
+                ) : agents.length === 0 ? (
+                    <div className="text-center py-16 text-muted-foreground w-full border border-border rounded-xl bg-card">
+                        <p className="text-sm">No crew specialists are available right now.</p>
                     </div>
                 ) : (
                     <AgentNodeMap
                         agents={agents}
-                        activeAgentIds={new Set()}
+                        activeAgentIds={activeAgentIds}
                         onNodeClick={setSelectedAgent}
                         selectedAgentId={selectedAgent?.id}
-                        coreAgentName={profile?.agentName ? `${profile.agentName} (Orchestrator)` : 'Core Orchestrator'}
+                        coreAgentName={profile?.agentName ? `${profile.agentName} (Orchestrator)` : 'Crewmate Orchestrator'}
                         onCoreNodeClick={() => setIsSoulDrawerOpen(true)}
                     />
                 )}
@@ -69,6 +124,7 @@ export function Agents(): React.JSX.Element {
                 {selectedAgent ? (
                     <AgentDrawerContent
                         agent={selectedAgent}
+                        isActive={activeAgentIds.has(selectedAgent.id)}
                     />
                 ) : null}
             </Drawer>
@@ -77,13 +133,13 @@ export function Agents(): React.JSX.Element {
             <Drawer
                 isOpen={isSoulDrawerOpen}
                 onClose={() => setIsSoulDrawerOpen(false)}
-                title="Orchestrator Identity"
+                title="Crewmate Identity"
             >
-                <SoulDrawerContent 
-                    profile={profile} 
-                    onSaved={(newProfile) => setProfile(newProfile)} 
+                <SoulDrawerContent
+                    profile={profile}
+                    onSaved={(newProfile) => setProfile(newProfile)}
                 />
             </Drawer>
-        </div>
-    );
+    </div>
+  );
 }

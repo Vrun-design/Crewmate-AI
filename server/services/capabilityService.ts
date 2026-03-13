@@ -1,12 +1,12 @@
-import { listTools } from '../mcp/mcpServer';
+import { listSkills } from '../skills/registry';
 import { listDiscoveredAgents } from './agents/agentDiscovery';
 import type { CapabilityRecord } from '../types';
 
 export function listCapabilities(workspaceId: string, userId: string): CapabilityRecord[] {
-  const mcpCapabilities: CapabilityRecord[] = listTools().map((t) => ({
-    id: `mcp - ${t.name} `,
-    title: `MCP: ${t.name} `,
-    description: t.description,
+  const skillCapabilities: CapabilityRecord[] = listSkills().map((skill) => ({
+    id: `skill - ${skill.id} `,
+    title: `Skill: ${skill.name} `,
+    description: skill.description,
     status: 'live',
     category: 'action'
   }));
@@ -34,21 +34,14 @@ export function listCapabilities(workspaceId: string, userId: string): Capabilit
       status: 'live',
       category: 'perception',
     },
-    ...mcpCapabilities,
+    ...skillCapabilities,
     {
       id: 'memory-checkpoints',
       title: 'Memory checkpointing',
-      description: 'Stores completed live turns as local memory nodes for later recall.',
+      description: 'Stores live context, durable knowledge, and artifact references for later recall.',
       status: 'live',
       category: 'memory',
     },
     ...a2aCapabilities,
-    {
-      id: 'creative-studio',
-      title: 'Creative mixed output',
-      description: 'Generates narrative plus an accompanying image artifact from a single prompt.',
-      status: 'live',
-      category: 'action',
-    },
   ];
 }

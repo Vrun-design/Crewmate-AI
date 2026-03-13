@@ -8,50 +8,26 @@
   "keywords": [
     "ai",
     "operator",
-    "electron",
     "react",
     "gemini",
     "productivity"
   ],
   "type": "module",
-  "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "vite --port=3000 --host=0.0.0.0",
     "dev:server": "tsx watch server/index.ts",
     "db:reset": "node --import tsx server/resetDatabase.ts",
+    "seed": "node --import tsx server/seedDemo.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "dev:electron": "concurrently \"npm run dev\" \"wait-on tcp:3000 && electron .\"",
-    "build:electron": "npm run build && electron-builder",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:smoke": "vitest run server/smoke/productionReadiness.test.ts",
-    "mcp": "tsx server/mcp/mcpProtocolServer.ts"
-  },
-  "build": {
-    "appId": "com.varun.crewmate",
-    "productName": "Crewmate",
-    "directories": {
-      "output": "release"
-    },
-    "mac": {
-      "target": "dmg",
-      "category": "public.app-category.productivity",
-      "hardenedRuntime": true
-    },
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "files": [
-      "dist/**/*",
-      "server/**/*",
-      "electron/**/*",
-      "package.json"
-    ]
+    "test:smoke": "vitest run server/smoke/productionReadiness.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
-    "@modelcontextprotocol/sdk": "^1.27.1",
     "@playwright/browser-chromium": "^1.58.2",
     "@tailwindcss/oxide-darwin-arm64": "^4.2.1",
     "@tailwindcss/vite": "^4.1.14",
@@ -61,16 +37,19 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "firebase": "^12.10.0",
+    "firebase-admin": "^13.7.0",
+    "helmet": "^8.1.0",
     "lightningcss-darwin-arm64": "^1.32.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "playwright": "^1.58.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-force-graph-2d": "^1.29.1",
     "react-router-dom": "^7.13.1",
     "tailwind-merge": "^3.5.0",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@rollup/rollup-darwin-arm64": "^4.59.0",
@@ -84,14 +63,11 @@
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.21",
     "concurrently": "^9.2.1",
-    "electron": "^40.8.0",
-    "electron-builder": "^26.8.1",
     "jsdom": "^28.1.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^4.0.18",
-    "wait-on": "^9.0.4"
+    "vitest": "^4.0.18"
   }
 }

@@ -3,7 +3,6 @@ import {
   BarChart2,
   Bot,
   Brain,
-  Calendar,
   CheckCircle2,
   Clock,
   Code2,
@@ -28,6 +27,7 @@ import {
   Package,
   MonitorUp,
   Settings2,
+  ClipboardList,
 } from 'lucide-react';
 import type { AgentStepType } from './types';
 import type { AgentManifest, AgentTask } from './types';
@@ -84,7 +84,7 @@ export const AGENT_DEPT_ICONS: Record<string, React.ComponentType<{ size?: numbe
   Marketing: PenTool,
   Engineering: Code2,
   Comms: Mail,
-  Ops: Calendar,
+  Ops: ClipboardList,
   Sales: BarChart2,
   Support: MessageSquare,
   Analytics: BarChart2,
@@ -103,7 +103,6 @@ const AGENT_ICONS: Record<string, React.ComponentType<{ size?: number; className
   'crewmate-social-agent': Presentation,
   'crewmate-devops-agent': Settings2,
   'crewmate-communications-agent': Mail,
-  'crewmate-calendar-agent': Calendar,
   'crewmate-sales-agent': HandCoins,
   'crewmate-support-agent': Headphones,
   'crewmate-hr-agent': Users,
@@ -150,6 +149,12 @@ const AGENT_TASK_STATUS_META: Record<AgentTask['status'], AgentTaskStatusMeta> =
     iconContainerClassName: 'border-red-500/30 bg-red-500/10',
     label: 'Failed',
   },
+  cancelled: {
+    badgeVariant: 'default',
+    cardClassName: 'border-amber-500/20',
+    iconContainerClassName: 'border-amber-500/30 bg-amber-500/10',
+    label: 'Cancelled',
+  },
 };
 
 export function getAgentTaskStatusMeta(status: AgentTask['status']): AgentTaskStatusMeta {
@@ -165,7 +170,11 @@ export function getAgentTaskDurationSeconds(task: Pick<AgentTask, 'createdAt' | 
   return Math.max(0, Math.round(durationMs / 1000));
 }
 
-export function getAgentTaskAgentLabel(agentId: string): string {
+export function getAgentTaskAgentLabel(agentId?: string | null): string {
+  if (!agentId) {
+    return 'Crewmate';
+  }
+
   const normalized = agentId
     .replace(/^crewmate-/, '')
     .replace(/-agent$/, '')
@@ -175,6 +184,17 @@ export function getAgentTaskAgentLabel(agentId: string): string {
   return normalized
     .split('-')
     .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+export function getSkillLabel(skillId?: string | null): string {
+  if (!skillId) {
+    return 'Direct Skill';
+  }
+
+  return skillId
+    .split('.')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 }

@@ -1,5 +1,5 @@
-import {useEffect, useState} from 'react';
 import {dashboardService} from '../services/dashboardService';
+import {useAsyncResource} from './useAsyncResource';
 import type {DashboardData} from '../types/live';
 
 interface UseDashboardResult {
@@ -10,42 +10,18 @@ interface UseDashboardResult {
 }
 
 export function useDashboard(): UseDashboardResult {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error, refresh } = useAsyncResource<DashboardData | null>({
+    initialData: null,
+    load: dashboardService.getDashboard,
+    loadErrorMessage: 'Unable to load dashboard',
+  });
 
-  const refresh = async () => {
-    setError(null);
-    const next = await dashboardService.getDashboard();
-    setData(next);
+  return {
+    data,
+    isLoading,
+    error,
+    refresh: async () => {
+      await refresh();
+    },
   };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function load() {
-      try {
-        const next = await dashboardService.getDashboard();
-        if (isMounted) {
-          setData(next);
-        }
-      } catch (loadError) {
-        if (isMounted) {
-          setError(loadError instanceof Error ? loadError.message : 'Unable to load dashboard');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  return {data, isLoading, error, refresh};
 }

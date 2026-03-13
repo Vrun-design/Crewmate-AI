@@ -6,6 +6,7 @@ function createTask(overrides: Partial<AgentTask> = {}): AgentTask {
   return {
     id: 'task_1',
     agentId: 'crewmate-product-agent',
+    routeType: 'delegated_agent',
     userId: 'user_1',
     workspaceId: 'ws_1',
     intent: 'Create a Notion summary for the checkout bug',
@@ -32,18 +33,17 @@ describe('notificationFormatter', () => {
     });
   });
 
-  test('builds a rich GitHub notification for completed tasks', () => {
+  test('builds a rich ClickUp notification for completed tasks', () => {
     const notification = buildTaskNotification(createTask({
       result: {
-        issueNumber: 42,
-        title: 'Checkout overlap bug',
-        url: 'https://github.com/acme/app/issues/42',
+        name: 'Checkout overlap bug',
+        url: 'https://app.clickup.com/t/abc123',
       },
     }));
 
     expect(notification).toEqual({
-      title: 'GitHub issue created',
-      message: 'Created "#42 Checkout overlap bug". Open here: https://github.com/acme/app/issues/42',
+      title: 'ClickUp task created',
+      message: 'Created "Checkout overlap bug". Open here: https://app.clickup.com/t/abc123',
       type: 'success',
     });
   });

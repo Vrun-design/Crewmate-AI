@@ -9,6 +9,7 @@
  */
 import { db } from '../db';
 import { decryptJson, encryptJson } from './secretVault';
+import { logServerError } from './runtimeLogger';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS notification_prefs (
@@ -38,16 +39,29 @@ const DEFAULTS: Omit<NotificationPrefs, 'userId' | 'updatedAt'> = {
     inAppEnabled: true,
 };
 
+function looksEncryptedSecret(value: string): boolean {
+    const parts = value.split('.');
+    if (parts.length !== 3) {
+        return false;
+    }
+
+    return parts.every((part) => /^[A-Za-z0-9+/=]+$/.test(part));
+}
+
 function decodeSlackWebhookUrl(rawValue: unknown): string | undefined {
     if (!rawValue) {
         return undefined;
     }
 
     const value = String(rawValue);
+    if (!looksEncryptedSecret(value)) {
+        return value;
+    }
 
     try {
         return decryptJson(value).slackWebhookUrl;
-    } catch {
+    } catch (error) {
+        logServerError('notificationPrefs:decode-slack-webhook', error);
         return value;
     }
 }
@@ -59,7 +73,10 @@ function encodeSlackWebhookUrl(value: string | undefined): string | null {
 
     try {
         return encryptJson({ slackWebhookUrl: value });
-    } catch {
+    } catch (error) {
+        if (looksEncryptedSecret(value)) {
+            logServerError('notificationPrefs:encode-slack-webhook', error);
+        }
         return value;
     }
 }

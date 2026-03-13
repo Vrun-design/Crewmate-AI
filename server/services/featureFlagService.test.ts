@@ -7,8 +7,6 @@ describe('featureFlagService', () => {
 
     expect(flags).toEqual({
       approvalGates: expect.any(Boolean),
-      jobTypesV2: expect.any(Boolean),
-      offshiftInbox: expect.any(Boolean),
       researchGrounding: expect.any(Boolean),
       slackInbound: expect.any(Boolean),
       uiNavigator: expect.any(Boolean),
@@ -16,6 +14,6 @@ describe('featureFlagService', () => {
   });
 
   test('reads a single feature flag by name', () => {
-    expect(isFeatureEnabled('offshiftInbox')).toBe(getFeatureFlags().offshiftInbox);
+    expect(isFeatureEnabled('uiNavigator')).toBe(getFeatureFlags().uiNavigator);
   });
 });

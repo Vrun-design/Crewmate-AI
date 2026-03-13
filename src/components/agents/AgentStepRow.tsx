@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { STEP_COLORS, STEP_TYPE_LABELS, StepIcon } from './agentUi';
 import type { AgentStepEvent } from './types';
 
@@ -7,7 +7,15 @@ type AgentStepRowProps = {
   isLast: boolean;
 };
 
+const DETAIL_PREVIEW_LENGTH = 140;
+
 export function AgentStepRow({ step, isLast }: AgentStepRowProps): React.JSX.Element {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasLongDetail = (step.detail?.length ?? 0) > DETAIL_PREVIEW_LENGTH;
+  const detailText = !step.detail || isExpanded || !hasLongDetail
+    ? step.detail
+    : `${step.detail.slice(0, DETAIL_PREVIEW_LENGTH).trimEnd()}...`;
+
   return (
     <div className="flex gap-3 group">
       <div className="flex flex-col items-center">
@@ -28,7 +36,20 @@ export function AgentStepRow({ step, isLast }: AgentStepRowProps): React.JSX.Ele
           {step.durationMs !== undefined ? <span className="text-[10px] text-muted-foreground">{step.durationMs}ms</span> : null}
         </div>
         <p className="text-sm text-foreground mt-1">{step.label}</p>
-        {step.detail ? <p className="text-xs text-muted-foreground mt-0.5 truncate">{step.detail}</p> : null}
+        {detailText ? (
+          <div className="mt-0.5">
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">{detailText}</p>
+            {hasLongDetail ? (
+              <button
+                type="button"
+                className="mt-1 text-[11px] font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                onClick={() => setIsExpanded((current) => !current)}
+              >
+                {isExpanded ? 'See less' : 'See more'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

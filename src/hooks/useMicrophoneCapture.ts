@@ -4,11 +4,13 @@ import { arrayBufferToBase64 } from '../utils/mediaEncoding';
 import type { MicrophoneStatus } from '../types/live';
 
 const PCM_SAMPLE_RATE = 16000;
-const PCM_FLUSH_MS = 120;
+const PCM_FLUSH_MS = 80;
 
 interface UseMicrophoneCaptureOptions {
   sessionId: string | null;
   enabled: boolean;
+  onAudioChunk?: (payload: { mimeType: string; data: string }) => Promise<void> | void;
+  onAudioStreamEnd?: () => Promise<void> | void;
 }
 
 interface UseMicrophoneCaptureResult {
@@ -71,6 +73,8 @@ function hasAudibleSignal(input: Float32Array): boolean {
 export function useMicrophoneCapture({
   sessionId,
   enabled,
+  onAudioChunk,
+  onAudioStreamEnd,
 }: UseMicrophoneCaptureOptions): UseMicrophoneCaptureResult {
   const [status, setStatus] = useState<MicrophoneStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -104,11 +108,18 @@ export function useMicrophoneCapture({
 
     pcmChunksRef.current = [];
 
-    await liveSessionService.sendAudio(currentSessionId, {
+    const payload = {
       mimeType: `audio/pcm;rate=${PCM_SAMPLE_RATE}`,
       data: arrayBufferToBase64(merged.buffer),
-    });
-  }, []);
+    };
+
+    if (onAudioChunk) {
+      await onAudioChunk(payload);
+      return;
+    }
+
+    await liveSessionService.sendAudio(currentSessionId, payload);
+  }, [onAudioChunk]);
 
   const stopMicrophone = useCallback(async () => {
     const currentSessionId = sessionId;
@@ -141,14 +152,18 @@ export function useMicrophoneCapture({
 
     if (currentSessionId) {
       try {
-        await liveSessionService.endAudio(currentSessionId);
+        if (onAudioStreamEnd) {
+          await onAudioStreamEnd();
+        } else {
+          await liveSessionService.endAudio(currentSessionId);
+        }
       } catch {
         // Keep the UI responsive even if the local backend is unavailable.
       }
     }
 
     setStatus('muted');
-  }, [flushAudio, sessionId]);
+  }, [flushAudio, onAudioStreamEnd, sessionId]);
 
   const startMicrophone = useCallback(async () => {
     if (!enabled || !sessionId || streamRef.current || !isSupported) {

@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { AlertCircle, AlignLeft, Calendar, Clock, Link as LinkIcon } from 'lucide-react';
+import { AlertCircle, AlignLeft, Calendar, Clock, Link as LinkIcon, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
+import { PropertyRow } from '../ui/PropertyRow';
 import { getTaskStatusBadge } from './tasksUtils';
-import type { Task } from '../../types';
+import type { Task, TaskDetail } from '../../types';
 
 const TOOL_OPTIONS = [
   { value: 'ClickUp', label: 'ClickUp' },
-  { value: 'GitHub', label: 'GitHub' },
   { value: 'Notion', label: 'Notion' },
-  { value: 'Slack', label: 'Slack' },
+  { value: 'Crewmate', label: 'Crewmate' },
 ];
 
 const PRIORITY_OPTIONS = [
@@ -21,8 +21,11 @@ const PRIORITY_OPTIONS = [
 interface TaskDrawerContentProps {
   task: Task | null;
   onClose: () => void;
-  onCreateTask?: (input: { title: string; description: string; tool: string; priority: Task['priority'] }) => Promise<void>;
+  onCreateTask?: (input: { title: string; description: string; tool: string; priority: Task['priority'] }) => Promise<Task>;
+  onDelegateTask?: (input: { title: string; description: string; tool: string; priority: Task['priority'] }) => Promise<TaskDetail>;
 }
+
+type CreateMode = 'manual' | 'delegated';
 
 const TASK_METADATA_ITEMS = [
   { key: 'priority', label: 'Priority', icon: AlertCircle },
@@ -31,32 +34,42 @@ const TASK_METADATA_ITEMS = [
   { key: 'updated', label: 'Updated', icon: Clock },
 ] as const;
 
-function getTaskMetadataValue(task: Task, key: typeof TASK_METADATA_ITEMS[number]['key']): string {
-  if (key === 'priority') {
-    return task.priority;
+function getOpenLabel(task: Task): string {
+  if (task.url?.includes('notion.so')) {
+    return 'Open in Notion';
   }
 
-  if (key === 'tool') {
-    return task.tool;
+  if (task.url?.includes('clickup.com')) {
+    return 'Open in ClickUp';
   }
 
-  if (key === 'created') {
-    return 'Today, 10:30 AM';
-  }
-
-  return task.time;
+  return `Open in ${task.tool}`;
 }
 
-export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerContentProps): React.JSX.Element {
+function getTaskMetadataValue(task: Task, key: typeof TASK_METADATA_ITEMS[number]['key']): string {
+  switch (key) {
+    case 'priority':
+      return task.priority;
+    case 'tool':
+      return task.tool;
+    case 'created':
+      return 'Today, 10:30 AM';
+    case 'updated':
+      return task.time;
+  }
+}
+
+export function TaskDrawerContent({ task, onClose, onCreateTask, onDelegateTask }: TaskDrawerContentProps): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [tool, setTool] = useState('ClickUp');
+  const [tool, setTool] = useState('Crewmate');
   const [priority, setPriority] = useState<Task['priority']>('Medium');
+  const [mode, setMode] = useState<CreateMode>('manual');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   async function handleCreateTask(): Promise<void> {
-    if (!onCreateTask || !title.trim() || isSubmitting) {
+    if (!title.trim() || isSubmitting) {
       return;
     }
 
@@ -64,13 +77,25 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
     setSubmitError(null);
 
     try {
-      await onCreateTask({
+      const payload = {
         title: title.trim(),
         description: description.trim(),
         tool,
         priority,
-      });
-      onClose();
+      };
+
+      if (mode === 'delegated') {
+        if (!onDelegateTask) {
+          throw new Error('Delegated task creation is unavailable.');
+        }
+        await onDelegateTask(payload);
+      } else {
+        if (!onCreateTask) {
+          throw new Error('Manual task creation is unavailable.');
+        }
+        await onCreateTask(payload);
+        onClose();
+      }
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Unable to create task');
     } finally {
@@ -85,19 +110,16 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xs font-mono text-muted-foreground bg-secondary px-2 py-1 rounded-md">{task.id}</span>
             {getTaskStatusBadge(task.status)}
+            {task.sourceKind === 'delegated' ? (
+              <span className="text-[10px] uppercase tracking-wider text-blue-400">Background task</span>
+            ) : null}
           </div>
           <h3 className="text-xl font-semibold text-foreground">{task.title}</h3>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border/50 bg-secondary/20 p-4">
           {TASK_METADATA_ITEMS.map(({ key, label, icon: Icon }) => (
-            <div key={key} className="space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Icon size={14} />
-                {label}
-              </div>
-              <div className="text-sm font-medium text-foreground">{getTaskMetadataValue(task, key)}</div>
-            </div>
+            <PropertyRow key={key} icon={Icon} label={label} value={getTaskMetadataValue(task, key)} />
           ))}
         </div>
 
@@ -106,7 +128,7 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
             <AlignLeft size={16} className="text-muted-foreground" />
             Description
           </div>
-          <div className="text-sm text-muted-foreground bg-secondary/50 p-4 rounded-xl border border-border">
+          <div className="text-sm text-foreground/90 font-medium leading-relaxed">
             {task.description?.trim() || `This task was automatically generated by the agent during the session. It involves creating a ticket in ${task.tool} and syncing the relevant context from the screen recording.`}
           </div>
         </div>
@@ -118,7 +140,7 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
             onClick={() => task.url ? window.open(task.url, '_blank') : null}
             disabled={!task.url && task.tool !== 'Crewmate'}
           >
-            Open in {task.tool}
+            {getOpenLabel(task)}
           </Button>
         </div>
       </div>
@@ -127,22 +149,55 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
 
   return (
     <div className="space-y-5">
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">Task Mode</label>
+        <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-secondary/40 p-1">
+          <button
+            type="button"
+            onClick={() => setMode('manual')}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              mode === 'manual'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Track
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('delegated')}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              mode === 'delegated'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Delegate
+          </button>
+        </div>
+        <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+          {mode === 'manual'
+            ? 'Track work without starting background execution. Use this for reminders, planning, or manual follow-up.'
+            : 'Ask Crewmate to execute the work now. This creates a background task immediately.'}
+        </div>
+      </div>
+
       <div className="space-y-1.5">
-        <label className="text-sm font-medium text-foreground">Task Title</label>
+        <label className="text-sm font-medium text-foreground">{mode === 'manual' ? 'Task Title' : 'Background Task Title'}</label>
         <input
           type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="e.g. Schedule team sync"
+          placeholder={mode === 'manual' ? 'e.g. Schedule team sync' : 'e.g. Create launch summary in Notion'}
           className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground"
         />
       </div>
       <div className="space-y-1.5">
-        <label className="text-sm font-medium text-foreground">Description</label>
+        <label className="text-sm font-medium text-foreground">{mode === 'manual' ? 'Description' : 'Instructions'}</label>
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="Add more details..."
+          placeholder={mode === 'manual' ? 'Add more details...' : 'Describe what Crewmate should do, include any context, formatting, or deliverable details.'}
           rows={4}
           className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground resize-none"
         />
@@ -165,6 +220,11 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
           />
         </div>
       </div>
+      {mode === 'delegated' ? (
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-400">
+          Crewmate will use the selected tool when possible. `Notion` and `ClickUp` map to direct skills. `Crewmate` uses the orchestrator for broader work.
+        </div>
+      ) : null}
       {submitError ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {submitError}
@@ -177,7 +237,16 @@ export function TaskDrawerContent({ task, onClose, onCreateTask }: TaskDrawerCon
           onClick={() => void handleCreateTask()}
           disabled={!title.trim() || isSubmitting}
         >
-          {isSubmitting ? 'Creating...' : 'Create Task'}
+          {isSubmitting ? (
+            mode === 'delegated' ? 'Starting...' : 'Creating...'
+          ) : (
+            mode === 'delegated' ? (
+              <>
+                <Sparkles size={16} />
+                Start Background Task
+              </>
+            ) : 'Create Task'
+          )}
         </Button>
         <Button variant="secondary" className="flex-1" onClick={onClose}>
           Cancel

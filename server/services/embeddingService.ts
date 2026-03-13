@@ -1,9 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 import { serverConfig } from '../config';
 
-const EMBEDDING_MODEL = 'text-embedding-004';
+const PRIMARY_EMBEDDING_MODEL = 'gemini-embedding-2';
+const FALLBACK_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 let client: GoogleGenAI | null = null;
+
+let activeEmbeddingModel = PRIMARY_EMBEDDING_MODEL;
 
 function getClient(): GoogleGenAI {
     if (!client) {
@@ -16,15 +19,29 @@ function getClient(): GoogleGenAI {
 }
 
 /**
- * Embed a text string using text-embedding-004.
- * Returns a float32 vector of 768 dimensions.
+ * Embed a text string using Gemini Embedding 2 with a stable fallback if preview access
+ * is unavailable in the current environment.
  */
 export async function embedText(text: string): Promise<number[]> {
     const ai = getClient();
-    const result = await ai.models.embedContent({
-        model: EMBEDDING_MODEL,
-        contents: text,
-    });
+    let result;
+    try {
+        result = await ai.models.embedContent({
+            model: PRIMARY_EMBEDDING_MODEL,
+            contents: text,
+        });
+        activeEmbeddingModel = PRIMARY_EMBEDDING_MODEL;
+    } catch (error) {
+        if (!(error instanceof Error) || !/embedding|model|preview|not found|unsupported/i.test(error.message)) {
+            throw error;
+        }
+
+        result = await ai.models.embedContent({
+            model: FALLBACK_EMBEDDING_MODEL,
+            contents: text,
+        });
+        activeEmbeddingModel = FALLBACK_EMBEDDING_MODEL;
+    }
 
     const values = result.embeddings?.[0]?.values;
     if (!values || values.length === 0) {
@@ -32,6 +49,10 @@ export async function embedText(text: string): Promise<number[]> {
     }
 
     return values;
+}
+
+export function getEmbeddingModel(): string {
+    return activeEmbeddingModel;
 }
 
 /**

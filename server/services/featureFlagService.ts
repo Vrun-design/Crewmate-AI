@@ -1,8 +1,6 @@
 import { serverConfig } from '../config';
 
 export interface FeatureFlags {
-  offshiftInbox: boolean;
-  jobTypesV2: boolean;
   slackInbound: boolean;
   approvalGates: boolean;
   uiNavigator: boolean;

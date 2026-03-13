@@ -8,24 +8,43 @@ function containsKeyword(text: string, keywords: string[]): boolean {
   return keywords.some((keyword) => normalized.includes(keyword));
 }
 
+function getActionTargetText(action: UiAction): string {
+  switch (action.type) {
+    case 'open_url':
+      return action.url;
+    case 'type':
+    case 'clear_and_type':
+      return `${action.selector} ${action.value}`;
+    case 'select_option':
+      return `${action.selector} ${action.value}`;
+    case 'check':
+    case 'click':
+      return action.selector;
+    default:
+      return '';
+  }
+}
+
 export function getUiActionSafety(action: UiAction): UiNavigatorSafetyLevel {
   if (action.type === 'fail') {
     return 'blocked';
   }
 
-  if (action.type === 'finish' || action.type === 'request_confirmation' || action.type === 'extract_text' || action.type === 'wait_for') {
+  if (
+    action.type === 'finish' ||
+    action.type === 'request_confirmation' ||
+    action.type === 'extract_text' ||
+    action.type === 'wait_for' ||
+    action.type === 'wait_for_url' ||
+    action.type === 'dismiss_overlay' ||
+    action.type === 'scroll' ||
+    action.type === 'hover' ||
+    action.type === 'press_key'
+  ) {
     return 'safe';
   }
 
-  const targetText = action.type === 'open_url'
-    ? action.url
-    : action.type === 'type'
-      ? `${action.selector} ${action.value}`
-      : action.type === 'press_key'
-        ? action.key
-        : action.type === 'scroll'
-          ? action.direction
-          : action.selector;
+  const targetText = getActionTargetText(action);
 
   if (containsKeyword(targetText, BLOCKED_KEYWORDS)) {
     return 'blocked';

@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import { listNotifications, markAllNotificationsRead } from '../services/notificationService';
 import { getNotificationPrefs, saveNotificationPrefs } from '../services/notificationPrefsService';
+import { createErrorResponse, logServerError } from '../services/runtimeLogger';
 import type { RequireAuth } from './types';
 
 export function registerNotificationRoutes(app: Express, requireAuth: RequireAuth): void {
@@ -50,7 +51,12 @@ export function registerNotificationRoutes(app: Express, requireAuth: RequireAut
 
         const prefs = getNotificationPrefs(user.id);
         if (!prefs.slackWebhookUrl) {
-            res.status(400).json({ error: 'No Slack webhook URL configured' });
+            const errorResponse = createErrorResponse('No Slack webhook URL configured', {
+                code: 'missing_slack_webhook',
+                retryable: false,
+                status: 400,
+            });
+            res.status(errorResponse.status).json(errorResponse.body);
             return;
         }
 
@@ -63,7 +69,12 @@ export function registerNotificationRoutes(app: Express, requireAuth: RequireAut
             });
             res.json({ success: response.ok, status: response.status });
         } catch (err) {
-            res.status(500).json({ error: String(err) });
+            logServerError('notification-prefs:test', err, { userId: user.id });
+            const errorResponse = createErrorResponse('Unable to send Slack test notification right now.', {
+                code: 'notification_test_failed',
+                retryable: true,
+            });
+            res.status(errorResponse.status).json(errorResponse.body);
         }
     });
 }

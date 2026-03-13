@@ -324,7 +324,6 @@ Only safe read-only commands are allowed (git log/status/diff, ls, cat, grep, np
 Destructive, network, and privilege-escalating commands are always blocked.`,
     version: '2.0.0',
     category: 'code',
-    personas: ['developer'],
     requiresIntegration: [],
     triggerPhrases: [
         'Run the tests',

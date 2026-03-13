@@ -17,32 +17,18 @@ describe('dashboardMappers', () => {
     expect(mapped.icon).not.toBe(Terminal);
   });
 
-  test('falls back to integration id for custom logos when icon name differs', () => {
+  test('maps google workspace to the branded Google asset', () => {
     const mapped = mapIntegration({
-      id: 'zapier',
-      name: 'Zapier',
-      status: 'disconnected',
-      iconName: 'zap',
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10',
-      desc: 'Zapier integration',
-    });
-
-    expect(mapped.logoUrl).toBe('/zapier.svg');
-  });
-
-  test('uses the Telegram SVG logo asset for telegram integrations', () => {
-    const mapped = mapIntegration({
-      id: 'telegram',
-      name: 'Telegram',
+      id: 'google-workspace',
+      name: 'Google Workspace',
       status: 'connected',
-      iconName: 'telegram',
-      color: 'text-sky-600',
-      bgColor: 'bg-sky-500/10',
-      desc: 'Telegram integration',
+      iconName: 'google-workspace',
+      color: 'text-foreground',
+      bgColor: 'bg-foreground/10',
+      desc: 'Google integration',
     });
 
-    expect(mapped.logoUrl).toBe('/Telegram.svg');
+    expect(mapped.logoUrl).toBe('/Google.svg');
   });
 
   test('falls back to Terminal for unknown icon names', () => {

@@ -3,14 +3,6 @@ import { liveSessionService } from '../services/liveSessionService';
 import { arrayBufferToBase64 } from '../utils/mediaEncoding';
 import type { ScreenShareStatus } from '../types/live';
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      getDesktopSourceId: () => Promise<string | null>;
-    };
-  }
-}
-
 const CAPTURE_INTERVAL_MS = 1200;
 const VIDEO_READY_TIMEOUT_MS = 3000;
 
@@ -33,6 +25,7 @@ function createFrameSignature(bytes: Uint8Array): string {
 interface UseScreenShareCaptureOptions {
   sessionId: string | null;
   enabled: boolean;
+  onFrame?: (payload: { mimeType: string; data: string }) => Promise<void> | void;
 }
 
 interface UseScreenShareCaptureResult {
@@ -40,6 +33,7 @@ interface UseScreenShareCaptureResult {
   error: string | null;
   isSupported: boolean;
   previewStream: MediaStream | null;
+  captureCurrentFrame: () => Promise<{ mimeType: string; data: string } | null>;
   startScreenShare: () => Promise<void>;
   stopScreenShare: () => void;
 }
@@ -47,6 +41,7 @@ interface UseScreenShareCaptureResult {
 export function useScreenShareCapture({
   sessionId,
   enabled,
+  onFrame,
 }: UseScreenShareCaptureOptions): UseScreenShareCaptureResult {
   const [status, setStatus] = useState<ScreenShareStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +108,42 @@ export function useScreenShareCapture({
     setStatus('idle');
   }, []);
 
+  const captureCurrentFrame = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) {
+      return null;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) {
+      return null;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) {
+      return null;
+    }
+
+    context.drawImage(video, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.82);
+    });
+
+    if (!blob) {
+      return null;
+    }
+
+    const buffer = await blob.arrayBuffer();
+    return {
+      mimeType: blob.type || 'image/jpeg',
+      data: arrayBufferToBase64(buffer),
+    };
+  }, []);
+
   const captureAndSendFrame = useCallback(async () => {
     if (!sessionId || !videoRef.current || !canvasRef.current || uploadInFlightRef.current) {
       return;
@@ -157,10 +188,15 @@ export function useScreenShareCapture({
       }
 
       lastFrameSignatureRef.current = signature;
-      await liveSessionService.sendFrame(sessionId, {
+      const payload = {
         mimeType: blob.type || 'image/jpeg',
         data: arrayBufferToBase64(buffer),
-      });
+      };
+      if (onFrame) {
+        await onFrame(payload);
+      } else {
+        await liveSessionService.sendFrame(sessionId, payload);
+      }
       setStatus('sharing');
       setError(null);
     } catch (captureError) {
@@ -169,7 +205,7 @@ export function useScreenShareCapture({
     } finally {
       uploadInFlightRef.current = false;
     }
-  }, [sessionId]);
+  }, [onFrame, sessionId]);
 
   const startScreenShare = useCallback(async () => {
     if (!enabled || !sessionId || streamRef.current || !isSupported) {
@@ -180,32 +216,13 @@ export function useScreenShareCapture({
     setError(null);
 
     try {
-      let stream: MediaStream;
-
-      if (window.electronAPI) {
-        // Native Electron capture 
-        const sourceId = await window.electronAPI.getDesktopSourceId();
-        if (!sourceId) throw new Error('No desktop source found.');
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: sourceId,
-            }
-          } as unknown as MediaTrackConstraints // Type cast required for Chrome-specific electron constraints
-        });
-      } else {
-        // Fallback to standard web picker
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            frameRate: 4,
-            width: { ideal: 1280 },
-          },
-          audio: false,
-        });
-      }
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: 4,
+          width: { ideal: 1280 },
+        },
+        audio: false,
+      });
 
       streamRef.current = stream;
       setPreviewStream(stream);
@@ -251,6 +268,7 @@ export function useScreenShareCapture({
     error,
     isSupported,
     previewStream,
+    captureCurrentFrame,
     startScreenShare,
     stopScreenShare,
   };

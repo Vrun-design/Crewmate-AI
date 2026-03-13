@@ -39,9 +39,11 @@ export const browserOpenUrlSkill: Skill = {
     description: 'Navigate to a URL and retrieve its page title and HTTP status code.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'researcher', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['open website', 'navigate to', 'go to URL', 'visit page'],
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'low',
     inputSchema: {
         type: 'object',
         properties: {
@@ -64,9 +66,11 @@ export const browserExtractSkill: Skill = {
     description: 'Extract the readable text content from any webpage — strips navigation, ads, and boilerplate.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['researcher', 'developer', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['read webpage', 'extract content', 'get page text', 'read article', 'scrape page'],
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'none',
     inputSchema: {
         type: 'object',
         properties: {
@@ -93,9 +97,11 @@ export const browserFillFormSkill: Skill = {
     description: 'Fill in web form fields by CSS selector and optionally submit the form.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['fill form', 'submit form', 'fill in fields', 'auto-fill'],
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'high',
     inputSchema: {
         type: 'object',
         properties: {
@@ -121,9 +127,11 @@ export const browserSearchGoogleSkill: Skill = {
     description: 'Run a real Google search via browser and return the top results with titles, URLs, and snippets.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['researcher', 'developer', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['google this', 'search google for', 'look up on google', 'find results for'],
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'none',
     inputSchema: {
         type: 'object',
         properties: {
@@ -150,9 +158,11 @@ export const browserScreenshotSkill: Skill = {
     description: 'Take a screenshot of any webpage and return it as base64 JPEG (for Gemini vision analysis).',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'researcher', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['screenshot', 'capture page', 'take screenshot of', 'show me what', 'what does the site look like'],
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'none',
     inputSchema: {
         type: 'object',
         properties: {
@@ -179,10 +189,12 @@ export const browserInspectVisibleUiSkill: Skill = {
     description: 'Capture the current visible UI state, including screenshot metadata and interactable element candidates.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'researcher', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['inspect visible ui', 'inspect page controls', 'list clickable elements', 'analyze current page ui'],
     preferredModel: 'orchestration',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'none',
     inputSchema: {
         type: 'object',
         properties: {
@@ -215,9 +227,11 @@ export const browserClickElementSkill: Skill = {
     description: 'Open a page and click a visible element by selector.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['click element', 'click button', 'press ui element'],
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'high',
     inputSchema: {
         type: 'object',
         properties: {
@@ -242,9 +256,11 @@ export const browserTypeIntoSkill: Skill = {
     description: 'Open a page and type text into a visible field by selector.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['type into field', 'enter text', 'fill this input'],
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'high',
     inputSchema: {
         type: 'object',
         properties: {
@@ -270,7 +286,6 @@ export const browserPressKeySkill: Skill = {
     description: 'Open a page and press a keyboard key such as Enter, Tab, or Escape.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['press enter', 'press key', 'send keyboard shortcut'],
     inputSchema: {
@@ -297,7 +312,6 @@ export const browserScrollPageSkill: Skill = {
     description: 'Open a page and scroll it up or down by a specified amount.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['scroll down', 'scroll up', 'move page'],
     inputSchema: {
@@ -325,7 +339,6 @@ export const browserExtractTextSkill: Skill = {
     description: 'Open a page and extract text from a visible element by selector.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'researcher', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['extract ui text', 'read this button', 'read text from element'],
     inputSchema: {
@@ -352,7 +365,6 @@ export const browserUiNavigateSkill: Skill = {
     description: 'Use Gemini multimodal planning plus Playwright actions to navigate a browser UI toward a user goal.',
     version: '1.0.0',
     category: 'browser',
-    personas: ['developer', 'researcher', 'all'],
     requiresIntegration: [],
     triggerPhrases: ['navigate this ui', 'use the website for me', 'click through the page', 'automate browser steps'],
     preferredModel: 'orchestration',

@@ -81,7 +81,6 @@ export const zapierTriggerSkill: Skill = {
         '"send a WhatsApp message", or trigger any workflow automation.',
     version: '1.0.0',
     category: 'automation',
-    personas: ['founder', 'marketer', 'sales', 'developer'],
     requiresIntegration: ['zapier'],
     triggerPhrases: [
         'Trigger a Zap automation',
@@ -161,7 +160,6 @@ export const zapierListSkill: Skill = {
         'Use when the user asks "what automations do I have?" or "what can I trigger?"',
     version: '1.0.0',
     category: 'automation',
-    personas: ['founder', 'marketer', 'sales', 'developer'],
     requiresIntegration: ['zapier'],
     triggerPhrases: [
         'What Zap automations do I have?',

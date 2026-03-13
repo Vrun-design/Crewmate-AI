@@ -9,6 +9,7 @@ import { Card, CardContent } from '../components/ui/Card';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useNotifications } from '../hooks/useNotifications';
 import { api } from '../lib/api';
+import { getUserFacingErrorMessage } from '../utils/errorHandling';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -55,13 +56,26 @@ function NotificationSettings(): React.JSX.Element {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadPrefs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.get<NotificationPrefs>('/api/notification-prefs');
+      if (data) {
+        setPrefs(data);
+      }
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(getUserFacingErrorMessage(error, 'Unable to load notification preferences'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void api.get<NotificationPrefs>('/api/notification-prefs').then((data) => {
-      if (data) setPrefs(data);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    void loadPrefs();
+  }, [loadPrefs]);
 
   const save = useCallback(async (patch: Partial<NotificationPrefs>) => {
     const updated = { ...prefs, ...patch };
@@ -71,6 +85,10 @@ function NotificationSettings(): React.JSX.Element {
       const saved = await api.patch<NotificationPrefs>('/api/notification-prefs', updated);
       if (saved) setPrefs(saved);
       setSavedAt(new Date());
+      setLoadError(null);
+      setTestResult(null);
+    } catch (error) {
+      setLoadError(getUserFacingErrorMessage(error, 'Unable to save notification preferences'));
     } finally {
       setSaving(false);
     }
@@ -83,7 +101,7 @@ function NotificationSettings(): React.JSX.Element {
       const res = await api.post<{ success: boolean; status: number }>('/api/notification-prefs/test', {});
       setTestResult({ success: res?.success ?? false, message: res?.success ? '✅ Test message delivered!' : `Failed — HTTP ${res?.status ?? '?'}` });
     } catch (err) {
-      setTestResult({ success: false, message: `Error: ${String(err)}` });
+      setTestResult({ success: false, message: getUserFacingErrorMessage(err, 'Unable to send test notification') });
     } finally {
       setTesting(false);
     }
@@ -99,6 +117,15 @@ function NotificationSettings(): React.JSX.Element {
 
   return (
     <div className="space-y-5">
+      {loadError ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{loadError}</span>
+            <Button variant="secondary" onClick={() => void loadPrefs()}>Retry</Button>
+          </div>
+        </div>
+      ) : null}
+
       {/* In-app notifications */}
       <div className="rounded-xl border border-border bg-card/40 p-5">
         <div className="flex items-center justify-between mb-4">

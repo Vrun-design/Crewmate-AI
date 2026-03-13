@@ -2,303 +2,616 @@
 
 # ⚡ Crewmate
 
-![Crewmate](public/Crewmate_gang.png)
+![Crewmate Gang](public/Crewmate_gang.png)
 
-### Your AI-powered company — run an entire business with a crew of AI agents 🚀
+### *Your multimodal AI operator — sees your screen, hears your voice, acts on your behalf*
 
-**15 specialist agents · 30+ real integrations · Real-time voice via Gemini Live · Custom skill builder · MCP server**
+[![Built with Gemini](https://img.shields.io/badge/Built%20with-Gemini%20Live-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/gemini-api/docs/live)
+[![Google Cloud](https://img.shields.io/badge/Deployed%20on-Google%20Cloud-34A853?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com)
+[![Gemini Live Agent Challenge](https://img.shields.io/badge/Hackathon-Gemini%20Live%20Agent%20Challenge-FF6D00?style=for-the-badge)](https://devpost.com)
 
-[![Built with Gemini](https://img.shields.io/badge/Built%20with-Gemini%20Live%20API-4285F4?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev/)
-[![Gemini Live Challenge](https://img.shields.io/badge/Gemini%20Live%20Agent%20Challenge-2025-orange?style=flat-square)](https://ai.google.dev/)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tests](https://img.shields.io/badge/Tests-51%2F55%20passing-22c55e?style=flat-square)](./server)
+**Category: Live Agents 🗣️ + UI Navigator ☸️**
+
+[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-44-and-counting) · [Integrations](#-integrations) · [Deployment](#-google-cloud-deployment)
 
 </div>
 
 ---
 
-## 🌟 What is Crewmate?
+## What is Crewmate?
 
-Crewmate is a **full-stack, multimodal AI orchestration platform** built on Google's Gemini ecosystem. Think of it as hiring an entire company's worth of AI specialists — each with their own domain expertise, tools, and real integration access — all coordinated by an intelligent orchestrating layer.
+Crewmate is a next-generation **multimodal AI operator** that goes far beyond a chatbot. It is always listening, sees your screen in real-time, and executes complex multi-step work on your behalf — across your tools, browser, and workspace — while you stay in the flow.
 
-Stop acting like an employee typing prompts into a chat box. **Start acting like a Captain.** You open the app, and you simply share your screen and talk out loud:
-
-> *"I'm looking at Notion's pricing page right now (screen share active). Have the research crew do a competitive analysis in the background, and then have the comms team draft a Slack update for the #product channel when they are done."*
-
-Crewmate's orchestrator (powered by Gemini Pro) instantly classifies intent, selects the Research Agent, watches it call `web.search` (with Tavily AI-optimized results), streams every step back to your browser in real time via SSE, and finishes with a full analysis — while simultaneously sending you a Slack notification that the task is done.
-
-## Hackathon Category: Live Agents 🗣️
-
-Crewmate was built specifically to win the **Google Gemini Live Agent Challenge 2025**. Here is exactly how we deliver on the challenge requirements for a "Next Generation AI Agent":
-
-### 1. Multimodal — See, Hear, and Speak
-- 👁️ **See (Vision)** — WebRTC `getDisplayMedia()` captures your browser/screen as a video stream and passes the frames continuously to the Gemini Live API. **The agent literally sees what you are looking at while you talk to it.**
-- 🎙️ **Hear (Audio Input)** — Real-time bidirectional WebSocket voice streaming via the Gemini Live API. Zero turn delay.
-- 🗣️ **Speak (Native Output)** — Fast, expressive audio output using Gemini's native voices (Aoede, Charon, Fenrir, Kore, Puck) directly from the `gemini-2.5-flash-native-audio-preview-12-2025` model.
-
-### 2. Autonomous Background Delegations (Off-shift Work)
-Crewmate isn't a chatbot that stops working when you close the tab. As the Captain, you assign work. The Orchestrator routes the intent, and the 15-agent specialist crew executes the work autonomously. 
-If a task takes 10 minutes (like scraping 5 competitor websites), it gets routed to the **Off-shift Inbox**. Your crew works asynchronously in the background and delivers the final asset (Notion page, Slack message, PDF) whenever it's done.
-
-### 3. Native Barge-in & Interruptibility
-Because we use the true WebSocket-based Live API (not just STT -> LLM -> TTS), you can interrupt the agent mid-sentence. If it starts going down the wrong path, just say *"No, wait, actually let's do X instead"* and it instantly stops generating and pivots.
-
-### 4. Google Cloud Platform Deployment ☁️
-Crewmate is designed for enterprise scale on **GCP Cloud Run**. Our infrastructure-as-code script (`cloud-deploy.sh`) automatically builds the Docker container via **Cloud Build**, provisions **Secret Manager** for the API keys, and deploys to a fully autoscaled Cloud Run service.
-
----
-
-## 🔥 Enterprise-Grade Agent Architecture
-
-### A. Multi-Model Routing 🔀
-Using a single model for everything is poor engineering. Crewmate dynamically routes tasks based on complexity and payload size:
-
-| Tier | Default Model | What uses it |
-|------|-------------|-------------|
-| **Live Audio** | `gemini-2.5-flash-native-audio-preview-12-2025` | Real-time voice sessions with low latency |
-| **Orchestration** | `gemini-3.1-pro-preview` | Intent classification, complex routing decisions |
-| **Research** | `gemini-3.1-pro-preview` | Deep analysis, report generation, legal/finance |
-| **Creative** | `gemini-3.1-flash-image-preview` | Image generation (Social, Marketing agents) |
-| **Quick** | `gemini-3.1-flash-lite-preview` | Fast responses, simple data extraction |
-| **Lite** | `gemini-3.1-flash-lite-preview` | Ultra-fast tool calls and pre-routing filters |
-
-### B. A2A Orchestration (Agent-to-Agent) 👥
-Crewmate operates a true *Agent-to-Agent (A2A)* dynamic graph. When the Orchestrator (the router agent) receives an intent, it evaluates confidence scores across **15 discrete domain expert agents**. 
-
-Crucially, **agents can invoke other agents**. A typical A2A workflow looks like this:
-1. Orchestrator receives: *"Research Acme Corp and draft a cold email to their CTO."*
-2. Orchestrator delegates to **Research Agent** (domain: competitive analysis) passing `web.search` tool access.
-3. Research Agent completes the analysis and returns the structured payload.
-4. Orchestrator parses the Research output and sequentially routes the payload to the **Sales Agent** (domain: outreach).
-5. Sales Agent consumes the research context and executes `gmail.draft`.
-
-Each agent acts as an isolated sandbox with specific localized system prompts and authorized MCP skill sub-sets, drastically reducing hallucination and logic drift compared to a monolithic generic agent.
-
-### C. Always-On Memory Agent 🧠
-Standard context windows fill up. Crewmate solves this with a multi-layered semantic memory system inspired directly by Google's [Always-On Memory Agent framework](https://github.com/GoogleCloudPlatform/generative-ai/tree/main/gemini/agents/always-on-memory-agent):
-1. **Vector Storage:** Memories are tagged and stored in SQLite.
-2. **Context Injection:** When a live session starts, memories are injected into the system prompt.
-3. **Hourly Summarization:** A background worker (`memorySummaryWorker.ts`) runs hourly, using `gemini-3.1-flash-lite-preview` to aggressively summarize and compact older memories, preventing context bloat.
-
----
-
-## 🏗️ The "Full Company" Flow
+**The core idea is simple:** stop switching between apps. Talk to Crewmate like you talk to a colleague. It routes your intent to the right agent, uses the right tools, and reports back — all in real-time.
 
 ```
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║                              CREWMATE PLATFORM                               ║
-╠══════════════════════════╦════════════════════════════════════════════════════╣
-║   BROWSER (React + Vite) ║            SERVER (Express + TypeScript)          ║
-║                          ║                                                    ║
-║  ┌────────────────────┐  ║  ┌──────────────────────────────────────────────┐ ║
-║  │  Dashboard         │  ║  │              ORCHESTRATOR                     │ ║
-║  │  • Command bar     │◄─╫──│  • Gemini Pro intent classification           │ ║
-║  │  • Task stream     │  ║  │  • Confidence-scored agent routing            │ ║
-║  │  • Gmail inbox     │  ║  │  • Async background execution                 │ ║
-║  └────────────────────┘  ║  │  • SSE event broadcasting                     │ ║
-║           │ SSE           ║  └──────────────────────┬───────────────────────┘ ║
-║  ┌────────▼───────────┐  ║                         │ routes to                ║
-║  │  Agent Network     │  ║  ┌──────────────────────▼───────────────────────┐ ║
-║  │  • Live timeline   │  ║  │           14-AGENT SPECIALIST CREW            │ ║
-║  │  • Step events     │  ║  │                                               │ ║
-║  │  • Task status     │  ║  │  🔬 Research   💼 Sales    📣 Marketing       │ ║
-║  └────────────────────┘  ║  │  ✍️  Content    🛠️  DevOps   📋 Product        │ ║
-║                          ║  │  📧 Comms      👥 HR       🎧 Support         │ ║
-║  ┌────────────────────┐  ║  │  📅 Calendar   📱 Social   💰 Finance         │ ║
-║  │  Skill Builder     │  ║  │  ⚖️  Legal      📊 Data                        │ ║
-║  │  • LLM Recipes     │  ║  │                                               │ ║
-║  │  • Webhook skills  │  ║  │  Each agent: emitStep() → SSE stream          │ ║
-║  │  • Test runner     │  ║  └──────────────────────┬───────────────────────┘ ║
-║  └────────────────────┘  ║                         │ calls                    ║
-║                          ║  ┌──────────────────────▼───────────────────────┐ ║
-║  ┌────────────────────┐  ║  │            SKILL REGISTRY (30+ skills)        │ ║
-║  │  Notifications     │  ║  │                                               │ ║
-║  │  • Feed            │  ║  │  web.search        gmail.*        github.*    │ ║
-║  │  • Slack settings  │  ║  │  calendar.*        slack.*        notion.*    │ ║
-║  └────────────────────┘  ║  │  clickup.*         creative.*     memory.*   │ ║
-║                          ║  │  terminal.*        + custom skills (SQLite)   │ ║
-║  ┌────────────────────┐  ║  └──────────────────────┬───────────────────────┘ ║
-║  │  Gemini Live       │  ║                         │                          ║
-║  │  WebSocket session │◄─╫──────────────────────┐  │                          ║
-║  │  Screen capture    │  ║  Gemini Live API       │  │ fires                   ║
-║  │  5 voices          │  ║  (real-time audio)     │  ▼                        ║
-║  └────────────────────┘  ║                  ┌────▼──────────────────────┐    ║
-║                          ║                  │  NOTIFICATION LAYER        │    ║
-║  ┌────────────────────┐  ║                  │  In-app SSE + Slack Block  │    ║
-║  │  Account           │  ║                  │  Kit webhooks per user     │    ║
-║  │  6-tier model UI   │  ║                  └───────────────────────────┘    ║
-║  │  All 5 Gemini      │  ║                                                    ║
-║  │  Live voices       │  ║  ┌──────────────────────────────────────────────┐ ║
-║  └────────────────────┘  ║  │  MCP PROTOCOL SERVER                          │ ║
-║                          ║  │  • All 30+ skills exposed as Claude tools     │ ║
-║                          ║  │  • Claude Desktop integration                 │ ║
-║                          ║  │  • Cursor IDE integration                     │ ║
-║                          ║  └──────────────────────────────────────────────┘ ║
-╚══════════════════════════╩════════════════════════════════════════════════════╝
+"Summarize my open ClickUp tasks, draft a Notion doc, and screenshot this page for context."
+↓
+Crewmate routes this across 3 skills, streams progress, and stores the result in memory.
+```
+
+### Built for the Gemini Live API
+
+Crewmate is architected around the **Gemini Live API** as its conversational controller:
+
+- 🎙️ **Real-time voice** — speak naturally, interrupt at any time
+- 👁️ **Screen awareness** — live screen capture sent as multimodal context
+- 🧠 **Always-on memory** — vector-backed session + knowledge recall injected into every prompt
+- ⚡ **Delegated execution** — slow or high-impact work is spawned into background tasks, not blocking the live turn
+- 🔄 **Session resumption** — Gemini sessions auto-reconnect on drop (`goAway`, `transport_error`, `socket_closed`)
+
+---
+
+## ✨ Feature Highlights
+
+| Feature | Description |
+|---|---|
+| **Gemini Live** | Real-time audio conversation with interruption support |
+| **Screen Context** | Screenshot captured and sent as multimodal context each turn |
+| **44 Skills** | Research, browser, productivity, comms, code, creative |
+| **Orchestrator** | Intent-routed A2A dispatch to specialist agents |
+| **Memory** | Vector-embedded session recall + knowledge base |
+| **Tasks** | Real-time streamed background task execution |
+| **Integrations** | Notion, Slack, ClickUp, Google Workspace, GitHub |
+| **Auth** | Firebase Auth (production) + dev magic-code login |
+| **Audit Log** | Every skill run is recorded with timing, result, and origin |
+
+---
+
+## 🏗️ Architecture
+
+### System Overview
+
+```mermaid
+flowchart TD
+    U[👤 User — Voice + Screen] --> FE
+
+    subgraph Frontend["Frontend  (React + Vite)"]
+        FE[App Shell / Router]
+        DASH[Dashboard\nLive Controls + Activity]
+        TASKS[Tasks\nSSE Streaming Trace]
+        MEMORY[Memory\nKnowledge Base]
+        SKILLS[Skills\nTool Palette]
+        SESSIONS[Sessions\nHistory]
+    end
+
+    FE --> DASH & TASKS & MEMORY & SKILLS & SESSIONS
+
+    subgraph Backend["Backend  (Node.js + Express)"]
+        API[REST API: 8 route modules]
+        
+        subgraph LiveLayer["Live Layer"]
+            LGW[liveGateway]
+            LPB[promptBuilder\nMemory + Integrations]
+            LMP[messageProcessor\nTool Routing]
+            LTR[toolRunner\nInline vs Delegated]
+        end
+
+        subgraph ExecutionLayer["Execution Layer"]
+            ORCH[Orchestrator\nIntent Router]
+            POLICY[Execution Policy\nInline / Delegated / Either]
+            REG[Skill Registry\n44 Skills]
+        end
+
+        subgraph AgentLayer["Agent Layer"]
+            AG_RES[Research Agent]
+            AG_PRD[Product Agent]
+            AG_DAT[Data Agent]
+            AG_SAL[Sales Agent]
+            AG_UI[UI Navigator Agent]
+        end
+
+        subgraph Memory["Memory Layer"]
+            MEM[memoryService\nRead + Write]
+            EMB[embeddingService\nVector Search]
+            ING[memoryIngestor\nLive + Skills + Agents]
+        end
+
+        subgraph DataLayer["Data Layer"]
+            DB[(SQLite\n16 Tables)]
+            SSE[EventService\nSSE Broadcast]
+        end
+
+        GEMINI["☁️ Gemini Live API\ngemini-2.5-flash-native-audio"]
+        FB["🔥 Firebase Auth\n(Google Cloud)"]
+    end
+
+    FE -->|REST + SSE| API
+    API --> LiveLayer & ExecutionLayer
+    LGW <-->|WebSocket| GEMINI
+    LPB --> Memory
+    LTR --> POLICY --> REG
+    LTR -->|delegated| ORCH
+    ORCH --> AgentLayer
+    AgentLayer --> REG
+    REG -->|Notion, Slack, ClickUp\nGmail, Calendar, Docs\nBrowser, Terminal| ExternalServices["🔌 External Services"]
+    ING --> MEM --> EMB --> DB
+    ORCH --> DB
+    SSE --> FE
+    API -->|verify token| FB
+```
+
+### Request Routing Flow
+
+Every user request follows a deterministic routing decision:
+
+```mermaid
+flowchart LR
+    REQUEST["User Request\n(voice or text)"]
+    
+    REQUEST --> ENTRY{Entry Point}
+    
+    ENTRY -->|"live turn"| LIVE["Gemini Live\nSession"]
+    ENTRY -->|"async intent"| ORCH["Orchestrator"]
+    
+    LIVE --> POLICY_L["Execution Policy\nCheck"]
+    
+    POLICY_L -->|"inline\n(quick, safe)"| INLINE["Run Skill\nImmediately\n< 2s"]
+    POLICY_L -->|"delegated\n(slow, external)"| DELEGATE["Create Background Task\nSpeak Acknowledgement"]
+    POLICY_L -->|"no tool needed"| ANSWER["Speak Response\nNormally"]
+    
+    ORCH --> ROUTE["LLM Intent Router\n(gemini-pro)"]
+    ROUTE -->|"skill match"| SKILL_TASK["Run Delegated Skill"]
+    ROUTE -->|"complex workflow"| AGENT_TASK["Run Specialist Agent"]
+    
+    AGENT_TASK --> AGENT_SKILLS["Calls 1..N Skills\nSequentially"]
+    
+    DELEGATE & SKILL_TASK & AGENT_SKILLS --> SSE["📡 Stream Steps\nto Tasks UI"]
+    SSE --> MEMORY_WRITE["Write to Memory\n(session / knowledge / artifact)"]
+```
+
+### Memory Architecture
+
+```mermaid
+flowchart TD
+    subgraph WritePath["Write Path"]
+        LT["Live Turn"] --> ING1["ingestLiveTurnMemory"]
+        SK["Skill Result"] --> ING2["ingestSkillResult"]
+        AG["Agent Result"] --> ING3["ingestAgentResult"]
+        ART["Screenshot Artifact"] --> ING4["ingestArtifactMemory"]
+    end
+    
+    ING1 & ING2 & ING3 & ING4 --> STORE[("memory_records\nSQLite")]
+    STORE --> EMB["embedAndStore\nasync · fire-and-forget"]
+    EMB --> VEC["embedding column\ncosine similarity search"]
+    
+    subgraph ReadPath["Read Path — every Live prompt"]
+        RETRIEVE["retrieveRelevantMemories\ntopK=5"]
+        VEC --> RETRIEVE
+        RETRIEVE -->|"vector similarity"| RANKER["Score + Rank"]
+        RANKER -->|"fallback: lexical"| INJECT["Inject into\nSystem Prompt"]
+    end
+    
+    INJECT --> LIVE_PROMPT["Gemini Live Session\nContext-Aware from Turn 1"]
+```
+
+### Live Session Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Dashboard / Live UI
+    participant API as liveSessionRoutes
+    participant GW as liveGateway
+    participant Gemini as Gemini Live API
+    participant TR as toolRunner
+    participant Orch as Orchestrator
+    participant Skills as Skill Registry
+
+    User->>UI: Speaks (audio stream)
+    UI->>API: POST /sessions/:id/messages
+    API->>GW: sendLiveMessage(audio + screenshot)
+    GW->>Gemini: user turn (multimodal)
+    Note over Gemini: Processes audio + image context
+
+    alt Normal response
+        Gemini-->>GW: text/audio stream
+        GW-->>UI: transcript + audio chunks
+    else Tool call required
+        Gemini-->>GW: function_call (skill name + args)
+        GW->>TR: handleToolCall(...)
+        TR->>TR: executionPolicy.check()
+        
+        alt inline skill (quick, safe)
+            TR->>Skills: runSkill(skillId, args)
+            Skills-->>TR: result
+            TR-->>Gemini: tool_response
+            Gemini-->>UI: continues speaking
+        else delegated skill (slow or risky)
+            TR->>Orch: delegateSkillExecution(...)
+            Orch-->>UI: SSE: task created + streaming steps
+            TR-->>Gemini: tool_response {delegatedTaskId}
+            Gemini-->>UI: "I've kicked that off for you"
+        end
+    end
+
+    GW->>GW: ingestLiveTurnMemory()
+    Note over GW: Every turn enriches memory
 ```
 
 ---
 
-## 🤖 The Full Crew — 15 Specialist Agents
+## 🌐 Browser Navigation — Autonomous Web Agent
 
-No other hackathon entry has an agent architecture this wide. Each agent is a discrete, state-independent async domain expert. 
+Crewmate includes a full **autonomous browser operator** powered by Playwright + Gemini multimodal vision. It can navigate any website, fill forms, click through UIs, dismiss overlays, extract data, and complete multi-step web workflows — all without human guidance.
 
-| Agent | Core Model | Domain | Key Skills Used |
-|-------|------------|--------|------------|
-| 🔬 **Research** | Gemini 3.1 Pro | Market research, competitive analysis | `web.search` (Tavily), `web.summarize` |
-| ✍️ **Content** | Gemini 3.1 Pro | Documentation, SEO, blog posts | `web.search`, text generation |
-| 📧 **Comms** | Gemini 3.1 Flash-Lite | Internal updates, emails, DMs | `gmail.send`, `slack.post-message` |
-| 🛠️ **DevOps** | Gemini 3.1 Flash-Lite | Tickets, code reviews, CLI runs | `github.create-pr`, `terminal.run` |
-| 📅 **Calendar** | Gemini 3.1 Flash-Lite | Scheduling, time gap finding | `calendar.schedule`, free-time |
-| 💼 **Sales** | Gemini 3.1 Pro | Outreach pipelines, contact analysis | `gmail.send`, `notion.create-page` |
-| 📣 **Marketing**| Gemini 3.1 Pro | Ads, GTM, creative copy | `creative.generate`, text generation |
-| 📋 **Product** | Gemini 3.1 Pro | PRDs, user stories, agile workflows | `clickup.create-task`, `notion.write` |
-| 👥 **HR** | Gemini 3.1 Pro | Hiring, policies, internal onboarding | Document parsing, text generation |
-| 🎧 **Support** | Gemini 3.1 Flash-Lite | Triage, FAQs, KB articles | `slack.post`, `gmail.read` |
-| 📱 **Social** | Gen 3.1 Pro+Image| Social media threads, creatives | `creative.generate`, text formatting |
-| 💰 **Finance** | Gemini 3.1 Pro | Unit economics, P&Ls, modeling | `web.search`, structured JSON output |
-| ⚖️ **Legal** | Gemini 3.1 Pro | Policy drafts, compliance checks | High-temperature logic constraint |
-| 📊 **Data** | Gemini 3.1 Pro | SQL generation, analytics reviews | Code interpretation, JSON parsing |
-| ☸️ **Navigation** | Gemini 3.1 Pro | Visual UI automation, form filling | `browser.ui-navigate`, `browser.click-element` |
+### How it works
 
----
+Crewmate uses a **Perceive → Reason → Act** loop, running up to 30 steps:
 
-## 🛠️ Skills System — 30+ Built-in Skills
-
-### 🔍 Research & Browsing
-- `web.search` (v2.0 — Tavily primary, DuckDuckGo fallback for high-quality LLM-optimized snippets)
-- `web.summarize-url` (Fetches any URL, strips HTML, uses Gemini Flash for summaries)
-- `browser.extract`, `browser.open-url`, `browser.screenshot`
-
-Crewmate also includes a **Playwright-powered browser operations layer** on the server, exposed through the built-in `browser.*` skills. This gives agents real browser capabilities such as URL navigation, readable content extraction, screenshot capture, Google search, and form filling via:
-- `browser.ui-navigate` (Autonomous vision-based UI completion)
-- `browser.click-element` & `browser.type-into`
-- `browser.open-url`
-- `browser.extract`
-- `browser.fill-form`
-- `browser.search-google`
-- `browser.screenshot`
-
-### 📧 Productivity & Comms (OAuth2)
-- **Gmail**: `gmail.send`, `gmail.draft`, `gmail.read-inbox`
-- **Calendar**: `calendar.schedule`, `calendar.find-free-time`, `calendar.list-events`
-- **Slack**: `slack.post-message`, `slack.list-channels`
-- **ClickUp**: `clickup.create-task`, `clickup.list-tasks`
-- **Notion**: `notion.create-page`, `notion.list-pages`
-
-### 🖥️ Code & Automation
-- **GitHub**: `github.create-issue`, `github.create-pr`, `github.list-prs`
-- **Terminal**: `terminal.run-command` (Regex-enforced sandboxed executions like `ls`, `git`, `npm` only)
-- **Memory**: `memory.store`, `memory.retrieve`, `memory.list`
-- **Creative**: `creative.generate-image` (Generates images via Gemini 3.1 Flash Image model)
-- **Zapier**: `zapier.trigger`
-
-### 🔧 Custom Skills — Build Your Own
-Crewmate features a **no-code Skill Builder** at `/skills/build`. Users can wrap LLM recipes over intent prompts ("Translate to Japanese") or connect directly to standard API webhooks (with 10-second timeouts, 256KB caps, and automatic error handling).
-
----
-
-## 📡 Glass Box Transparency (SSE)
-
-One of the core UX innovations in Crewmate: every single step an agent takes is streamed to the browser in real time via **Server-Sent Events (SSE)**.
-
-| Type | When fired | What the UI shows |
-|------|-----------|-------------------|
-| `routing` | Intent classified | "Routing to Sales Agent (94% confidence)" |
-| `thinking` | Model is reasoning | Animated thinking indicator |
-| `skill_call` | About to call a skill | Tool name + skill ID badge |
-| `skill_result` | Skill returned | Duration, success/fail, char count |
-| `generating` | Generating output | Writing animation |
-| `done` | Task complete | Green checkmark + result |
-
----
-
-## 🌐 MCP Protocol Server (Model Context Protocol)
-
-Crewmate inherently functions as a bidirectional **Model Context Protocol (MCP) server** exposed over Streamable HTTP (`http://localhost:8787/mcp`). 
-
-MCP is the open standard for connecting AI models to data sources and tools. Because Crewmate is built on this architecture, its utility extends far beyond the Crewmate Dashboard:
-
-**1. Exposing Internal Integrations to External Clients**
-Every single one of Crewmate's 30+ built-in atomic skills (OAuth-authenticated Gmail, Notion, GitHub, Sandboxed CLI) is instantly exposed as a standard MCP tool. 
-
-By adding the Crewmate endpoint to your `claude_desktop_config.json` or Cursor Settings:
-```json
-{ "mcpServers": { "crewmate": { "url": "http://localhost:8787/mcp" } } }
 ```
-Your local Cursor IDE or Claude Desktop instantly inherits full, authenticated access to your Slack, Notion, and Gmail without any additional OAuth dances.
+1. PERCEIVE   screenshot + DOM elements + ARIA accessibility tree
+       ↓
+2. REASON     Gemini multimodal analyzes the state + full step history
+              → decides the single best next action
+       ↓
+3. ACT        Playwright executes the action in a real Chromium browser
+       ↓
+4. REPEAT     until task is complete, blocked, or max steps reached
+```
 
-**2. Standardized Agent Tool Calling**
-Internally, the 14-agent A2A network uses the exact same MCP-compliant JSON schemas to invoke tools, meaning Crewmate's internal engine is fully standards-compliant. If a developer builds a Custom Skill in the Crewmate UI (e.g. "Trigger Zapier Webhook"), that skill is immediately broadcast via MCP.
+### Action repertoire
+
+| Action | Description |
+|---|---|
+| `open_url` | Navigate to any URL |
+| `click` | Click any element — with fallback selector chain |
+| `clear_and_type` | Clear pre-filled inputs, then type new value |
+| `type` | Append text into a field |
+| `select_option` | Choose from native `<select>` dropdowns |
+| `check` | Toggle checkboxes and radio buttons |
+| `hover` | Hover to reveal sub-menus or tooltips |
+| `press_key` | Send keyboard events (Enter, Tab, Escape, etc.) |
+| `scroll` | Scroll up or down the page |
+| `wait_for` | Wait for an element to appear in the DOM |
+| `wait_for_url` | Wait for a URL change after redirect/submit |
+| `dismiss_overlay` | Auto-dismiss cookie banners, GDPR popups, modals (27 known patterns) |
+| `extract_text` | Read text from any element |
+| `finish` | Mark task complete with a structured summary |
+| `request_confirmation` | Pause for user approval before irreversible actions |
+
+### Reliability features
+
+- **Fallback selector chain** — if a CSS selector fails, tries `alternativeSelectors[]`, then a `text=...` locator
+- **Retry on failure** — each action retries up to 2× with an 800ms gap before being logged as failed
+- **Continues after failure** — a single bad selector doesn't abort the task; the planner sees the failure and adapts
+- **Automatic overlay dismissal** — first page load triggers a silent sweep for cookie/GDPR/modal dismiss buttons
+- **ARIA snapshot** — the accessibility tree is extracted alongside the screenshot for precise element targeting on SPAs and React apps
+- **URL inference** — "Go to Lenny's podcast" resolves to `lennysnewsletter.com` automatically
+
+### Example tasks
+
+```
+"Go to lenny's newsletter and sign me up with varun@example.com"
+"Search Product Hunt for the top AI tools this week and summarize them"
+"Screenshot the Vercel pricing page"
+"Find the cheapest MacBook Pro on apple.com right now"
+"Fill out the contact form on acme.com and send a meeting request"
+```
+
+### Voice-triggered
+
+All browser navigation is **voice-activated via Gemini Live** — say the task out loud, and the UI Navigator agent handles everything in the background while you continue your conversation.
 
 ---
 
-## 🔒 Security & Testing
+## ⚡ Skills — 44 and Counting
 
-When giving AI access to run tool code locally or access your Slack/Email, security cannot be an afterthought:
-- **Sandbox Executions (`terminal.run-command`)**: We use strict regex-enforced allowlists. Destructive changes (`rm`, `mv`) are blocked at the router layer. 
-- **SQLite AES Encryption**: All OAuth and webhook secrets from Integrations (Gmail, Slack, Notion) are encrypted via AES-256-GCM in `integrationCredentials.ts` before hitting SQLite.
-- **Testing (`npm test`)**: 51/55 passing Vitest suites, with *17 dedicated test cases* verifying the `terminal-sandbox` skill cannot be tricked with injection attacks.
+Skills are the **single execution primitive** in Crewmate. Every action — from posting a Slack message to filling a web form — is a skill.
+
+| Category | Skills |
+|---|---|
+| **Research** | `web.search`, `web.summarize-url` |
+| **Communication** | `slack.post-message`, `slack.list-channels` |
+| **Productivity — Notion** | `notion.create-page`, `notion.append-blocks`, `notion.append-screenshot`, `notion.create-database-record`, `notion.list-pages`, `notion.search-pages`, `notion.update-page` |
+| **Productivity — ClickUp** | `clickup.create-task`, `clickup.attach-screenshot`, `clickup.list-tasks` |
+| **Productivity — Google Workspace** | Gmail (draft/send/search), Docs (create/append), Sheets (create/append-rows), Slides (create/add-slides), Drive (search/create-folder), Calendar (create-event/list-events) |
+| **Productivity — Memory** | `memory.store`, `memory.retrieve`, `memory.list` |
+| **Productivity — Tasks** | `task.list-active`, `task.cancel`, `workspace.create-task` |
+| **Browser Automation** | `browser.open-url`, `browser.extract`, `browser.extract-text`, `browser.fill-form`, `browser.click-element`, `browser.inspect-visible-ui`, `browser.press-key`, `browser.search-google`, `browser.scroll-page`, `browser.screenshot`, `browser.type-into`, `browser.ui-navigate` |
+| **Code & DevOps** | `terminal.run-command` (sandboxed) |
+| **Live** | `live.capture-screenshot` |
+
+### Skill Execution Policy
+
+Each skill declares:
+- **`executionMode`**: `inline` | `delegated` | `either`
+- **`latencyClass`**: `quick` | `slow`  
+- **`sideEffectLevel`**: `none` | `low` | `high`
+
+The runtime uses these to automatically decide whether to run a skill immediately during the live turn or delegate it to a background task.
 
 ---
 
-## 🚀 Spin-Up Instructions (Local Run)
+## 🤖 Specialist Agents — 13 World-Class Domain Experts
+
+For complex multi-step workflows, Crewmate dispatches to **13 specialist agents**, each with a deep expert persona, multi-step research pipeline, and auto-integration with connected tools.
+
+Every agent follows the same pipeline: **Research → Strategy → Generate → Save (Notion/ClickUp/Slack)**.
+
+| Agent | Expert Persona | Output Types | Auto-Integrations |
+|---|---|---|---|
+| 🔬 **Research** | Intelligence analyst — multi-angle parallel searches, cross-source validation | Executive brief, deep report, bullets, fact-check | Notion |
+| ✍️ **Content** | Senior content strategist | Blog, LinkedIn, Twitter thread, video script, whitepaper, email sequence, PRD, docs | Notion |
+| 📣 **Marketing** | Growth & campaign strategist | GTM plan, ICP, positioning, campaign brief, A/B copy, social campaign | Notion |
+| 📱 **Social** | Social media strategist | Twitter threads, LinkedIn posts, Instagram, content calendar, founder brand building | Notion |
+| 👥 **HR** | Head of People & talent partner | JD with scoring rubric, interview guide, offer letter, 90-day onboarding, performance review, policy, culture guide | Notion |
+| 🗂️ **Product** | Senior Product Manager | PRD (RICE scoring), user stories, feature spec with API contract, sprint plan, competitive analysis, roadmap | ClickUp + Notion |
+| 🎧 **Support** | VP Customer Support | Customer response, FAQ, ticket triage, escalation report, support playbook, CS strategy | Slack (P0/P1 alerts) + Notion |
+| 💼 **Sales** | Enterprise AE strategist | Personalized outreach, 4-email sequence, discovery guide (MEDDIC), battle card, objection playbook (LAER), proposal | Notion |
+| 💰 **Finance** | CFO-level analyst | Financial model (3-scenario), budget, investor update, expense analysis, P&L report, invoice | Notion |
+| ⚖️ **Legal** | In-house counsel | Contract review (🔴🟡🟢 risk flags), NDA analysis, Terms of Service, GDPR privacy policy, compliance checklist | Notion |
+| 📧 **Communications** | Chief Communications Officer | Executive email, press release, internal announcement, newsletter, memo, crisis comms (3 versions), Slack/DM | Slack + Notion |
+| ⚙️ **DevOps** | Staff Engineer & platform expert | Code review, architecture design, GitHub Actions CI/CD YAML, incident runbook, security audit (CVSS), Terraform IaC | Terminal + Notion |
+| 📊 **Data** | Senior Data Scientist & analytics engineer | SQL (CTE-pattern), cohort/funnel analysis, A/B test with power calculation, metrics framework, data story, dashboard design | Notion |
+| 🌐 **UI Navigator** | Autonomous browser operator | Multi-step web automation, data extraction, form filling, login flows, SPA navigation, content scraping | Browser (Playwright) |
+
+All agents emit real-time step-by-step trace events streamed to the Tasks UI. Agents use the shared skill registry internally.
+
+> **Intent routing is automatic.** Say *"Write a JD for a senior engineer"* and the orchestrator routes to the HR Agent, which detects `jd` type, extracts the role, researches market benchmarks, and saves the result to Notion — all without you specifying any of this.
+
+---
+
+## 🔌 Integrations
+
+| Integration | Auth Method | Capabilities |
+|---|---|---|
+| **Notion** | OAuth 2.0 | Pages, databases, blocks, screenshots |
+| **Slack** | OAuth 2.0 | Post messages, list channels |
+| **ClickUp** | OAuth 2.0 | Create tasks, attach screenshots, list tasks |
+| **Google Workspace** | OAuth 2.0 | Gmail, Calendar, Docs, Sheets, Slides, Drive |
+| **GitHub** | Personal Access Token | Issues, PRs, repositories |
+
+All integration credentials are encrypted at rest using AES encryption (`CREWMATE_ENCRYPTION_KEY`) before storage in SQLite.
+
+---
+
+## 🗄️ Database Schema
+
+Crewmate uses **SQLite with 16 tables** for a zero-dependency, portable data layer:
+
+```
+users                   → User accounts
+workspaces              → Team workspaces
+workspace_members       → Membership + roles
+sessions                → Live session records
+session_messages        → Transcript per session
+agent_tasks             → Task run registry
+task_runs               → Detailed run records with step JSON
+activities              → Activity log feed
+notifications           → In-app notification inbox
+memory_records          → Vector-embedded memory store
+integration_connections → Encrypted integration configs
+oauth_states            → OAuth PKCE state table
+user_preferences        → Model + UX preferences per user
+screenshot_artifacts    → Screenshot metadata + access tokens
+auth_sessions           → Server-side session tokens
+schema_migrations       → Applied migration tracking
+```
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20+ and npm 10+
-- `GOOGLE_API_KEY` ([Get free at aistudio.google.com](https://aistudio.google.com/app/apikey))
 
-### Installation
-**Step 1: Clone the repository**
-```bash
-git clone https://github.com/YOUR_USER/crewmate-dashboard.git && cd crewmate-dashboard
-```
+- Node.js 20+
+- A [Gemini API Key](https://aistudio.google.com/app/apikey)
 
-**Step 2: Install dependencies**
+### 1. Clone & Install
+
 ```bash
+git clone https://github.com/your-org/crewmate.git
+cd crewmate
 npm install
 ```
 
-**Step 3: Configure environment**
+### 2. Configure Environment
+
 ```bash
 cp .env.example .env
 ```
-Open `.env` and set the required variables:
-```bash
-GOOGLE_API_KEY=AIza...            # Required — your Gemini API key
-CREWMATE_ENCRYPTION_KEY=abc123... # Required — openssl rand -hex 16
-TAVILY_API_KEY=tvly-...           # Strongly Recommended for Web Search
+
+Edit `.env` and fill in at minimum:
+
+```env
+# Required
+GOOGLE_API_KEY=your_gemini_api_key_here
+CREWMATE_ENCRYPTION_KEY=your_32_char_secret_here  # openssl rand -hex 16
+
+# Optional integrations (enable per demo needs)
+NOTION_TOKEN=
+SLACK_BOT_TOKEN=
+CLICKUP_TOKEN=
 ```
 
-**Step 4: Start the development server**
+### 3. Run
+
 ```bash
 npm run dev
 ```
 
-**Step 5: Open the app**
+This starts:
+- **Frontend** on `http://localhost:3000`
+- **Backend API** on `http://localhost:8787`
+
+On first run, the database is auto-created and migrated at `data/crewmate.db`.
+
+### 4. (Optional) Seed Demo Data
+
+For a fresh install with sample tasks, memories, and activities pre-loaded:
+
+```bash
+npm run seed
 ```
-http://localhost:5173
-```
-You are now running an entire multimodal AI company on your machine.
+
+This inserts 3 sample tasks, 3 memory records, and 4 activity log entries — so the dashboard never looks empty during a demo.
+
+In development mode, use any email. The auth code is returned in the API response and printed to server logs.
 
 ---
 
-## ☁️ Cloud Deployment (Google Cloud Run)
+## ☁️ Google Cloud Deployment
 
-Crewmate ships with a deployment script for GCP Cloud Run! Simply fire it:
+Crewmate is designed to run on **Google Cloud Run** using Docker.
+
+### Build & Deploy
+
 ```bash
-./cloud-deploy.sh YOUR_GCP_PROJECT_ID
+# Build the Docker image locally
+docker build -t crewmate .
+
+# OR use Cloud Build (no local Docker needed)
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/crewmate
+
+# Deploy to Cloud Run
+gcloud run deploy crewmate \
+  --image gcr.io/YOUR_PROJECT_ID/crewmate \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 1Gi \
+  --timeout 300 \
+  --set-env-vars "GOOGLE_API_KEY=...,CREWMATE_ENCRYPTION_KEY=..."
+
+# Or use the included deploy script:
+bash scripts/deploy-cloud-run.sh
 ```
-The script automatically builds the Docker container via Cloud Build, creates API keys in Google Secret Manager, and deploys to a fully autoscaled Cloud Run microservice instance. See our Hackathon demonstration video for proof of zero-downtime deployment.
+
+> The included `Dockerfile` uses a multi-stage build (Alpine Node.js) and includes a `HEALTHCHECK` pointing to `/api/health/live`.
+
+### Google Cloud Services Used
+
+| Service | Usage |
+|---|---|
+| **Google Cloud Run** | Container hosting for the Express backend |
+| **Firebase Authentication** | Production user identity and JWT verification |
+| **Google Gemini API** | Live audio/vision model, text models, embeddings |
+| **Google GenAI SDK** | `@google/genai` v1.44.0 — all Gemini API calls |
+| **Google Workspace APIs** | Gmail, Calendar, Docs, Sheets, Slides, Drive via OAuth |
+
+---
+
+## 🔐 Environment Variables Reference
+
+| Variable | Required | Description |
+|---|---|---|
+| `GOOGLE_API_KEY` | ✅ | Gemini API key |
+| `CREWMATE_ENCRYPTION_KEY` | ✅ | 32-char secret for credential encryption |
+| `PORT` | ⬜ | Server port (default: 8787) |
+| `CORS_ORIGIN` | ⬜ | Frontend origin (default: localhost:3000) |
+| `FIREBASE_PROJECT_ID` | ⬜ | Firebase project for production auth |
+| `FIREBASE_CLIENT_EMAIL` | ⬜ | Firebase service account email |
+| `FIREBASE_PRIVATE_KEY` | ⬜ | Firebase service account private key |
+| `SLACK_BOT_TOKEN` | ⬜ | Slack OAuth bot token |
+| `NOTION_TOKEN` | ⬜ | Notion integration token |
+| `CLICKUP_TOKEN` | ⬜ | ClickUp API token |
+| `GOOGLE_WORKSPACE_CLIENT_ID` | ⬜ | OAuth client for Workspace |
+| `TAVILY_API_KEY` | ⬜ | AI-optimized web search (falls back to DuckDuckGo) |
+
+See `.env.example` for the complete list.
+
+---
+
+## 🧪 Testing
+
+```bash
+# Type-check (TypeScript)
+npm run lint
+
+# Run all unit tests
+npm run test
+
+# Run smoke tests (production readiness checks)
+npm run test:smoke
+```
+
+Tests are in `*.test.ts` files alongside their source files. The smoke test suite validates startup config, DB connectivity, and key service contracts.
+
+---
+
+## 📁 Project Structure
+
+```
+crewmate/
+├── server/                    # Node.js + Express backend
+│   ├── routeModules/          # 8 REST route modules
+│   ├── services/              # Core services
+│   │   ├── liveGateway*.ts    # Gemini Live session management
+│   │   ├── orchestrator.ts    # Task routing engine
+│   │   ├── memoryService.ts   # Vector memory store
+│   │   ├── memoryIngestor.ts  # Write paths for memory
+│   │   ├── executionPolicy.ts # Inline vs delegated routing
+│   │   ├── agents/            # Specialist agent definitions
+│   │   └── ...                # Integration services (Notion, Slack, etc.)
+│   ├── skills/                # 44 registered skills
+│   │   ├── browser/           # Playwright-powered browser skills
+│   │   ├── communication/     # Slack
+│   │   ├── productivity/      # Notion, ClickUp, Google Workspace, Memory
+│   │   ├── research/          # Web search + URL summarization
+│   │   ├── code/              # Terminal execution
+│   │   ├── creative/          # Creative generation
+│   │   └── registry.ts        # Skill registry + runner
+│   ├── repositories/          # DB query layer
+│   ├── dbSchema.ts            # SQLite schema (16 tables)
+│   └── config.ts              # Centralized config with env vars
+│
+├── src/                       # React + Vite frontend
+│   ├── pages/                 # Route-level page components
+│   │   ├── Dashboard.tsx      # Live session + activity
+│   │   ├── Tasks.tsx          # Real-time task streaming
+│   │   ├── MemoryBase.tsx     # Memory knowledge base
+│   │   ├── Sessions.tsx       # Session history
+│   │   ├── Skills.tsx         # Skill palette
+│   │   ├── Integrations.tsx   # Integration management
+│   │   └── Account.tsx        # Preferences + personas
+│   ├── components/            # UI component library
+│   ├── contexts/              # LiveSessionContext, AuthContext
+│   ├── hooks/                 # useLiveSession, useSSE, etc.
+│   └── services/              # Frontend API clients
+│
+├── AGENT_ARCHITECTURE.md      # Full architecture deep-dive
+├── SOUL.md                    # Crewmate's identity and values
+└── .env.example               # All environment variables documented
+```
+
+---
+
+## 🧬 The Model Strategy
+
+Crewmate uses a **multi-model routing strategy** to balance quality, speed, and cost across every use case:
+
+| Role | Model | Used For |
+|---|---|---|
+| 🎙️ **Live audio** | `gemini-2.5-flash-native-audio-preview-12-2025` | Real-time bidirectional voice + screen sessions |
+| 🔬 **Research & agents** | `gemini-3.1-pro-preview` | All 13 specialist agents, deep research, multi-step reasoning |
+| 🧠 **Orchestration** | `gemini-3.1-pro-preview` | Intent classification, A2A routing decisions |
+| ⚡ **Text & quick tasks** | `gemini-3.1-flash-lite-preview` | Inline skill calls, fast responses, confirmations |
+| 🎨 **Creative / images** | `gemini-3.1-flash-image-preview` | Image generation, creative content |
+| 💬 **Lite / filler** | `gemini-3.1-flash-lite-preview` | Acknowledgements, simple Q&A |
+
+All models can be overridden via environment variables (`GEMINI_LIVE_MODEL`, `GEMINI_RESEARCH_MODEL`, etc.).
+
+---
+
+## 🙏 Acknowledgments
+
+Built for the **Gemini Live Agent Challenge** hackathon.
+
+Powered by:
+- [Google Gemini Live API](https://ai.google.dev/gemini-api/docs/live)
+- [Google GenAI SDK](https://www.npmjs.com/package/@google/genai)
+- [Firebase](https://firebase.google.com)
+- [React](https://react.dev) + [Vite](https://vitejs.dev)
+- [Playwright](https://playwright.dev) (browser automation)
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
 
 ---
 
 <div align="center">
 
-MIT © 2025 Crewmate
-Built for the **Google Gemini Live Agent Challenge 2025**.
+**Stop typing. Start operating.**
 
-> *"The best way to predict the future is to build it."* — and we just built your entire company.
+*Crewmate — From Static Chatbots to Immersive Experiences*
 
 </div>

@@ -1,13 +1,24 @@
 import type { Express, Request, Response } from 'express';
+import { z } from 'zod';
 import { serverConfig } from '../config';
-import { buildCalendarAuthUrl, exchangeCalendarCode } from '../services/calendarService';
 import { clearAuthSession, getAuthUser, requestLoginCode, verifyLoginCode } from '../services/authService';
-import { buildGmailAuthUrl, exchangeGmailCode } from '../services/gmailService';
+import { createRateLimitMiddleware } from '../services/rateLimit';
 
 const AUTH_REQUEST_WINDOW_MS = 10 * 60 * 1000;
 const AUTH_REQUEST_MIN_INTERVAL_MS = 30 * 1000;
 const AUTH_REQUEST_MAX_ATTEMPTS = 5;
 const authRequestTracker = new Map<string, number[]>();
+const authVerifyLimiter = createRateLimitMiddleware({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  message: 'Too many verification attempts. Please wait before trying again.',
+});
+const emailSchema = z.string().email().transform((value) => value.trim().toLowerCase());
+const requestCodeSchema = z.object({ email: emailSchema });
+const verifyCodeSchema = z.object({
+  email: emailSchema,
+  code: z.string().trim().regex(/^\d{6}$/),
+});
 
 function getAuthThrottleKey(email: string, req: Request): string {
   const forwardedFor = req.headers['x-forwarded-for'];
@@ -36,12 +47,13 @@ function isAuthRequestRateLimited(key: string, now: number): boolean {
 
 export function registerAuthRoutes(app: Express): void {
   app.post('/api/auth/request-code', (req: Request, res: Response) => {
-    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-
-    if (!email) {
-      res.status(400).json({ message: 'email is required' });
+    const parsed = requestCodeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: 'A valid email is required.' });
       return;
     }
+
+    const email = parsed.data.email;
 
     const now = Date.now();
     if (isAuthRequestRateLimited(getAuthThrottleKey(email, req), now)) {
@@ -53,14 +65,14 @@ export function registerAuthRoutes(app: Express): void {
     res.status(201).json(serverConfig.exposeDevAuthCode ? result : { email: result.email });
   });
 
-  app.post('/api/auth/verify', (req: Request, res: Response) => {
-    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
-
-    if (!email || !code) {
-      res.status(400).json({ message: 'email and code are required' });
+  app.post('/api/auth/verify', authVerifyLimiter, (req: Request, res: Response) => {
+    const parsed = verifyCodeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: 'A valid email and 6-digit code are required.' });
       return;
     }
+
+    const { email, code } = parsed.data;
 
     try {
       res.json(verifyLoginCode(email, code));
@@ -70,9 +82,7 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   app.get('/api/auth/me', (req: Request, res: Response) => {
-    const authHeader = req.headers.authorization ?? '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    const user = token ? getAuthUser(token) : null;
+    const user = (req as Request & { authUser?: ReturnType<typeof getAuthUser> }).authUser ?? null;
 
     if (!user) {
       res.status(401).json({ message: 'Unauthorized' });
@@ -85,59 +95,9 @@ export function registerAuthRoutes(app: Express): void {
   app.post('/api/auth/logout', (req: Request, res: Response) => {
     const authHeader = req.headers.authorization ?? '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-    if (token) {
+    if (token && token.startsWith('auth_')) {
       clearAuthSession(token);
     }
     res.status(204).send();
-  });
-
-  app.get('/api/auth/gmail', (req: Request, res: Response) => {
-    const token = (req.headers.authorization ?? '').replace('Bearer ', '');
-    const user = token ? getAuthUser(token) : null;
-    const workspaceId = user?.workspaceId ?? (req.query.workspaceId as string) ?? 'default';
-    res.redirect(buildGmailAuthUrl(workspaceId));
-  });
-
-  app.get('/api/auth/gmail/callback', async (req: Request, res: Response) => {
-    const code = req.query.code as string;
-    const workspaceId = (req.query.state as string) ?? 'default';
-
-    if (!code) {
-      res.status(400).send('Missing authorization code from Google');
-      return;
-    }
-
-    try {
-      await exchangeGmailCode(workspaceId, code);
-      res.redirect(`${process.env.CORS_ORIGIN ?? 'http://localhost:3000'}/integrations?connected=gmail`);
-    } catch (err) {
-      console.error('[Gmail OAuth] callback error:', err);
-      res.redirect(`${process.env.CORS_ORIGIN ?? 'http://localhost:3000'}/integrations?error=gmail_auth_failed`);
-    }
-  });
-
-  app.get('/api/auth/calendar', (req: Request, res: Response) => {
-    const token = (req.headers.authorization ?? '').replace('Bearer ', '');
-    const user = token ? getAuthUser(token) : null;
-    const workspaceId = user?.workspaceId ?? (req.query.workspaceId as string) ?? 'default';
-    res.redirect(buildCalendarAuthUrl(workspaceId));
-  });
-
-  app.get('/api/auth/calendar/callback', async (req: Request, res: Response) => {
-    const code = req.query.code as string;
-    const workspaceId = (req.query.state as string) ?? 'default';
-
-    if (!code) {
-      res.status(400).send('Missing authorization code from Google');
-      return;
-    }
-
-    try {
-      await exchangeCalendarCode(workspaceId, code);
-      res.redirect(`${process.env.CORS_ORIGIN ?? 'http://localhost:3000'}/integrations?connected=calendar`);
-    } catch (err) {
-      console.error('[Calendar OAuth] callback error:', err);
-      res.redirect(`${process.env.CORS_ORIGIN ?? 'http://localhost:3000'}/integrations?error=calendar_auth_failed`);
-    }
   });
 }

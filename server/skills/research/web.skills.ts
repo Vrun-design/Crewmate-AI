@@ -131,7 +131,6 @@ export const webSearchSkill: Skill = {
     description: 'Search the web for information. Uses Tavily AI-optimized search (set TAVILY_API_KEY) with DuckDuckGo as fallback. Use for research, news, competitive analysis.',
     version: '2.0.0',
     category: 'research',
-    personas: ['developer', 'marketer', 'founder', 'sales', 'designer'],
     requiresIntegration: [],
     triggerPhrases: [
         'Search the web for X',
@@ -140,6 +139,9 @@ export const webSearchSkill: Skill = {
         'Find current information about Z',
     ],
     preferredModel: 'quick',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'none',
     inputSchema: {
         type: 'object',
         properties: {
@@ -194,7 +196,6 @@ export const webSummarizeUrlSkill: Skill = {
     description: 'Fetch and summarize any web page. Use when the user shares a URL and wants its content extracted, or when researching a specific page.',
     version: '1.0.0',
     category: 'research',
-    personas: ['developer', 'marketer', 'founder', 'sales', 'designer'],
     requiresIntegration: [],
     triggerPhrases: [
         'Summarize this link',
@@ -203,6 +204,9 @@ export const webSummarizeUrlSkill: Skill = {
         'Read this article for me',
     ],
     preferredModel: 'research',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'none',
     exposeInLiveSession: true,
     liveFunctionBehavior: Behavior.NON_BLOCKING,
     inputSchema: {

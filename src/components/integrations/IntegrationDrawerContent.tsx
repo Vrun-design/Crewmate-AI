@@ -13,6 +13,10 @@ interface IntegrationDrawerContentProps {
 
 const GOOGLE_LOGO_URL = '/Google.svg';
 
+function getOAuthButtonLabel(integrationName: string, isConnected: boolean): string {
+  return isConnected ? `Reconnect ${integrationName}` : `Connect ${integrationName}`;
+}
+
 export function IntegrationDrawerContent({
   integration,
   onClose,
@@ -35,6 +39,11 @@ export function IntegrationDrawerContent({
 
   const isConnected = integration.status === 'connected';
   const isOAuth = Boolean(integration.connectUrl);
+  const oauthConnection = config?.connection;
+  const isGoogleWorkspace = integration.id === 'google-workspace';
+  const connectHref = isOAuth
+    ? `${import.meta.env.VITE_API_URL ?? ''}${integration.connectUrl}${integration.connectUrl?.includes('?') ? '&' : '?'}redirectPath=${encodeURIComponent('/integrations')}`
+    : '';
 
   async function handleSave(): Promise<void> {
     await saveConfig(formValues);
@@ -81,22 +90,81 @@ export function IntegrationDrawerContent({
           <div className="p-4 border border-green-500/20 bg-green-500/5 rounded-lg">
             <h4 className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">Ready for live tool calls</h4>
             <p className="text-xs text-muted-foreground">
-              Crewmate can use this integration in-session with the current saved workspace configuration.
+              Crewmate can use this integration in live sessions and background tasks with the current saved settings.
             </p>
           </div>
 
           {/* OAuth connected — show reconnect button instead of key form */}
           {isOAuth ? (
-            <div className="space-y-4">
-              <div className="p-4 border border-border rounded-lg bg-secondary/50 space-y-2">
-                <p className="text-xs text-muted-foreground">Authenticated via Google OAuth. Token is stored securely.</p>
-              </div>
+              <div className="space-y-4">
+                <div className="p-4 border border-border rounded-lg bg-secondary/50 space-y-2">
+                  <p className="text-xs text-muted-foreground">Authenticated via secure OAuth. Tokens are stored securely on the server.</p>
+                  {oauthConnection?.accountEmail || oauthConnection?.accountLabel ? (
+                    <p className="text-sm text-foreground">
+                      Connected as <span className="font-medium">{oauthConnection?.accountLabel ?? oauthConnection?.accountEmail}</span>
+                    </p>
+                  ) : null}
+                </div>
+                {oauthConnection ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-border bg-card p-4">
+                      <h5 className="text-sm font-medium text-foreground mb-2">Granted Access</h5>
+                      <div className="space-y-2">
+                        {(oauthConnection.grantedModules ?? []).map((moduleName) => (
+                          <div key={moduleName} className="flex items-center gap-2 text-sm text-foreground">
+                            <Check size={14} className="text-green-500" />
+                            {moduleName}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
+                      <h5 className="text-sm font-medium text-foreground mb-2">Needs Attention</h5>
+                      <div className="space-y-2">
+                        {(oauthConnection.missingModules ?? []).length > 0 ? (
+                          (oauthConnection.missingModules ?? []).map((moduleName) => (
+                            <div key={moduleName} className="text-sm text-muted-foreground">{moduleName}</div>
+                          ))
+                        ) : (
+                          <div className="text-sm text-muted-foreground">All planned modules are available.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                {config ? (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Settings size={16} className="text-muted-foreground" />
+                      Default Destinations
+                    </h4>
+                    <div className="space-y-3">
+                      {config.fields.map((field) => (
+                        <div key={field.key} className="space-y-2">
+                          <label className="text-sm font-medium text-foreground">{field.label}</label>
+                          <input
+                            type="text"
+                            placeholder={field.placeholder}
+                            value={formValues[field.key] ?? ''}
+                            onChange={(event) =>
+                              setFormValues((current) => ({ ...current, [field.key]: event.target.value }))
+                            }
+                            className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring"
+                          />
+                          {field.helpText ? <div className="text-xs text-muted-foreground">{field.helpText}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               <a
-                href={`${import.meta.env.VITE_API_URL ?? ''}${integration.connectUrl}`}
+                href={connectHref}
                 className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground transition-all hover:bg-accent hover:border-foreground/30"
               >
-                <img src={GOOGLE_LOGO_URL} alt="Google" className="w-5 h-5" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                Reconnect with Google
+                {isGoogleWorkspace ? (
+                  <img src={GOOGLE_LOGO_URL} alt="Google" className="w-5 h-5" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                ) : null}
+                {getOAuthButtonLabel(integration.name, true)}
                 <ExternalLink size={14} className="text-muted-foreground ml-auto" />
               </a>
             </div>
@@ -127,15 +195,17 @@ export function IntegrationDrawerContent({
           ) : null}
 
           {/* Capabilities */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-foreground flex items-center gap-2 px-1">
               <Settings size={16} className="text-muted-foreground" />
               Available Capabilities
             </h4>
-            <div className="space-y-2">
+            <div className="rounded-xl border border-border/50 bg-secondary/20 p-2">
               {capabilities.map((capability) => (
-                <div key={capability} className="flex items-center gap-2 p-3 border border-border rounded-lg bg-card text-sm text-foreground">
-                  <Check size={14} className="text-green-500" />
+                <div key={capability} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/40 last:border-0 text-sm text-foreground hover:bg-muted/5 transition-colors group">
+                  <div className="bg-green-500/10 p-1 rounded-md text-green-500 group-hover:bg-green-500/20 transition-colors">
+                    <Check size={12} strokeWidth={3} />
+                  </div>
                   {capability}
                 </div>
               ))}
@@ -144,15 +214,18 @@ export function IntegrationDrawerContent({
 
           {/* Permissions */}
           {!isOAuth && (integration.requiredKeys ?? []).length > 0 ? (
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground flex items-center gap-2 px-1">
                 <Shield size={16} className="text-muted-foreground" />
                 Permissions
               </h4>
-              <div className="p-4 border border-border rounded-lg bg-secondary/50 space-y-2">
+              <div className="rounded-xl border border-border/50 bg-secondary/20 p-2">
                 {(integration.requiredKeys ?? []).map((requiredKey) => (
-                  <div key={requiredKey} className="flex items-center gap-2 text-sm text-foreground">
-                    <Check size={14} className="text-green-500" /> {requiredKey}
+                  <div key={requiredKey} className="flex items-center gap-3 px-3 py-2.5 border-b border-border/40 last:border-0 text-sm text-foreground hover:bg-muted/5 transition-colors group">
+                    <div className="bg-green-500/10 p-1 rounded-md text-green-500 group-hover:bg-green-500/20 transition-colors">
+                      <Check size={12} strokeWidth={3} />
+                    </div>
+                    {requiredKey}
                   </div>
                 ))}
               </div>
@@ -170,7 +243,11 @@ export function IntegrationDrawerContent({
               <Button variant="primary" className="w-full" onClick={() => void handleSave()} disabled={isSaving}>
                 {isSaving ? 'Saving...' : 'Save Configuration'}
               </Button>
-            ) : null}
+            ) : (
+              <Button variant="primary" className="w-full" onClick={() => void handleSave()} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save Defaults'}
+              </Button>
+            )}
             {integration.docsUrl ? (
               <a
                 href={integration.docsUrl}
@@ -222,18 +299,25 @@ export function IntegrationDrawerContent({
           {isOAuth ? (
             <div className="pt-4 border-t border-border space-y-3">
               <a
-                href={`${import.meta.env.VITE_API_URL ?? ''}${integration.connectUrl}`}
+                href={connectHref}
                 className="flex items-center justify-center gap-3 w-full rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-foreground transition-all hover:bg-accent hover:border-foreground/30 hover:shadow-sm"
               >
-                <img
-                  src={GOOGLE_LOGO_URL}
-                  alt="Google"
-                  className="w-5 h-5"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-                Connect with Google
+                {isGoogleWorkspace ? (
+                  <img
+                    src={GOOGLE_LOGO_URL}
+                    alt="Google"
+                    className="w-5 h-5"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : null}
+                {getOAuthButtonLabel(integration.name, false)}
                 <ExternalLink size={14} className="text-muted-foreground ml-auto" />
               </a>
+              {isGoogleWorkspace ? (
+                <div className="rounded-lg border border-border bg-secondary/50 p-4 text-sm text-muted-foreground">
+                  One connection unlocks Gmail, Drive, Docs, Sheets, Slides, and Calendar. Gmail send and calendar invites still require confirmation before side effects.
+                </div>
+              ) : null}
               {integration.docsUrl ? (
                 <a
                   href={integration.docsUrl}

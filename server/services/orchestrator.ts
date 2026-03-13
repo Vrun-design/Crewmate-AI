@@ -1,375 +1,345 @@
-/**
- * A2A Orchestrator — Phase 11 (Inline agents + sub-step SSE streaming)
- *
- * Architecture:
- *   1. Classify intent via Gemini Flash
- *   2. Call the right specialist agent INLINE (same process — no HTTP hops)
- *   3. Each agent emits typed step events via emitStep callback → pushed to SSE
- *   4. User sees every skill call, result, and reasoning step in real-time
- *
- * Agent communication model:
- *   Agents → emitStep → orchestrator → SSE → UI
- *   Agents NEVER message the user directly. Only the orchestrator does.
- */
-import { createGeminiClient } from './geminiClient';
-import { serverConfig } from '../config';
-import type { SkillRunContext } from '../skills/types';
-import { listSkillsForUser, runSkill } from '../skills/registry';
-import { db } from '../db';
-import type { AgentStepEvent, AgentStepType, EmitStep } from '../types/agentEvents';
-import { runResearchAgent, RESEARCH_AGENT_MANIFEST } from './agents/researchAgent';
-import { runContentAgent, CONTENT_AGENT_MANIFEST } from './agents/contentAgent';
-import { runDevOpsAgent, DEVOPS_AGENT_MANIFEST } from './agents/devOpsAgent';
-import { runCommunicationsAgent, COMMS_AGENT_MANIFEST } from './agents/communicationsAgent';
-import { runCalendarAgent, CALENDAR_AGENT_MANIFEST } from './agents/calendarAgent';
-import { runSalesAgent, SALES_AGENT_MANIFEST } from './agents/salesAgent';
-import { runMarketingAgent, MARKETING_AGENT_MANIFEST } from './agents/marketingAgent';
-import { runProductAgent, PRODUCT_AGENT_MANIFEST } from './agents/productAgent';
-import { runHRAgent, HR_AGENT_MANIFEST } from './agents/hrAgent';
-import { runSupportAgent, SUPPORT_AGENT_MANIFEST } from './agents/supportAgent';
-import { runSocialAgent, SOCIAL_AGENT_MANIFEST } from './agents/socialAgent';
-import { runFinanceAgent, FINANCE_AGENT_MANIFEST } from './agents/financeAgent';
-import { runLegalAgent, LEGAL_AGENT_MANIFEST } from './agents/legalAgent';
-import { runDataAgent, DATA_AGENT_MANIFEST } from './agents/dataAgent';
-import { runUiNavigatorAgent, UI_NAVIGATOR_AGENT_MANIFEST } from './agents/uiNavigatorAgent';
 import { notifyTaskComplete } from './agentNotifier';
-import { isFeatureEnabled } from './featureFlagService';
+import { runAgentForRoutingDecision, AGENT_MANIFESTS } from './orchestratorAgents';
+import {
+  AgentTask,
+  completeCancelledTask,
+  createStepEmitter,
+  createTask,
+  emitTaskEvent,
+  getTask,
+  isCancellationRequested,
+  listActiveTasks,
+  listTasks,
+  routeIntent,
+  subscribeToTask,
+  updateTask,
+  cancelTask,
+} from './orchestratorShared';
+import { ingestAgentResult } from './memoryIngestor';
+import type { SkillRunContext } from '../skills/types';
+import { getSkill, runSkill } from '../skills/registry';
+import { getSkillRouteType, type RuntimeRouteType } from './executionPolicy';
 
-// ── Task record types ─────────────────────────────────────────────────────────
+export { AGENT_MANIFESTS, cancelTask, createTask, getTask, listTasks, subscribeToTask };
+export { listActiveTasks };
+export type { AgentTask, AgentTaskStatus } from './orchestratorShared';
 
-export type AgentTaskStatus = 'queued' | 'running' | 'completed' | 'failed';
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
 
-export interface AgentTask {
-    id: string;
-    agentId: string;
-    userId: string;
-    workspaceId: string;
-    intent: string;
-    status: AgentTaskStatus;
-    result?: unknown;
-    error?: string;
-    steps?: AgentStepEvent[];
-    createdAt: string;
-    updatedAt: string;
-    completedAt?: string;
+  return value as Record<string, unknown>;
 }
 
-// Ensure tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS agent_tasks (
-    id TEXT PRIMARY KEY,
-    agent_id TEXT NOT NULL,
-    user_id TEXT,
-    workspace_id TEXT,
-    intent TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'queued',
-    result_json TEXT,
-    error TEXT,
-    steps_json TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    completed_at TEXT
-  )
-`);
-
-// ── SSE event listeners ───────────────────────────────────────────────────────
-
-const taskListeners = new Map<string, Array<(event: string) => void>>();
-
-export function subscribeToTask(taskId: string, listener: (event: string) => void): () => void {
-    if (!taskListeners.has(taskId)) taskListeners.set(taskId, []);
-    taskListeners.get(taskId)!.push(listener);
-    return () => {
-        const list = taskListeners.get(taskId) ?? [];
-        const idx = list.indexOf(listener);
-        if (idx !== -1) list.splice(idx, 1);
-    };
+function getResultSuccess(result: unknown): boolean {
+  return asRecord(result)?.success !== false;
 }
 
-function emitTaskEvent(taskId: string, event: object): void {
-    const payload = `data: ${JSON.stringify(event)}\n\n`;
-    for (const listener of taskListeners.get(taskId) ?? []) listener(payload);
+function getResultErrorMessage(result: unknown): string {
+  const record = asRecord(result);
+  if (!record) {
+    return 'Task reported an unsuccessful result.';
+  }
+
+  const summary = typeof record.summary === 'string' ? record.summary.trim() : '';
+  if (summary) {
+    return summary;
+  }
+
+  const message = typeof record.message === 'string' ? record.message.trim() : '';
+  if (message) {
+    return message;
+  }
+
+  const output = asRecord(record.output);
+  const outputError = typeof output?.error === 'string' ? output.error.trim() : '';
+  if (outputError) {
+    return outputError;
+  }
+
+  return 'Task reported an unsuccessful result.';
 }
 
-// ── Task persistence ──────────────────────────────────────────────────────────
-
-export function createTask(agentId: string, intent: string, ctx: Pick<SkillRunContext, 'userId' | 'workspaceId'>): AgentTask {
-    const task: AgentTask = {
-        id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        agentId,
-        userId: ctx.userId,
-        workspaceId: ctx.workspaceId,
-        intent,
-        status: 'queued',
-        steps: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    };
-    db.prepare(`
-      INSERT INTO agent_tasks (id, agent_id, user_id, workspace_id, intent, status, steps_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(task.id, task.agentId, task.userId, task.workspaceId, task.intent, task.status, '[]', task.createdAt, task.updatedAt);
-    return task;
+function getTaskIdentifier(task: AgentTask): string {
+  return task.workspaceTaskId ?? task.id;
 }
 
-export function getTask(id: string, userId?: string): AgentTask | null {
-    const row = userId
-        ? db.prepare('SELECT * FROM agent_tasks WHERE id = ? AND user_id = ?').get(id, userId) as Record<string, unknown> | undefined
-        : db.prepare('SELECT * FROM agent_tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    return rowToTask(row);
+function logTaskFailure(taskId: string, errorMessage: string, error: unknown): void {
+  console.error(`[orchestrator] Task ${taskId} failed: ${errorMessage}`, error);
 }
 
-export function listTasks(userId: string, limit = 20): AgentTask[] {
-    const rows = db.prepare(`
-      SELECT * FROM agent_tasks
-      WHERE user_id = ?
-      ORDER BY created_at DESC
-      LIMIT ?
-    `).all(userId, limit) as Record<string, unknown>[];
-    return rows.map(rowToTask);
+function emitRunningStatus(task: AgentTask, agentId: string, routing?: { agent: string; confidence: number; reasoning: string }): void {
+  emitTaskEvent(task.id, {
+    type: 'status',
+    taskId: task.workspaceTaskId,
+    taskRunId: task.id,
+    status: 'running',
+    agentId,
+    routeType: task.routeType,
+    ...(routing ? { routing } : {}),
+  });
 }
 
-function rowToTask(row: Record<string, unknown>): AgentTask {
-    return {
-        id: String(row.id),
-        agentId: String(row.agent_id),
-        userId: String(row.user_id ?? ''),
-        workspaceId: String(row.workspace_id ?? ''),
-        intent: String(row.intent),
-        status: String(row.status) as AgentTaskStatus,
-        result: row.result_json ? JSON.parse(String(row.result_json)) as unknown : undefined,
-        error: row.error ? String(row.error) : undefined,
-        steps: row.steps_json ? JSON.parse(String(row.steps_json)) as AgentStepEvent[] : [],
-        createdAt: String(row.created_at),
-        updatedAt: String(row.updated_at),
-        completedAt: row.completed_at ? String(row.completed_at) : undefined,
-    };
+function emitTerminalTaskEvent(task: AgentTask, type: 'completed' | 'failed', payload: { result?: unknown; error?: string; steps: unknown[] }): void {
+  emitTaskEvent(task.id, {
+    type,
+    taskId: task.workspaceTaskId,
+    taskRunId: task.id,
+    routeType: task.routeType,
+    ...payload,
+    totalSteps: payload.steps.length,
+  });
 }
 
-function updateTask(id: string, patch: Partial<AgentTask>, steps?: AgentStepEvent[]): void {
-    const now = new Date().toISOString();
-    db.prepare(`
-    UPDATE agent_tasks
-    SET status = COALESCE(?, status),
-        result_json = COALESCE(?, result_json),
-        error = COALESCE(?, error),
-        steps_json = COALESCE(?, steps_json),
-        completed_at = COALESCE(?, completed_at),
-        updated_at = ?
-    WHERE id = ?
-  `).run(
-        patch.status ?? null,
-        patch.result !== undefined ? JSON.stringify(patch.result) : null,
-        patch.error ?? null,
-        steps ? JSON.stringify(steps) : null,
-        patch.completedAt ?? null,
-        now,
-        id,
-    );
-}
+async function runDelegatedSkillTask(
+  task: AgentTask,
+  ctx: SkillRunContext,
+  skillId: string,
+  args: Record<string, unknown>,
+): Promise<void> {
+  const skill = getSkill(skillId);
+  if (!skill) {
+    throw new Error(`Skill not found: ${skillId}`);
+  }
 
-// ── Agent registry (manifests for the UI) ────────────────────────────────────
+  const { emitStep, getSteps } = createStepEmitter(task);
+  emitRunningStatus(task, task.agentId);
+  emitStep('routing', `Delegating skill ${skillId}`, { detail: task.intent, skillId });
 
-export const AGENT_MANIFESTS = [
-    // Original 5
-    RESEARCH_AGENT_MANIFEST,
-    CONTENT_AGENT_MANIFEST,
-    DEVOPS_AGENT_MANIFEST,
-    COMMS_AGENT_MANIFEST,
-    CALENDAR_AGENT_MANIFEST,
-    // Phase 12 workforce expansion
-    SALES_AGENT_MANIFEST,
-    MARKETING_AGENT_MANIFEST,
-    PRODUCT_AGENT_MANIFEST,
-    HR_AGENT_MANIFEST,
-    SUPPORT_AGENT_MANIFEST,
-    SOCIAL_AGENT_MANIFEST,
-    FINANCE_AGENT_MANIFEST,
-    LEGAL_AGENT_MANIFEST,
-    DATA_AGENT_MANIFEST,
-    UI_NAVIGATOR_AGENT_MANIFEST,
-];
+  try {
+    emitStep('skill_call', `Running ${skillId}...`, { skillId });
+    const startedAt = Date.now();
+    const runRecord = await runSkill(skillId, {
+      ...ctx,
+      taskId: getTaskIdentifier(task),
+      taskRunId: task.id,
+      originType: task.originType,
+      originRef: task.originRef,
+    }, args);
+    const result = runRecord.result;
 
-// ── Intent routing via Gemini Flash ──────────────────────────────────────────
+    emitStep('skill_result', `${skillId} complete`, {
+      skillId,
+      durationMs: Date.now() - startedAt,
+      success: result.success !== false,
+      detail: typeof result.message === 'string' ? result.message : undefined,
+    });
 
-interface RoutingDecision {
-    agent: 'research' | 'content' | 'devops' | 'communications' | 'calendar'
-    | 'sales' | 'marketing' | 'product' | 'hr' | 'support' | 'social'
-    | 'finance' | 'legal' | 'data' | 'ui_navigator' | 'skill';
-    skillId?: string;
-    confidence: number;
-    reasoning: string;
-}
-
-async function routeIntent(intent: string, userId: string): Promise<RoutingDecision> {
-    if (isFeatureEnabled('uiNavigator')) {
-        const lowerIntent = intent.toLowerCase();
-        const looksLikeUiNavigatorRequest = lowerIntent.includes('ui navigator')
-            || lowerIntent.includes('start url:')
-            || /\b(click|fill|type into|press|scroll|open the site|navigate the ui|use the website)\b/.test(lowerIntent);
-
-        if (looksLikeUiNavigatorRequest) {
-            return {
-                agent: 'ui_navigator',
-                confidence: 0.95,
-                reasoning: 'Intent explicitly references browser UI navigation or direct on-page interaction.',
-            };
-        }
+    if (isCancellationRequested(task.id)) {
+      completeCancelledTask(task, getSteps(), 'Cancelled by user');
+      return;
     }
 
-    const ai = createGeminiClient();
-    const skills = listSkillsForUser(userId).map((s) => `${s.id}: ${s.description}`).join('\n');
+    const success = result.success !== false;
+    emitStep('done', success ? `${skill.name} completed` : `${skill.name} halted — see details`, { success });
+    const steps = getSteps();
+    if (typeof result.message === 'string' && steps.length > 0) {
+      steps[steps.length - 1] = { ...steps[steps.length - 1], detail: result.message };
+    }
 
-    const response = await ai.models.generateContent({
-        model: serverConfig.geminiOrchestrationModel,
-        contents: `You are an intent router for a 15-agent AI workforce. Route the user's intent to the most appropriate agent or direct skill.
+    if (!success) {
+      const errorMessage = getResultErrorMessage(result);
+      updateTask(task.id, {
+        userId: task.userId,
+        status: 'failed',
+        result,
+        error: errorMessage,
+        completedAt: new Date().toISOString(),
+      }, steps);
+      emitTerminalTaskEvent(task, 'failed', { result, error: errorMessage, steps });
+      return;
+    }
 
-Agents:
-- research: Deep research, market analysis, technical deep-dives, competitive intelligence
-- content: Blog posts, articles, documentation, any long-form writing
-- devops: Code review, GitHub, terminal commands, CI/CD, technical architecture
-- communications: Email drafting, Slack messages, outreach sequences, follow-ups
-- calendar: Scheduling, free time finding, meeting creation, agenda
-- sales: Lead research, outreach emails, CRM, sales copy, pipeline
-- marketing: Campaign briefs, A/B copy, marketing strategy, brand
-- product: User stories, PRD, backlog, sprint planning, feature specs
-- hr: Job descriptions, interviews, offer letters, onboarding, people ops
-- support: Customer responses, ticket triage, FAQ, escalations, playbooks
-- social: Tweet threads, LinkedIn posts, Instagram, social calendars
-- finance: Invoices, expense reports, budgets, financial templates
-- legal: Contract analysis, NDA review, compliance, policy drafts
-- data: SQL queries, data analysis, metrics, KPI reports, data stories
-- ui_navigator: Visual browser interaction, clicking, typing, scrolling, and navigating website UIs
+    updateTask(task.id, {
+      userId: task.userId,
+      status: 'completed',
+      result,
+      completedAt: new Date().toISOString(),
+    }, steps);
+    emitTerminalTaskEvent(task, 'completed', { result, steps });
+  } catch (error) {
+    if (isCancellationRequested(task.id)) {
+      completeCancelledTask(task, getSteps(), 'Cancelled by user');
+      return;
+    }
 
-Direct skills (for simple single atomic tasks):
-${skills}
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const steps = getSteps();
+    emitStep('error', `Failed: ${errorMessage}`, { success: false, skillId });
+    updateTask(task.id, {
+      userId: task.userId,
+      status: 'failed',
+      error: errorMessage,
+      completedAt: new Date().toISOString(),
+    }, steps);
+    emitTerminalTaskEvent(task, 'failed', { error: errorMessage, steps });
+  }
+}
 
-User intent: "${intent}"
+export async function delegateSkillExecution(
+  skillId: string,
+  ctx: SkillRunContext,
+  args: Record<string, unknown>,
+  options?: { intent?: string; originType?: AgentTask['originType']; originRef?: string },
+): Promise<{ taskId: string; routeType: RuntimeRouteType }> {
+  const skill = getSkill(skillId);
+  if (!skill) {
+    throw new Error(`Skill not found: ${skillId}`);
+  }
 
-Respond ONLY with valid JSON (no markdown, no explanation):
-{"agent":"<agent_name or 'skill'>","skillId":"<skill id if skill route, else null>","confidence":0.9,"reasoning":"<1 sentence>"}`,
+  const routeType = getSkillRouteType(skill, 'async');
+  const intent = options?.intent ?? `Run ${skill.name}`;
+  const task = createTask('skill-registry', intent, ctx, {
+    routeType,
+    delegatedSkillId: skillId,
+    delegatedSkillArgs: args,
+    originType: options?.originType ?? 'app',
+    originRef: options?.originRef,
+  });
 
+  void runDelegatedSkillTask(task, ctx, skillId, args);
+  return { taskId: getTaskIdentifier(task), routeType };
+}
+
+export async function orchestrate(
+  intent: string,
+  ctx: SkillRunContext,
+): Promise<{ taskId: string; result?: unknown; routeType: RuntimeRouteType }> {
+  const routing = await routeIntent(intent, ctx.userId);
+  const agentId = routing.agent === 'skill' ? 'skill-registry' : `crewmate-${routing.agent}-agent`;
+  const task = createTask(agentId, intent, ctx, {
+    routeType: routing.routeType ?? (routing.agent === 'skill' ? 'delegated_skill' : 'delegated_agent'),
+  });
+  const { emitStep, getSteps } = createStepEmitter(task);
+
+  async function runOrchestratedTask(): Promise<void> {
+    updateTask(task.id, { userId: task.userId, status: 'running' });
+    emitRunningStatus(task, agentId, {
+      agent: routing.agent,
+      confidence: routing.confidence,
+      reasoning: routing.reasoning,
+    });
+    emitStep('routing', `Routing to ${routing.agent === 'skill' ? `skill: ${routing.skillId}` : `${routing.agent} agent`}`, {
+      detail: routing.reasoning,
     });
 
     try {
-        const text = (response.text ?? '').replace(/```json\n?|\n?```/g, '').trim();
-        return JSON.parse(text) as RoutingDecision;
-    } catch {
-        return { agent: 'research', confidence: 0.5, reasoning: 'Fallback to research agent' };
-    }
-}
+      if (isCancellationRequested(task.id)) {
+        completeCancelledTask(task, getSteps(), 'Cancelled by user');
+        return;
+      }
 
-// ── Main orchestration entry point ────────────────────────────────────────────
-
-export async function orchestrate(
-    intent: string,
-    ctx: SkillRunContext,
-): Promise<{ taskId: string; result?: unknown }> {
-    // Classify intent
-    const routing = await routeIntent(intent, ctx.userId);
-    const agentId = routing.agent === 'skill'
-        ? 'skill-registry'
-        : `crewmate-${routing.agent}-agent`;
-
-    const task = createTask(agentId, intent, ctx);
-    const steps: AgentStepEvent[] = [];
-    let stepIndex = 0;
-
-    // emitStep builder — each agent calls this
-    const emitStep: EmitStep = (type: AgentStepType, label: string, options = {}) => {
-        const step: AgentStepEvent = {
-            taskId: task.id,
-            stepIndex: stepIndex++,
-            type,
-            timestamp: new Date().toISOString(),
-            label,
-            detail: options.detail,
-            skillId: options.skillId,
-            durationMs: options.durationMs,
-            success: options.success,
-        };
-        steps.push(step);
-        // Emit to SSE immediately
-        emitTaskEvent(task.id, { type: 'step', step });
-    };
-
-    // Run async in background
-    void (async () => {
-        updateTask(task.id, { status: 'running' });
-        emitTaskEvent(task.id, {
-            type: 'status',
-            status: 'running',
-            agentId,
-            routing: { agent: routing.agent, confidence: routing.confidence, reasoning: routing.reasoning },
+      let result: unknown;
+      if (routing.agent === 'skill' && routing.skillId) {
+        emitStep('skill_call', `Running ${routing.skillId}...`, { skillId: routing.skillId });
+        const startedAt = Date.now();
+        const runRecord = await runSkill(routing.skillId, {
+          ...ctx,
+          taskId: getTaskIdentifier(task),
+          originType: task.originType,
+          originRef: task.originRef,
+        }, {});
+        result = runRecord.result;
+        emitStep('skill_result', `${routing.skillId} complete`, {
+          skillId: routing.skillId,
+          durationMs: Date.now() - startedAt,
+          success: (result as { success?: boolean }).success !== false,
         });
+      } else {
+        result = await runAgentForRoutingDecision(routing, intent, ctx, emitStep);
+      }
 
-        // Emit the routing step
-        emitStep('routing', `Routing to ${routing.agent === 'skill' ? `skill: ${routing.skillId}` : `${routing.agent} agent`}`, {
-            detail: routing.reasoning,
-        });
+      if (isCancellationRequested(task.id)) {
+        completeCancelledTask(task, getSteps(), 'Cancelled by user');
+        return;
+      }
 
-        try {
-            let result: unknown;
+      const completedAt = new Date().toISOString();
+      const doneTask = getTask(task.id, ctx.userId);
+      const steps = getSteps();
+      const success = getResultSuccess(result);
 
-            if (routing.agent === 'skill' && routing.skillId) {
-                emitStep('skill_call', `Running ${routing.skillId}...`, { skillId: routing.skillId });
-                const t0 = Date.now();
-                const runRecord = await runSkill(routing.skillId, ctx, {});
-                result = runRecord.result;
-                emitStep('skill_result', `${routing.skillId} complete`, {
-                    skillId: routing.skillId,
-                    durationMs: Date.now() - t0,
-                    success: (result as { success?: boolean }).success !== false,
-                });
-            } else if (routing.agent === 'research') {
-                result = await runResearchAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'content') {
-                result = await runContentAgent(intent, ctx, emitStep, { researchFirst: true });
-            } else if (routing.agent === 'devops') {
-                result = await runDevOpsAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'communications') {
-                result = await runCommunicationsAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'calendar') {
-                result = await runCalendarAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'sales') {
-                result = await runSalesAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'marketing') {
-                result = await runMarketingAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'product') {
-                result = await runProductAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'hr') {
-                result = await runHRAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'support') {
-                result = await runSupportAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'social') {
-                result = await runSocialAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'finance') {
-                result = await runFinanceAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'legal') {
-                result = await runLegalAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'data') {
-                result = await runDataAgent(intent, ctx, emitStep);
-            } else if (routing.agent === 'ui_navigator') {
-                result = await runUiNavigatorAgent(intent, ctx, emitStep);
-            } else {
-                // Fallback to research
-                result = await runResearchAgent(intent, ctx, emitStep);
-            }
+      if (!success) {
+        const errorMessage = getResultErrorMessage(result);
+        updateTask(task.id, {
+          userId: task.userId,
+          status: 'failed',
+          result,
+          error: errorMessage,
+          completedAt,
+        }, steps);
+        emitTerminalTaskEvent(task, 'failed', { result, error: errorMessage, steps });
 
-            const doneTask = getTask(task.id, ctx.userId);
-            updateTask(task.id, { status: 'completed', result, completedAt: new Date().toISOString() }, steps);
-            emitTaskEvent(task.id, { type: 'completed', result, steps, totalSteps: steps.length });
-            if (doneTask) notifyTaskComplete(ctx.userId, { ...doneTask, status: 'completed', result, steps, completedAt: new Date().toISOString() }).catch(e => console.error('[agentNotifier] success notification failed:', e));
-
-        } catch (err) {
-            emitStep('error', `Failed: ${String(err)}`, { success: false });
-            updateTask(task.id, { status: 'failed', error: String(err), completedAt: new Date().toISOString() }, steps);
-            emitTaskEvent(task.id, { type: 'failed', error: String(err), steps });
-            notifyTaskComplete(ctx.userId, { ...task, status: 'failed', error: String(err), steps, completedAt: new Date().toISOString() }).catch(e => console.error('[agentNotifier] failure notification failed:', e));
-
+        if (doneTask) {
+          void notifyTaskComplete(ctx.userId, {
+            ...doneTask,
+            status: 'failed',
+            result,
+            error: errorMessage,
+            steps,
+            completedAt,
+          }).catch((error) => console.error('[agentNotifier] failure notification failed:', error));
         }
-    })();
+        return;
+      }
 
-    return { taskId: task.id };
+      updateTask(task.id, {
+        userId: task.userId,
+        status: 'completed',
+        result,
+        completedAt,
+      }, steps);
+      ingestAgentResult({
+        userId: ctx.userId,
+        workspaceId: ctx.workspaceId,
+        agentId: routing.agent,
+        intent,
+        result,
+        taskId: getTaskIdentifier(task),
+        originType: task.originType,
+        originRef: task.originRef,
+      });
+      emitTerminalTaskEvent(task, 'completed', { result, steps });
+
+      if (doneTask) {
+        void notifyTaskComplete(ctx.userId, {
+          ...doneTask,
+          status: 'completed',
+          result,
+          steps,
+          completedAt,
+        }).catch((error) => console.error('[agentNotifier] success notification failed:', error));
+      }
+    } catch (error) {
+      if (isCancellationRequested(task.id)) {
+        completeCancelledTask(task, getSteps(), 'Cancelled by user');
+        return;
+      }
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const completedAt = new Date().toISOString();
+      const steps = getSteps();
+      logTaskFailure(task.id, errorMessage, error);
+      emitStep('error', `Failed: ${errorMessage}`, { success: false });
+      updateTask(task.id, {
+        userId: task.userId,
+        status: 'failed',
+        error: errorMessage,
+        completedAt,
+      }, steps);
+      emitTerminalTaskEvent(task, 'failed', { error: errorMessage, steps });
+      void notifyTaskComplete(ctx.userId, {
+        ...task,
+        status: 'failed',
+        error: errorMessage,
+        steps,
+        completedAt,
+      }).catch((notifyError) => console.error('[agentNotifier] failure notification failed:', notifyError));
+    }
+  }
+
+  void runOrchestratedTask();
+
+  return { taskId: getTaskIdentifier(task), routeType: task.routeType };
 }

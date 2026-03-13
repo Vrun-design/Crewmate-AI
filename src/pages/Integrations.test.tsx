@@ -7,17 +7,29 @@ import {Integrations} from './Integrations';
 const {refreshMock, integrationConfigMock} = vi.hoisted(() => ({
   refreshMock: vi.fn(),
   integrationConfigMock: {
-    integrationId: 'github',
+    integrationId: 'google-workspace',
     configuredVia: 'vault' as const,
     fields: [
       {
-        key: 'token',
-        label: 'Access token',
-        placeholder: 'ghp_...',
-        secret: true,
+        key: 'defaultCalendarId',
+        label: 'Default calendar ID',
+        placeholder: 'primary',
+        secret: false,
         configured: true,
+        value: 'primary',
       },
     ],
+    connection: {
+      status: 'connected' as const,
+      accountEmail: 'owner@example.com',
+      accountLabel: 'Owner User',
+      grantedModules: ['gmail', 'docs', 'sheets'],
+      missingModules: ['slides', 'calendar'],
+      grantedScopes: ['openid'],
+      defaults: {
+        defaultCalendarId: 'primary',
+      },
+    },
   },
 }));
 
@@ -25,16 +37,17 @@ vi.mock('../hooks/useIntegrations', () => ({
   useIntegrations: () => ({
     integrations: [
       {
-        id: 'github',
-        name: 'GitHub',
+        id: 'google-workspace',
+        name: 'Google Workspace',
         status: 'connected',
-        icon: () => <span>GH</span>,
+        icon: () => <span>N</span>,
         color: 'text-foreground',
         bgColor: 'bg-foreground/10',
-        desc: 'Create issues',
-        setupSteps: ['Create token'],
-        capabilities: ['Create issues'],
-        requiredKeys: ['token', 'repoOwner', 'repoName'],
+        desc: 'Create docs',
+        connectUrl: '/api/integrations/google-workspace/connect',
+        setupSteps: ['Connect account'],
+        capabilities: ['Create and append Google Docs'],
+        requiredKeys: [],
         missingKeys: [],
       },
     ],
@@ -67,6 +80,8 @@ describe('Integrations', () => {
 
     fireEvent.click(screen.getByRole('button', {name: /configure|connect/i}));
 
-    expect(screen.getByText('Configure GitHub')).toBeInTheDocument();
+    expect(screen.getByText('Configure Google Workspace')).toBeInTheDocument();
+    expect(screen.getByText(/Connected as/i)).toBeInTheDocument();
+    expect(screen.getByText('Default calendar ID')).toBeInTheDocument();
   });
 });

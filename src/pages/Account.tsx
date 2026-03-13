@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, Keyboard, Settings2, User, Users, MonitorUp, Activity } from 'lucide-react';
+import { Cpu, Keyboard, Settings2, User } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { EmptyStateCard } from '../components/shared/EmptyStateCard';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -9,13 +9,9 @@ import { useAuth } from '../hooks/useAuth';
 import { usePreferences } from '../hooks/usePreferences';
 import { authService, authStorage } from '../services/authService';
 import { AccountSidebar } from '../components/account/AccountSidebar';
-import { PreferencesPanel } from '../components/account/PreferencesPanel';
 import { ProfilePanel } from '../components/account/ProfilePanel';
 import { RuntimeConfigPanel } from '../components/account/RuntimeConfigPanel';
 import { ShortcutsPanel } from '../components/account/ShortcutsPanel';
-import { PersonasPanel } from '../components/account/PersonasPanel';
-import { SessionHistoryPanel } from '../components/account/SessionHistoryPanel';
-import { ActivityLogPanel } from '../components/account/ActivityLogPanel';
 import type { AccountPreferences, AccountTab, AccountTabId } from '../components/account/accountTypes';
 
 const DEFAULT_PREFERENCES: AccountPreferences = {
@@ -30,9 +26,7 @@ const DEFAULT_PREFERENCES: AccountPreferences = {
 
 const ACCOUNT_TABS: AccountTab[] = [
   { id: 'profile', label: 'My Profile', icon: User },
-  { id: 'personas', label: 'Personas', icon: Users },
   { id: 'ai-models', label: 'AI Models', icon: Cpu },
-  { id: 'preferences', label: 'Preferences', icon: Settings2 },
   { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
 ];
 
@@ -98,20 +92,9 @@ export function Account(): React.JSX.Element {
     switch (activeTab) {
       case 'profile':
         return <ProfilePanel initials={initials} user={user} onLogout={() => void handleLogout()} />;
-      case 'personas':
-        return <PersonasPanel />;
       case 'ai-models':
         return (
           <RuntimeConfigPanel
-            currentPreferences={currentPreferences}
-            isPreferencesLoading={isPreferencesLoading}
-            isPreferencesSaving={isPreferencesSaving}
-            updatePreferences={updatePreferences}
-          />
-        );
-      case 'preferences':
-        return (
-          <PreferencesPanel
             currentPreferences={currentPreferences}
             isPreferencesLoading={isPreferencesLoading}
             isPreferencesSaving={isPreferencesSaving}
@@ -127,7 +110,7 @@ export function Account(): React.JSX.Element {
 
   return (
     <div className="space-y-6 pb-10">
-      <PageHeader title="Account & Settings" description="Manage your profile, personas, live voice, and workspace preferences." />
+      <PageHeader title="Account & Settings" description="Manage your profile, live voice, and workspace preferences." />
 
       {isLoading ? (
         <Card>

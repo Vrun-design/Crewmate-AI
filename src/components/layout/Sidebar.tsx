@@ -35,14 +35,14 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
       { to: '/agents', icon: Network, label: 'Crew Network' },
+      { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
     ],
   },
   {
     title: 'Workspace',
     items: [
-      { to: '/memory', icon: BrainCircuit, label: 'Memory Base' },
+      { to: '/memory', icon: BrainCircuit, label: 'Memory' },
       { to: '/sessions', icon: MonitorUp, label: 'Sessions' },
-      { to: '/tasks', icon: CheckSquare, label: 'Tasks' },
       { to: '/skills', icon: Cpu, label: 'Skills Hub' },
     ],
   },

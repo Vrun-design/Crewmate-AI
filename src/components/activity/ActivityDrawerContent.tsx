@@ -1,14 +1,15 @@
 import React from 'react';
-import {AlignLeft, Clock} from 'lucide-react';
-import {Button} from '../ui/Button';
-import {getActivityBadge} from './activityLogUtils';
-import type {Activity} from '../../types';
+import { AlignLeft, Clock } from 'lucide-react';
+import type { Activity } from '../../types';
+import { Button } from '../ui/Button';
+import { PropertyRow } from '../ui/PropertyRow';
+import { getActivityBadge } from './activityLogUtils';
 
 interface ActivityDrawerContentProps {
   activity: Activity | null;
 }
 
-export function ActivityDrawerContent({activity}: ActivityDrawerContentProps): React.ReactNode {
+export function ActivityDrawerContent({ activity }: ActivityDrawerContentProps): React.ReactNode {
   if (!activity) {
     return null;
   }
@@ -23,19 +24,11 @@ export function ActivityDrawerContent({activity}: ActivityDrawerContentProps): R
         <h3 className="text-xl font-semibold text-foreground">{activity.title}</h3>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <Clock size={14} /> Time
-          </div>
-          <div className="text-sm font-medium text-foreground">{activity.time}</div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <AlignLeft size={14} /> Type
-          </div>
-          <div className="text-sm font-medium text-foreground capitalize">{activity.type}</div>
-        </div>
+      <div className="rounded-xl border border-border/50 bg-secondary/20 p-4">
+        <PropertyRow icon={Clock} label="Time" value={activity.time} />
+        <PropertyRow icon={AlignLeft} label="Type">
+          <span className="capitalize">{activity.type}</span>
+        </PropertyRow>
       </div>
 
       <div className="space-y-2">
@@ -43,12 +36,12 @@ export function ActivityDrawerContent({activity}: ActivityDrawerContentProps): R
           <AlignLeft size={16} className="text-muted-foreground" />
           Description
         </div>
-        <div className="text-sm text-muted-foreground bg-secondary/50 p-4 rounded-xl border border-border">
+        <div className="text-sm text-foreground/90 font-medium leading-relaxed">
           {activity.description}
         </div>
       </div>
 
-      <div className="pt-4 border-t border-border flex gap-3">
+      <div className="flex gap-3 border-t border-border pt-4">
         <Button variant="secondary" className="flex-1">
           View Raw Context
         </Button>

@@ -18,6 +18,7 @@ export type AgentStepType =
 
 export interface AgentStepEvent {
     taskId: string;
+    taskRunId?: string;
     stepIndex: number;
     type: AgentStepType;
     timestamp: string;

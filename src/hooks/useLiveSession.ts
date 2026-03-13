@@ -1,14 +1,30 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { GoogleGenAI, createUserContent, type Session } from '@google/genai';
 import { ApiError } from '../lib/api';
 import { liveSessionService } from '../services/liveSessionService';
+import { createAudioBuffer, stopAudioSource } from './liveSessionAudio';
+import { handleDirectLiveMessage } from './liveSessionDirect';
+import {
+  getElapsedLabel,
+  getErrorMessage,
+  mergeSessionState,
+  mergeStreamingText,
+  normalizeText,
+  upsertTranscript,
+} from './liveSessionUtils';
 import { useLiveEvents } from './useLiveEvents';
-import type { AudioChunk, LiveSession } from '../types/live';
+import type { AudioChunk, LiveSession, LiveToolCall, TranscriptMessage } from '../types/live';
 
 const AUDIO_POLL_MS = 200;
+const DIRECT_CLIENT_API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? import.meta.env.VITE_GOOGLE_API_KEY ?? '';
+const DIRECT_LIVE_ENABLED = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DIRECT_LIVE === 'true';
+const CAN_USE_DIRECT_LIVE = DIRECT_LIVE_ENABLED && Boolean(DIRECT_CLIENT_API_KEY);
 
 interface UseLiveSessionOptions {
   initialSession: LiveSession | null;
   onSessionChange?: () => Promise<void> | void;
+  eventsEnabled?: boolean;
+  prepareToolCalls?: (calls: LiveToolCall[]) => Promise<LiveToolCall[]>;
 }
 
 interface UseLiveSessionResult {
@@ -21,81 +37,14 @@ interface UseLiveSessionResult {
   startSession: () => Promise<LiveSession | null>;
   endSession: () => Promise<void>;
   sendMessage: (text: string, sessionIdOverride?: string) => Promise<void>;
+  sendAudioChunk: (payload: { mimeType: string; data: string }) => Promise<void>;
+  endAudioInput: () => Promise<void>;
+  sendVideoFrame: (payload: { mimeType: string; data: string }) => Promise<void>;
 }
 
-export function getElapsedLabel(startedAt: string): string {
-  const diffSeconds = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
-  const mins = Math.floor(diffSeconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const secs = (diffSeconds % 60).toString().padStart(2, '0');
-  return `${mins}:${secs}`;
-}
+type TransportMode = 'relay' | 'direct' | null;
 
-function mergeSessionState(
-  initialSession: LiveSession | null,
-  currentSession: LiveSession | null,
-): LiveSession | null {
-  if (!initialSession) {
-    return currentSession;
-  }
-
-  if (!currentSession || currentSession.id !== initialSession.id) {
-    return initialSession;
-  }
-
-  return {
-    ...currentSession,
-    ...initialSession,
-    provider: initialSession.provider ?? currentSession?.provider,
-  };
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}
-
-function decodeBase64(base64: string): ArrayBuffer {
-  const binary = window.atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes.buffer;
-}
-
-function getSampleRate(mimeType: string): number {
-  const match = mimeType.match(/rate=(\d+)/i);
-  return match ? Number.parseInt(match[1], 10) : 24000;
-}
-
-function createAudioBuffer(audioContext: AudioContext, chunk: AudioChunk): AudioBuffer {
-  const pcmBytes = decodeBase64(chunk.data);
-  const pcm = new Int16Array(pcmBytes);
-  const sampleRate = getSampleRate(chunk.mimeType);
-  const buffer = audioContext.createBuffer(1, pcm.length, sampleRate);
-  const channel = buffer.getChannelData(0);
-
-  for (let index = 0; index < pcm.length; index += 1) {
-    channel[index] = pcm[index] / 0x8000;
-  }
-
-  return buffer;
-}
-
-function stopAudioSource(source: AudioBufferSourceNode | null): void {
-  if (!source) {
-    return;
-  }
-
-  try {
-    source.stop();
-  } catch {
-    // Ignore stop races during interruption and teardown.
-  }
-}
-
-export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessionOptions): UseLiveSessionResult {
+export function useLiveSession({ initialSession, onSessionChange, eventsEnabled = true, prepareToolCalls }: UseLiveSessionOptions): UseLiveSessionResult {
   const [session, setSession] = useState<LiveSession | null>(initialSession);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +59,21 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
   const stopPollingRef = useRef(false);
   const isAudioPollingRef = useRef(false);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const directSessionRef = useRef<Session | null>(null);
+  const transportModeRef = useRef<TransportMode>(null);
+  const directAudioChunkIdRef = useRef(0);
+  const directAssistantTextRef = useRef('');
+  const directUserTextRef = useRef('');
+  const sessionIdRef = useRef<string | null>(initialSession?.id ?? null);
+
+  const ensureAudioContext = useCallback(async () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new window.AudioContext();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+  }, []);
 
   const interruptPlayback = useCallback(() => {
     audioQueueRef.current = [];
@@ -119,9 +83,121 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     setIsAssistantSpeaking(false);
   }, []);
 
+  const queueAudioChunk = useCallback((chunk: AudioChunk) => {
+    audioQueueRef.current.push(chunk);
+    setIsAssistantSpeaking(true);
+
+    void ensureAudioContext().then(() => {
+      if (!audioContextRef.current || isPlayingAudioRef.current) {
+        return;
+      }
+
+      isPlayingAudioRef.current = true;
+      void (async () => {
+        while (audioQueueRef.current.length > 0 && audioContextRef.current) {
+          const nextChunk = audioQueueRef.current.shift();
+          if (!nextChunk) {
+            continue;
+          }
+
+          await new Promise<void>((resolve) => {
+            const audioContext = audioContextRef.current!;
+            const source = audioContext.createBufferSource();
+            const buffer = createAudioBuffer(audioContext, nextChunk);
+            currentSourceRef.current = source;
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.addEventListener('ended', () => {
+              if (currentSourceRef.current === source) {
+                currentSourceRef.current = null;
+              }
+              resolve();
+            }, { once: true });
+            source.start();
+          });
+        }
+
+        window.setTimeout(() => {
+          if (audioContextRef.current && !currentSourceRef.current) {
+            isPlayingAudioRef.current = false;
+            setIsAssistantSpeaking(false);
+          }
+        }, 80);
+      })().catch((playbackError: unknown) => {
+        isPlayingAudioRef.current = false;
+        setIsAssistantSpeaking(false);
+        setError(getErrorMessage(playbackError, 'Unable to play live audio response'));
+      });
+    }).catch((audioError: unknown) => {
+      setError(getErrorMessage(audioError, 'Unable to initialize live audio playback'));
+    });
+  }, [ensureAudioContext]);
+
+  const persistCompletedTurn = useCallback(async (userText: string, assistantText: string) => {
+    const currentSessionId = sessionIdRef.current;
+    if (!currentSessionId || (!userText && !assistantText)) {
+      return;
+    }
+
+    try {
+      const nextSession = await liveSessionService.persistTurn(currentSessionId, {
+        userText: userText || undefined,
+        assistantText: assistantText || undefined,
+      });
+      setSession((currentSession) => ({
+        ...nextSession,
+        provider: currentSession?.provider ?? nextSession.provider,
+      }));
+      await onSessionChange?.();
+    } catch (persistError) {
+      setError(getErrorMessage(persistError, 'Unable to persist live turn'));
+    }
+  }, [onSessionChange]);
+
+  const applyDirectTranscript = useCallback((role: TranscriptMessage['role'], text: string, status: TranscriptMessage['status']) => {
+    setSession((currentSession) => {
+      if (!currentSession) {
+        return currentSession;
+      }
+
+      return {
+        ...currentSession,
+        transcript: upsertTranscript(currentSession.transcript, role, text, status),
+      };
+    });
+  }, []);
+
+  const handleDirectMessage = useCallback(async (message: Record<string, any>) => {
+    await handleDirectLiveMessage({
+      message,
+      directAssistantTextRef,
+      directAudioChunkIdRef,
+      directSessionRef: directSessionRef as React.MutableRefObject<{ sendToolResponse: (payload: { functionResponses: unknown[] }) => void } | null>,
+      directUserTextRef,
+      sessionIdRef,
+      prepareToolCalls,
+      applyDirectTranscript,
+      interruptPlayback,
+      persistCompletedTurn,
+      queueAudioChunk,
+      setError,
+      incrementPlaybackRevision: () => {
+        setSession((currentSession) => currentSession ? {
+          ...currentSession,
+          playbackRevision: (currentSession.playbackRevision ?? 0) + 1,
+        } : currentSession);
+      },
+    });
+  }, [applyDirectTranscript, interruptPlayback, persistCompletedTurn, prepareToolCalls, queueAudioChunk]);
+
   useEffect(() => {
     setSession((currentSession) => mergeSessionState(initialSession, currentSession));
+    sessionIdRef.current = initialSession?.id ?? sessionIdRef.current;
   }, [initialSession]);
+
+  useEffect(() => {
+    sessionIdRef.current = session?.id ?? null;
+  }, [session?.id]);
 
   useEffect(() => {
     if (!session || session.status !== 'live') {
@@ -139,7 +215,9 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
   }, [session]);
 
   const refreshSession = useCallback(() => {
-    if (!session?.id) return;
+    if (!session?.id || transportModeRef.current === 'direct') {
+      return;
+    }
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
@@ -160,10 +238,11 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
             setError('Live session polling route is unavailable. Restart `npm run dev:server` and start a new session.');
           }
         });
-    }, 300);
+    }, 200);
   }, [session?.id]);
 
   useLiveEvents({
+    enabled: eventsEnabled,
     onSessionUpdate: (data) => {
       if (data.sessionId === session?.id) {
         refreshSession();
@@ -176,7 +255,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
   const sessionPlaybackRevision = session?.playbackRevision;
 
   useEffect(() => {
-    if (!sessionId || sessionStatus !== 'live') {
+    if (!sessionId || sessionStatus !== 'live' || transportModeRef.current === 'direct') {
       lastAudioChunkIdRef.current = 0;
       lastPlaybackRevisionRef.current = 0;
       stopPollingRef.current = false;
@@ -208,51 +287,8 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
           }
 
           lastAudioChunkIdRef.current = chunks[chunks.length - 1].id;
-          audioQueueRef.current.push(...chunks);
-          setIsAssistantSpeaking(true);
-
-          if (!audioContextRef.current) {
-            audioContextRef.current = new window.AudioContext();
-          }
-          if (audioContextRef.current.state === 'suspended') {
-            void audioContextRef.current.resume();
-          }
-
-          if (!isPlayingAudioRef.current && audioContextRef.current) {
-            isPlayingAudioRef.current = true;
-            void (async () => {
-              while (audioQueueRef.current.length > 0 && audioContextRef.current) {
-                const nextChunk = audioQueueRef.current.shift();
-                if (nextChunk) {
-                  await new Promise<void>((resolve) => {
-                    const audioContext = audioContextRef.current!;
-                    const source = audioContext.createBufferSource();
-                    const buffer = createAudioBuffer(audioContext, nextChunk);
-                    currentSourceRef.current = source;
-                    source.buffer = buffer;
-                    source.connect(audioContext.destination);
-                    source.addEventListener('ended', () => {
-                      if (currentSourceRef.current === source) {
-                        currentSourceRef.current = null;
-                      }
-                      resolve();
-                    }, { once: true });
-                    source.start();
-                  });
-                }
-              }
-
-              window.setTimeout(() => {
-                if (audioContextRef.current && !currentSourceRef.current) {
-                  isPlayingAudioRef.current = false;
-                  setIsAssistantSpeaking(false);
-                }
-              }, 120);
-            })().catch((playbackError: unknown) => {
-              isPlayingAudioRef.current = false;
-              setIsAssistantSpeaking(false);
-              setError(getErrorMessage(playbackError, 'Unable to play live audio response'));
-            });
+          for (const chunk of chunks) {
+            queueAudioChunk(chunk);
           }
         })
         .catch((pollError: unknown) => {
@@ -267,7 +303,7 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     return () => {
       window.clearInterval(audioInterval);
     };
-  }, [interruptPlayback, sessionId, sessionStatus, sessionPlaybackRevision]);
+  }, [interruptPlayback, queueAudioChunk, sessionId, sessionStatus, sessionPlaybackRevision]);
 
   useEffect(() => {
     return () => {
@@ -278,6 +314,8 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
       if (audioContext) {
         void audioContext.close();
       }
+      directSessionRef.current?.close();
+      directSessionRef.current = null;
     };
   }, []);
 
@@ -286,13 +324,44 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     setError(null);
 
     try {
+      await ensureAudioContext();
+
+      if (CAN_USE_DIRECT_LIVE) {
+        const direct = await liveSessionService.startDirect();
+        const ai = new GoogleGenAI({ apiKey: DIRECT_CLIENT_API_KEY });
+        const liveSession = await ai.live.connect({
+          model: direct.bootstrap.model,
+          config: direct.bootstrap.config as any,
+          callbacks: {
+            onmessage: (message) => {
+              void handleDirectMessage(message as Record<string, any>);
+            },
+            onerror: (event) => {
+              setError(event?.error instanceof Error ? event.error.message : 'Gemini Live connection error.');
+            },
+            onclose: () => {
+              interruptPlayback();
+            },
+          },
+        });
+
+        directSessionRef.current = liveSession;
+        transportModeRef.current = 'direct';
+        directAssistantTextRef.current = '';
+        directUserTextRef.current = '';
+        directAudioChunkIdRef.current = 0;
+        setSession(direct.session);
+        stopPollingRef.current = true;
+        lastAudioChunkIdRef.current = 0;
+        lastPlaybackRevisionRef.current = direct.session.playbackRevision ?? 0;
+        audioQueueRef.current = [];
+        setIsAssistantSpeaking(false);
+        await onSessionChange?.();
+        return direct.session;
+      }
+
       const next = await liveSessionService.start();
-      if (!audioContextRef.current) {
-        audioContextRef.current = new window.AudioContext();
-      }
-      if (audioContextRef.current.state === 'suspended') {
-        await audioContextRef.current.resume();
-      }
+      transportModeRef.current = 'relay';
       setSession(next);
       stopPollingRef.current = false;
       lastAudioChunkIdRef.current = 0;
@@ -318,8 +387,13 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     setError(null);
 
     try {
+      if (transportModeRef.current === 'direct') {
+        directSessionRef.current?.close();
+        directSessionRef.current = null;
+      }
       const next = await liveSessionService.end(session.id);
       setSession(next);
+      transportModeRef.current = null;
       interruptPlayback();
       await onSessionChange?.();
     } catch (endError) {
@@ -339,6 +413,16 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     setError(null);
 
     try {
+      if (transportModeRef.current === 'direct' && directSessionRef.current) {
+        directUserTextRef.current = text.trim();
+        applyDirectTranscript('user', directUserTextRef.current, 'complete');
+        directSessionRef.current.sendClientContent({
+          turns: createUserContent(text),
+          turnComplete: true,
+        });
+        return;
+      }
+
       const next = await liveSessionService.sendMessage(targetSessionId, text);
       setSession(next);
     } catch (messageError) {
@@ -347,6 +431,48 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
       setIsBusy(false);
     }
   };
+
+  const sendAudioChunk = useCallback(async (payload: { mimeType: string; data: string }) => {
+    const targetSessionId = sessionIdRef.current;
+    if (!targetSessionId) {
+      return;
+    }
+
+    if (transportModeRef.current === 'direct' && directSessionRef.current) {
+      directSessionRef.current.sendRealtimeInput({ audio: payload });
+      return;
+    }
+
+    await liveSessionService.sendAudio(targetSessionId, payload);
+  }, []);
+
+  const endAudioInput = useCallback(async () => {
+    const targetSessionId = sessionIdRef.current;
+    if (!targetSessionId) {
+      return;
+    }
+
+    if (transportModeRef.current === 'direct' && directSessionRef.current) {
+      directSessionRef.current.sendRealtimeInput({ audioStreamEnd: true });
+      return;
+    }
+
+    await liveSessionService.endAudio(targetSessionId);
+  }, []);
+
+  const sendVideoFrame = useCallback(async (payload: { mimeType: string; data: string }) => {
+    const targetSessionId = sessionIdRef.current;
+    if (!targetSessionId) {
+      return;
+    }
+
+    if (transportModeRef.current === 'direct' && directSessionRef.current) {
+      directSessionRef.current.sendRealtimeInput({ video: payload });
+      return;
+    }
+
+    await liveSessionService.sendFrame(targetSessionId, payload);
+  }, []);
 
   return {
     session,
@@ -358,5 +484,8 @@ export function useLiveSession({ initialSession, onSessionChange }: UseLiveSessi
     startSession,
     endSession,
     sendMessage,
+    sendAudioChunk,
+    endAudioInput,
+    sendVideoFrame,
   };
 }

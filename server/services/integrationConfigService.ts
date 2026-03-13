@@ -8,74 +8,16 @@ import type {
 } from '../types';
 
 const integrationFieldDefinitions: Record<string, IntegrationConfigFieldDefinition[]> = {
-  github: [
-    { key: 'token', label: 'Access token', placeholder: 'ghp_...', secret: true, helpText: 'Token with issue creation access.' },
-    { key: 'repoOwner', label: 'Repository owner', placeholder: 'your-org', secret: false },
-    { key: 'repoName', label: 'Repository name', placeholder: 'your-repo', secret: false },
-  ],
-  slack: [
-    { key: 'botToken', label: 'Bot token', placeholder: 'xoxb-...', secret: true, helpText: 'Bot token with chat:write scope.' },
-    { key: 'defaultChannelId', label: 'Default channel ID', placeholder: 'C0123456789', secret: false },
-  ],
-  telegram: [
-    { key: 'botToken', label: 'Bot token', placeholder: '123456:ABCDEF...', secret: true, helpText: 'Telegram bot token from BotFather.' },
-    { key: 'defaultChatId', label: 'Default chat ID', placeholder: '123456789', secret: false, helpText: 'Only this chat can issue commands and receive updates.' },
-    { key: 'webhookSecret', label: 'Webhook secret token', placeholder: 'random-secret-token', secret: true, helpText: 'Used to verify Telegram webhook requests.' },
-  ],
-  notion: [
-    { key: 'token', label: 'Internal integration token', placeholder: 'secret_...', secret: true },
-    { key: 'parentPageId', label: 'Parent page ID', placeholder: 'parent-page-id', secret: false },
-  ],
-  clickup: [
-    { key: 'token', label: 'API token', placeholder: 'pk_...', secret: true },
-    { key: 'listId', label: 'List ID', placeholder: '901234567890', secret: false },
-  ],
-  zapier: [
-    {
-      key: 'webhookUrl',
-      label: 'Default Zap webhook URL',
-      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
-      secret: true,
-      helpText: 'Create a "Catch Hook" Zap at zapier.com and paste the webhook URL here.',
-    },
-    {
-      key: 'save-lead-url',
-      label: 'Save lead automation URL (optional)',
-      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
-      secret: true,
-      helpText: 'A named Zap for saving leads to your CRM or spreadsheet.',
-    },
-    {
-      key: 'notify-team-url',
-      label: 'Notify team automation URL (optional)',
-      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
-      secret: true,
-      helpText: 'A named Zap for sending team notifications (Slack, WhatsApp, email).',
-    },
-    {
-      key: 'custom-1-url',
-      label: 'Custom automation URL (optional)',
-      placeholder: 'https://hooks.zapier.com/hooks/catch/...',
-      secret: true,
-      helpText: 'Any additional named Zap you want to trigger from Crewmate.',
-    },
-  ],
+  slack: [],
+  notion: [],
+  clickup: [],
+  'google-workspace': [],
 };
 
 const envValueMap: Record<string, Record<string, string>> = {
-  github: {
-    token: serverConfig.githubToken,
-    repoOwner: serverConfig.githubRepoOwner,
-    repoName: serverConfig.githubRepoName,
-  },
   slack: {
     botToken: serverConfig.slackBotToken,
     defaultChannelId: serverConfig.slackDefaultChannelId,
-  },
-  telegram: {
-    botToken: serverConfig.telegramBotToken,
-    defaultChatId: serverConfig.telegramDefaultChatId,
-    webhookSecret: serverConfig.telegramWebhookSecret,
   },
   notion: {
     token: serverConfig.notionToken,
@@ -85,7 +27,6 @@ const envValueMap: Record<string, Record<string, string>> = {
     token: serverConfig.clickupToken,
     listId: serverConfig.clickupListId,
   },
-  zapier: {},
 };
 
 function getStoredConfig(workspaceId: string, integrationId: string): Record<string, string> {

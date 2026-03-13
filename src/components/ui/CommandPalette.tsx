@@ -22,7 +22,7 @@ const BASE_LINKS: CommandLink[] = [
   { path: '/dashboard', label: 'Dashboard', desc: 'Go to main dashboard', icon: LayoutDashboard, color: 'text-primary', bg: 'bg-primary/10' },
   { path: '/tasks', label: 'Tasks', desc: 'View all tasks', icon: CheckSquare, color: 'text-purple-500', bg: 'bg-purple-500/10' },
   { path: '/sessions', label: 'Sessions', desc: 'Review past sessions', icon: MonitorUp, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-  { path: '/memory', label: 'Memory Base', desc: 'Manage agent context', icon: BrainCircuit, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  { path: '/memory', label: 'Memory', desc: 'Review context, knowledge, and artifacts', icon: BrainCircuit, color: 'text-amber-500', bg: 'bg-amber-500/10' },
   { path: '/skills', label: 'Capabilities', desc: 'Inspect live agent capabilities', icon: Cpu, color: 'text-cyan-500', bg: 'bg-cyan-500/10' },
   { path: '/integrations', label: 'Integrations', desc: 'Connect your tools', icon: PlugZap, color: 'text-pink-500', bg: 'bg-pink-500/10' },
   { path: '/account', label: 'Account & Settings', desc: 'Manage profile and preferences', icon: User, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },

@@ -4,9 +4,10 @@
  */
 import type { Skill } from '../types';
 import {
-    ingestMemoryNode,
+    ingestArtifactMemory,
+    ingestKnowledgeMemory,
     retrieveRelevantMemories,
-    listMemoryNodesForUser,
+    searchMemoryRecords,
 } from '../../services/memoryService';
 
 export const memoryStoreSkill: Skill = {
@@ -15,7 +16,6 @@ export const memoryStoreSkill: Skill = {
     description: 'Save a piece of information to long-term memory. Use when the user says "remember that", "save this", or asks you to keep track of something for later.',
     version: '1.0.0',
     category: 'productivity',
-    personas: [],
     requiresIntegration: [],
     triggerPhrases: [
         'Remember that',
@@ -25,28 +25,39 @@ export const memoryStoreSkill: Skill = {
         'Store this for later',
     ],
     preferredModel: 'quick',
+    executionMode: 'inline',
+    latencyClass: 'quick',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {
             title: { type: 'string', description: 'Short title or label for this memory' },
             content: { type: 'string', description: 'The information to remember' },
-            type: { type: 'string', description: 'Memory type: "core", "document", "integration", "preference". Defaults to "core".' },
+            type: { type: 'string', description: 'Memory type: "knowledge" or "artifact". Defaults to "knowledge".' },
         },
         required: ['title', 'content'],
     },
     handler: async (ctx, args) => {
         const title = String(args.title ?? '');
         const content = String(args.content ?? '');
-        const type = (args.type as 'core' | 'document' | 'integration' | 'preference') ?? 'core';
+        const type = String(args.type ?? 'knowledge');
 
-        const id = ingestMemoryNode({
-            userId: ctx.userId,
-            workspaceId: ctx.workspaceId,
-            title,
-            type,
-            searchText: `${title}\n${content}`,
-            source: 'skill',
-        });
+        const id = type === 'artifact'
+            ? ingestArtifactMemory({
+                userId: ctx.userId,
+                workspaceId: ctx.workspaceId,
+                title,
+                summary: content,
+            })
+            : ingestKnowledgeMemory({
+                userId: ctx.userId,
+                workspaceId: ctx.workspaceId,
+                title,
+                summary: content.slice(0, 280),
+                contentText: content,
+                sourceType: 'skill_run',
+            });
 
         return {
             success: true,
@@ -62,7 +73,6 @@ export const memoryRetrieveSkill: Skill = {
     description: 'Search long-term memory for relevant information. Use when you need context about past conversations, user preferences, or stored facts.',
     version: '1.0.0',
     category: 'productivity',
-    personas: [],
     requiresIntegration: [],
     triggerPhrases: [
         'What did I say about',
@@ -72,6 +82,10 @@ export const memoryRetrieveSkill: Skill = {
         'Find notes about',
     ],
     preferredModel: 'quick',
+    executionMode: 'inline',
+    latencyClass: 'quick',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {
@@ -102,7 +116,6 @@ export const memoryListSkill: Skill = {
     description: 'List all stored memory entries for the current user. Use when the user asks what you remember or wants to see all stored notes.',
     version: '1.0.0',
     category: 'productivity',
-    personas: [],
     requiresIntegration: [],
     triggerPhrases: [
         'What do you remember?',
@@ -111,13 +124,17 @@ export const memoryListSkill: Skill = {
         'What have I stored?',
     ],
     preferredModel: 'quick',
+    executionMode: 'inline',
+    latencyClass: 'quick',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {},
     },
     handler: async (ctx) => {
-        const memories = listMemoryNodesForUser(ctx.userId);
-        const summary = memories.map((m) => `• [${m.type}] "${m.title}"`)
+        const memories = searchMemoryRecords(ctx.userId, { limit: 50 });
+        const summary = memories.map((m) => `• [${m.kind}] "${m.title}"`)
             .slice(0, 30)
             .join('\n');
 

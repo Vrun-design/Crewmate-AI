@@ -1,18 +1,15 @@
 import 'dotenv/config';
 import { serverConfig } from './config';
 import { createApp } from './app';
-import { attachMcpServer } from './mcp/mcpProtocolServer';
-import { processPendingJobs } from './services/delegationService';
 import { researchAgentApp } from './services/agents/researchAgent';
 import { discoverAgent } from './services/agents/agentDiscovery';
 import { runMemorySummarizationPass } from './services/memorySummaryWorker';
+import { validateStartupConfig } from './services/startupValidation';
 import './skills/index'; // Register all built-in skills on startup
 
-const app = createApp();
+validateStartupConfig();
 
-const jobInterval = setInterval(() => {
-  void processPendingJobs();
-}, 5000);
+const app = createApp();
 
 const memoryInterval = setInterval(() => {
   void runMemorySummarizationPass();
@@ -34,7 +31,6 @@ server.on('error', (error: NodeJS.ErrnoException) => {
 });
 
 function shutdown() {
-  clearInterval(jobInterval);
   clearInterval(memoryInterval);
   server.close(() => {
     process.exit(0);

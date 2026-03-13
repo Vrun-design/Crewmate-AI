@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { authStorage } from '../../services/authService';
+import { onboardingFlowService } from '../../services/onboardingFlowService';
 import { applyTheme, getInitialTheme } from '../../services/themeService';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { ScreenSharePiP } from '../ui/ScreenSharePiP';
+import { MiniSessionBar } from '../ui/MiniSessionBar';
+import { useLiveSessionContext } from '../../contexts/LiveSessionContext';
 
 export function MainLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -12,12 +16,44 @@ export function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
+  const {
+    isOverlayOpen,
+    previewStream,
+    screenShareStatus,
+    microphoneStatus,
+    isMicrophoneSupported,
+    toggleMicrophone,
+    stopScreenShare,
+    setIsOverlayOpen,
+  } = useLiveSessionContext();
+  const showScreenSharePiP = !isOverlayOpen;
 
   useEffect(() => {
-    if (!isLoading && !authStorage.isAuthenticated()) {
+    if (!isLoading && !user && !authStorage.isAuthenticated()) {
       navigate('/login');
     }
-  }, [isLoading, navigate]);
+  }, [isLoading, navigate, user]);
+
+  useEffect(() => {
+    if (isLoading || !user || !authStorage.isAuthenticated()) {
+      return;
+    }
+
+    if (!onboardingFlowService.isComplete() && location.pathname !== '/onboarding') {
+      navigate('/onboarding');
+    }
+  }, [isLoading, location.pathname, navigate, user]);
+
+  useEffect(() => {
+    function handleAuthExpired(): void {
+      navigate('/login');
+    }
+
+    window.addEventListener('crewmate:auth-expired', handleAuthExpired);
+    return () => {
+      window.removeEventListener('crewmate:auth-expired', handleAuthExpired);
+    };
+  }, [navigate]);
 
   useEffect(() => {
     applyTheme(isDarkMode ? 'dark' : 'light');
@@ -55,6 +91,18 @@ export function MainLayout() {
           </div>
         </div>
       </main>
+      {showScreenSharePiP && (
+        <ScreenSharePiP
+          previewStream={previewStream}
+          screenShareStatus={screenShareStatus}
+          microphoneStatus={microphoneStatus}
+          isMicrophoneSupported={isMicrophoneSupported}
+          onToggleMicrophone={toggleMicrophone}
+          onStopScreenShare={stopScreenShare}
+          onOpenOverlay={() => setIsOverlayOpen(true)}
+        />
+      )}
+      <MiniSessionBar />
     </div>
   );
 }

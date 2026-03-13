@@ -13,14 +13,13 @@ vi.mock('../hooks/useSkills', () => ({
   useSkills: () => ({
     skills: [
       {
-        id: 'github.create-issue',
-        name: 'Create GitHub Issue',
-        description: 'Files a new issue in the connected GitHub repo.',
+        id: 'slack.post-message',
+        name: 'Post Slack Message',
+        description: 'Sends a message to the connected Slack workspace.',
         version: '1.0.0',
-        category: 'code',
-        personas: ['developer'],
-        requiresIntegration: ['github'],
-        triggerPhrases: ['"Create a GitHub issue for this bug"'],
+        category: 'communication',
+        requiresIntegration: ['slack'],
+        triggerPhrases: ['"Post this update to Slack"'],
         preferredModel: 'quick',
       },
     ],
@@ -35,11 +34,11 @@ describe('Skills', () => {
     render(<Skills />);
 
     await waitFor(() => {
-      expect(screen.getByText('Create GitHub Issue')).toBeInTheDocument();
+      expect(screen.getByText('Post Slack Message')).toBeInTheDocument();
     });
 
     expect(screen.getByText('Skills Hub')).toBeInTheDocument();
-    expect(screen.getByText('Create GitHub Issue')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /create github issue/i })).toBeInTheDocument();
+    expect(screen.getByText('Post Slack Message')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /post slack message/i })).toBeInTheDocument();
   });
 });

@@ -1,74 +1,48 @@
 import React, { useEffect, useState } from 'react';
-import { Play, Square } from 'lucide-react';
-import { ActiveSessionCard } from '../components/dashboard/ActiveSessionCard';
-import { GmailInboxCard } from '../components/dashboard/GmailInboxCard';
+import { Clock3 } from 'lucide-react';
+import { ActiveDelegatedTasksCard } from '../components/dashboard/ActiveDelegatedTasksCard';
 import { IntegrationsCard } from '../components/dashboard/IntegrationsCard';
+import { LiveSessionCard } from '../components/dashboard/LiveSessionCard';
 import { RecentActivityCard } from '../components/dashboard/RecentActivityCard';
 import { RecentTasksCard } from '../components/dashboard/RecentTasksCard';
 import { Button } from '../components/ui/Button';
+import { Drawer } from '../components/ui/Drawer';
 import { LiveSessionOverlay } from '../components/ui/LiveSessionOverlay';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useDashboard } from '../hooks/useDashboard';
-import { useLiveSession } from '../hooks/useLiveSession';
-import { useMicrophoneCapture } from '../hooks/useMicrophoneCapture';
-import { usePreferences } from '../hooks/usePreferences';
-import { useScreenShareCapture } from '../hooks/useScreenShareCapture';
-import { onboardingService } from '../services/onboardingService';
-import { workspaceService } from '../services/workspaceService';
-import { buildGuidedSetupMemoryText, buildGuidedSetupPrompt } from '../utils/onboarding';
+import { useLiveSessionContext } from '../contexts/LiveSessionContext';
 import { getDisplayNameFromEmail } from '../utils/userName';
 
 export function Dashboard() {
   const [userName, setUserName] = useState('User');
-  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [hasAttemptedGuidedSetup, setHasAttemptedGuidedSetup] = useState(false);
+  const [isRecentDrawerOpen, setIsRecentDrawerOpen] = useState(false);
   const { data, isLoading, error, refresh } = useDashboard();
-  const { preferences } = usePreferences();
   const {
     session,
     isBusy,
     error: liveSessionError,
-    elapsedLabel,
     isSessionActive,
     startSession,
     endSession,
     sendMessage,
-  } = useLiveSession({
-    initialSession: data?.currentSession ?? null,
-    onSessionChange: refresh,
-  });
-  const {
-    status: screenShareStatus,
-    error: screenShareError,
-    isSupported: isScreenShareSupported,
     previewStream,
+    screenShareStatus,
+    screenShareError,
+    isScreenShareSupported,
     startScreenShare,
     stopScreenShare,
-  } = useScreenShareCapture({
-    sessionId: session?.id ?? null,
-    enabled: isSessionActive,
-  });
-  const {
-    status: microphoneStatus,
-    error: microphoneError,
-    isSupported: isMicrophoneSupported,
-    startMicrophone,
+    microphoneStatus,
+    microphoneError,
+    isMicrophoneSupported,
     toggleMicrophone,
     stopMicrophone,
-  } = useMicrophoneCapture({
-    sessionId: session?.id ?? null,
-    enabled: isSessionActive,
-  });
+    isOverlayOpen,
+    setIsOverlayOpen,
+  } = useLiveSessionContext();
 
   useEffect(() => {
     setUserName(getDisplayNameFromEmail(localStorage.getItem('crewmate_user_email')));
   }, []);
-
-  const tasks = data?.tasks ?? [];
-  const activities = data?.activities ?? [];
-  const integrations = data?.integrations ?? [];
-  const pendingGuidedSetup = onboardingService.getPendingGuidedSetup();
-  const activeGuidedSetupSession = onboardingService.getActiveGuidedSetupSession();
 
   function handleSessionToggle(): void {
     if (isSessionActive) {
@@ -80,136 +54,75 @@ export function Dashboard() {
     }
 
     void startSession();
-    setIsOverlayOpen(true);
   }
 
   function handleOverlayClose(): void {
     setIsOverlayOpen(false);
   }
 
-  useEffect(() => {
-    if (!pendingGuidedSetup || hasAttemptedGuidedSetup || isSessionActive || isBusy) {
-      return;
-    }
-
-    setHasAttemptedGuidedSetup(true);
-    setIsOverlayOpen(true);
-
-    void (async () => {
-      const nextSession = await startSession();
-      if (!nextSession) {
-        return;
-      }
-
-      onboardingService.setActiveGuidedSetupSession({
-        profile: pendingGuidedSetup,
-        sessionId: nextSession.id,
-      });
-      await sendMessage(buildGuidedSetupPrompt(pendingGuidedSetup), nextSession.id);
-      onboardingService.clearPendingGuidedSetup();
-    })();
-  }, [hasAttemptedGuidedSetup, isBusy, isSessionActive, pendingGuidedSetup, sendMessage, startSession]);
-
-  useEffect(() => {
-    if (!isSessionActive || !isMicrophoneSupported || microphoneStatus !== 'idle') {
-      return;
-    }
-
-    void startMicrophone();
-  }, [isMicrophoneSupported, isSessionActive, microphoneStatus, startMicrophone]);
-
-  useEffect(() => {
-    if (!isSessionActive || !preferences?.autoStartScreenShare || screenShareStatus !== 'idle') {
-      return;
-    }
-
-    void startScreenShare();
-  }, [isSessionActive, preferences?.autoStartScreenShare, screenShareStatus, startScreenShare]);
-
-  useEffect(() => {
-    if (!session || session.status !== 'ended' || !activeGuidedSetupSession) {
-      return;
-    }
-
-    if (activeGuidedSetupSession.sessionId !== session.id) {
-      return;
-    }
-
-    const transcript = session.transcript.filter((message) => message.text.trim());
-    onboardingService.clearActiveGuidedSetupSession();
-
-    if (transcript.length === 0) {
-      return;
-    }
-
-    void workspaceService.ingestMemory({
-      title: 'Guided onboarding summary',
-      type: 'document',
-      searchText: buildGuidedSetupMemoryText(activeGuidedSetupSession.profile, transcript),
-    });
-  }, [activeGuidedSetupSession, session]);
-
   return (
-    <div className="space-y-6 pb-10">
+    <div className="h-full flex flex-col gap-4 pb-2">
       <PageHeader
         title={`Hi ${userName}`}
         description="How can I help you today? Let's build something cool."
       >
         <div className="relative">
-          {pendingGuidedSetup && !isSessionActive && (
-            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-            </span>
-          )}
           <Button
-            variant={isSessionActive ? 'danger' : 'primary'}
-            onClick={handleSessionToggle}
-            disabled={isBusy}
-            className={pendingGuidedSetup && !isSessionActive ? 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background' : ''}
+            variant="secondary"
+            onClick={() => setIsRecentDrawerOpen(true)}
+            rounded="full"
           >
-            {isSessionActive ? (
-              <>
-                <Square size={16} className="fill-current" />
-                {isBusy ? 'Ending...' : 'End Session'}
-              </>
-            ) : (
-              <>
-                <Play size={16} className="fill-current" />
-                {isBusy ? 'Starting...' : 'Start Live Session'}
-              </>
-            )}
+            <Clock3 size={16} />
+            Recent
           </Button>
         </div>
       </PageHeader>
 
       {(error || isLoading || liveSessionError) && (
         <div className="glass-panel rounded-2xl px-4 py-3 text-sm text-muted-foreground">
-          {isLoading ? 'Loading local Crewmate workspace...' : liveSessionError ?? `Local API status: ${error}`}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{isLoading ? 'Loading your Crewmate dashboard...' : liveSessionError ?? `Dashboard API status: ${error}`}</span>
+            {(error || liveSessionError) ? (
+              <Button variant="secondary" onClick={() => void refresh()}>
+                Retry
+              </Button>
+            ) : null}
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <ActiveSessionCard
-            session={session}
-            isSessionActive={isSessionActive}
-            elapsedLabel={elapsedLabel}
-            isOverlayOpen={isOverlayOpen}
-            microphoneStatus={microphoneStatus}
-            previewStream={previewStream}
-            screenShareStatus={screenShareStatus}
-            onOpenOverlay={() => setIsOverlayOpen(true)}
-          />
-          <RecentActivityCard activities={activities} />
-        </div>
-
-        <div className="space-y-6">
-          <GmailInboxCard />
-          <RecentTasksCard tasks={tasks} />
-          <IntegrationsCard integrations={integrations} />
-        </div>
+      <div className="min-h-0 flex-1">
+        <LiveSessionCard
+          session={session}
+          isSessionActive={isSessionActive}
+          microphoneStatus={microphoneStatus}
+          screenShareStatus={screenShareStatus}
+          isMicrophoneSupported={isMicrophoneSupported}
+          isScreenShareSupported={isScreenShareSupported}
+          isBusy={isBusy}
+          provider={session?.provider || 'local'}
+          previewStream={previewStream}
+          onOpenOverlay={() => setIsOverlayOpen(true)}
+          onToggleSession={handleSessionToggle}
+          onToggleMicrophone={toggleMicrophone}
+          onStartScreenShare={startScreenShare}
+          onStopScreenShare={stopScreenShare}
+          onSendMessage={sendMessage}
+        />
       </div>
+
+      <Drawer
+        isOpen={isRecentDrawerOpen}
+        onClose={() => setIsRecentDrawerOpen(false)}
+        title="Recent Activity"
+      >
+        <div className="grid content-start gap-4">
+          <ActiveDelegatedTasksCard summary={data?.activeTaskSummary} />
+          <RecentTasksCard tasks={data?.tasks ?? []} />
+          <RecentActivityCard activities={data?.activities ?? []} />
+          <IntegrationsCard integrations={data?.integrations ?? []} />
+        </div>
+      </Drawer>
 
       <LiveSessionOverlay
         isOpen={isOverlayOpen && isSessionActive}
@@ -218,13 +131,13 @@ export function Dashboard() {
         onSendMessage={sendMessage}
         isBusy={isBusy}
         provider={session?.provider}
+        previewStream={previewStream}
+        onEndSession={handleSessionToggle}
         screenShareStatus={screenShareStatus}
-        screenShareError={screenShareError}
         isScreenShareSupported={isScreenShareSupported}
         onStartScreenShare={startScreenShare}
         onStopScreenShare={stopScreenShare}
         microphoneStatus={microphoneStatus}
-        microphoneError={microphoneError}
         isMicrophoneSupported={isMicrophoneSupported}
         onToggleMicrophone={toggleMicrophone}
       />

@@ -11,15 +11,13 @@ interface HeaderProps {
 
 const VALID_ROUTES = new Set([
   '/dashboard', '/agents', '/memory', '/sessions', '/tasks', '/skills',
-  '/integrations', '/account', '/notifications', '/personas',
+  '/integrations', '/account', '/notifications',
 ]);
 
 const LEGACY_ROUTE_MAP: Record<string, string> = {
   '/activity': '/sessions?tab=activity',
   '/sessions/activity': '/sessions?tab=activity',
   '/delegations': '/account',
-  '/offshift': '/account',
-  '/off-shift': '/account',
   '/studio': '/dashboard',
 };
 

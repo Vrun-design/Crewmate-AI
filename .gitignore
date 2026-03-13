@@ -6,7 +6,18 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# SQLite databases — never commit user data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 data/*.db
 data/*.db-shm
 data/*.db-wal
+server/database.sqlite
+
+# Runtime-generated artifacts (screenshots, etc.)
+data/artifacts/
+data/test-artifacts/
+
 release/

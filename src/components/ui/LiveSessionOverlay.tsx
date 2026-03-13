@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mic, MicOff, Monitor, ScreenShare, ScreenShareOff, X, AlignLeft, BrainCircuit, User } from 'lucide-react';
+import { Mic, MicOff, ScreenShare, ScreenShareOff, Square, Minimize2, AlignLeft, User, BrainCircuit } from 'lucide-react';
 import { Drawer } from './Drawer';
 import type { MicrophoneStatus, ScreenShareStatus, TranscriptMessage } from '../../types/live';
 import { getDisplayNameFromEmail } from '../../utils/userName';
@@ -13,13 +13,13 @@ interface LiveSessionOverlayProps {
   onSendMessage?: (text: string) => Promise<void> | void;
   isBusy?: boolean;
   provider?: 'local' | 'gemini-live';
+  previewStream?: MediaStream | null;
+  onEndSession?: () => void;
   screenShareStatus?: ScreenShareStatus;
-  screenShareError?: string | null;
   isScreenShareSupported?: boolean;
   onStartScreenShare?: () => Promise<void> | void;
   onStopScreenShare?: () => void;
   microphoneStatus?: MicrophoneStatus;
-  microphoneError?: string | null;
   isMicrophoneSupported?: boolean;
   onToggleMicrophone?: () => Promise<void> | void;
 }
@@ -68,6 +68,14 @@ function getMicrophoneLabel(status: MicrophoneStatus): string {
   return 'Mic ready';
 }
 
+const AUDIO_BARS = [
+  { id: 1, base: 12, active: [12, 32, 12], delay: 0 },
+  { id: 2, base: 16, active: [16, 48, 16], delay: 0.1 },
+  { id: 3, base: 24, active: [24, 64, 24], delay: 0.2 },
+  { id: 4, base: 16, active: [16, 52, 16], delay: 0.3 },
+  { id: 5, base: 12, active: [12, 36, 12], delay: 0.4 },
+];
+
 export function LiveSessionOverlay({
   isOpen,
   onClose,
@@ -75,13 +83,13 @@ export function LiveSessionOverlay({
   onSendMessage,
   isBusy = false,
   provider = 'local',
+  previewStream = null,
+  onEndSession,
   screenShareStatus = 'idle',
-  screenShareError = null,
   isScreenShareSupported = false,
   onStartScreenShare,
   onStopScreenShare,
   microphoneStatus = 'idle',
-  microphoneError = null,
   isMicrophoneSupported = false,
   onToggleMicrophone,
 }: LiveSessionOverlayProps) {
@@ -89,6 +97,36 @@ export function LiveSessionOverlay({
   const [mounted, setMounted] = useState(false);
   const [username, setUsername] = useState('User');
   const [draft, setDraft] = useState('');
+  const previewRef = useRef<HTMLVideoElement | null>(null);
+
+  const setVideoRef = useCallback((video: HTMLVideoElement | null) => {
+    previewRef.current = video;
+    if (video && previewStream) {
+      video.srcObject = previewStream;
+      void video.play().catch(() => {});
+    }
+  }, [previewStream]);
+
+  useEffect(() => {
+    const video = previewRef.current;
+    if (!video) return;
+
+    if (!previewStream) {
+      video.srcObject = null;
+      return;
+    }
+
+    if (video.srcObject !== previewStream) {
+      video.srcObject = previewStream;
+      void video.play().catch(() => {});
+    }
+
+    return () => {
+      if (video && video.srcObject === previewStream) {
+        video.srcObject = null;
+      }
+    };
+  }, [previewStream]);
 
   useEffect(() => {
     setMounted(true);
@@ -111,8 +149,6 @@ export function LiveSessionOverlay({
   const composerPlaceholder = getComposerPlaceholder(provider);
   const isMuted = microphoneStatus === 'muted' || microphoneStatus === 'idle';
   const isScreenSharing = screenShareStatus === 'sharing';
-  const screenShareLabel = getScreenShareLabel(screenShareStatus);
-  const microphoneLabel = getMicrophoneLabel(microphoneStatus);
 
   return createPortal(
     <AnimatePresence>
@@ -121,13 +157,14 @@ export function LiveSessionOverlay({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-between p-6 md:p-8"
+          className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center p-4 md:p-6"
         >
-          {/* Top Bar */}
-          <div className="w-full flex justify-end max-w-6xl mx-auto">
+          {/* Top Bar (Header) */}
+          <div className="w-full flex justify-end shrink-0 max-w-7xl mx-auto mb-2">
             <button
               onClick={() => setIsTranscriptOpen(true)}
-              className="p-2.5 rounded-full bg-secondary border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors relative"
+              className="p-2.5 rounded-full bg-secondary border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-colors relative shadow-sm"
+              title="Open Transcript"
             >
               <AlignLeft size={20} />
               {!isMuted && (
@@ -136,152 +173,110 @@ export function LiveSessionOverlay({
             </button>
           </div>
 
-          {/* Center Orb */}
-          <div className="flex-1 flex items-center justify-center relative w-full max-w-md">
-            {/* Outer Glow */}
-            {!isMuted && (
-              <motion.div
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.1, 0.2, 0.1],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                className="absolute w-64 h-64 rounded-full bg-primary/20 blur-3xl pointer-events-none"
-              />
-            )}
-
-            {/* Inner Orb */}
-            <div className="relative w-48 h-48 rounded-full bg-secondary border border-border shadow-2xl flex items-center justify-center overflow-hidden">
-              {/* Audio Wave */}
-              <div className="flex items-center justify-center gap-1.5 h-24">
-                {[
-                  { id: 1, base: 12, active: [12, 24, 12], delay: 0 },
-                  { id: 2, base: 16, active: [16, 36, 16], delay: 0.1 },
-                  { id: 3, base: 24, active: [24, 48, 24], delay: 0.2 },
-                  { id: 4, base: 16, active: [16, 40, 16], delay: 0.3 },
-                  { id: 5, base: 12, active: [12, 28, 12], delay: 0.4 },
-                ].map((bar) => (
-                  <motion.div
-                    key={bar.id}
-                    className={`w-1.5 rounded-full ${isMuted ? 'bg-muted-foreground/50' : 'bg-foreground'}`}
-                    animate={{ height: isMuted ? bar.base : bar.active }}
-                    transition={{
-                      duration: 0.8,
-                      repeat: Infinity,
-                      delay: bar.delay,
-                      ease: "easeInOut"
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Controls */}
-          <div className="w-full max-w-xl flex flex-col gap-4 mb-4 md:mb-8 px-4">
-            <div className="grid gap-2 text-xs text-muted-foreground px-1">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Monitor size={14} />
-                  <span>{screenShareLabel}</span>
-                  {screenShareError ? <span className="text-red-500">{screenShareError}</span> : null}
-                </div>
-
-                {isScreenShareSupported ? (
-                  isScreenSharing ? (
-                    <button
-                      type="button"
-                      onClick={onStopScreenShare}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1.5 text-foreground transition-colors hover:bg-accent"
-                    >
-                      <ScreenShareOff size={14} />
-                      Stop
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void onStartScreenShare?.()}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1.5 text-foreground transition-colors hover:bg-accent"
-                    >
-                      <ScreenShare size={14} />
-                      Share Screen
-                    </button>
-                  )
-                ) : (
-                  <span>Screen capture unsupported in this browser.</span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
-                  <span>{microphoneLabel}</span>
-                  {microphoneError ? <span className="text-red-500">{microphoneError}</span> : null}
-                </div>
-
-                {isMicrophoneSupported ? (
-                  <button
-                    type="button"
-                    onClick={() => void onToggleMicrophone?.()}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-3 py-1.5 text-foreground transition-colors hover:bg-accent"
-                  >
-                    {isMuted ? <Mic size={14} /> : <MicOff size={14} />}
-                    {isMuted ? 'Unmute' : 'Mute'}
-                  </button>
-                ) : (
-                  <span>Microphone capture unsupported in this browser.</span>
-                )}
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="glass-panel rounded-2xl p-3 border border-border">
-              <div className="flex items-center gap-3">
-                <input
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder={composerPlaceholder}
-                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          {/* Main View Area (Flex-1) */}
+          <div className="flex-1 w-full max-w-7xl mx-auto flex flex-col items-center justify-center min-h-0 relative mb-6">
+            {previewStream ? (
+              <div className="w-full h-full max-h-full rounded-2xl bg-black border border-border/50 shadow-2xl overflow-hidden flex items-center justify-center relative">
+                <video
+                  ref={setVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain"
                 />
-                <button
-                  type="submit"
-                  disabled={!draft.trim() || !onSendMessage || isBusy}
-                  className="px-3 py-2 rounded-xl btn-bevel btn-bevel-primary text-sm font-medium disabled:opacity-50"
-                >
-                  {isBusy ? 'Sending...' : 'Send'}
-                </button>
+                <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-md bg-black/50 backdrop-blur-md border border-white/10">
+                  <ScreenShare size={14} className="text-white" />
+                  <span className="text-xs font-medium text-white uppercase tracking-wider">Sharing Screen</span>
+                </div>
               </div>
-            </form>
-
-            <div className="w-full max-w-md self-center flex items-center justify-between">
-              <div className="w-12"></div>
-
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => void onToggleMicrophone?.()}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all ${isMuted
-                    ? 'bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20'
-                    : 'bg-secondary border-border text-foreground hover:bg-accent'
-                    }`}
-                >
-                  {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
-                </button>
-
-                <button
-                  onClick={onClose}
-                  className="w-14 h-14 rounded-full bg-secondary border border-border text-foreground flex items-center justify-center hover:bg-accent transition-colors"
-                >
-                  <X size={24} />
-                </button>
+            ) : (
+              <div className="relative flex items-center justify-center w-full h-full">
+                {/* Outer Glow */}
+                {!isMuted && (
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    className="absolute w-80 h-80 rounded-full bg-primary/20 blur-3xl pointer-events-none"
+                  />
+                )}
+                <div className="relative w-56 h-56 rounded-full bg-secondary border border-border shadow-2xl flex items-center justify-center overflow-hidden">
+                  <div className="flex items-center justify-center gap-2 h-24">
+                    {AUDIO_BARS.map((bar) => (
+                      <motion.div
+                        key={bar.id}
+                        className={`w-2 rounded-full ${isMuted ? 'bg-muted-foreground/50' : 'bg-foreground'}`}
+                        animate={{ height: isMuted ? bar.base : bar.active }}
+                        transition={{ duration: 0.8, repeat: Infinity, delay: bar.delay, ease: 'easeInOut' }}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
-
-              <div className="w-12 flex justify-end"></div>
-            </div>
+            )}
           </div>
 
+          {/* Bottom Dock (Controls & Input) */}
+          <div className="shrink-0 w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-4">
+            {/* Action Toggles */}
+            <div className="flex items-center gap-3 p-2 rounded-2xl bg-secondary/80 backdrop-blur-xl border border-border shadow-lg">
+              <button
+                onClick={() => void onToggleMicrophone?.()}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isMuted ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-background shadow-sm text-foreground'}`}
+                title={getMicrophoneLabel(microphoneStatus)}
+              >
+                {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+              </button>
+              
+              {isScreenShareSupported && (
+                <button
+                  onClick={isScreenSharing ? onStopScreenShare : () => void onStartScreenShare?.()}
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isScreenSharing ? 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/20' : 'bg-background shadow-sm text-foreground hover:bg-accent'}`}
+                  title={isScreenSharing ? 'Stop Sharing' : getScreenShareLabel(screenShareStatus)}
+                >
+                  {isScreenSharing ? <ScreenShareOff size={20} /> : <ScreenShare size={20} />}
+                </button>
+              )}
+
+              {onEndSession && (
+                <button
+                  onClick={onEndSession}
+                  className="w-12 h-12 rounded-xl bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow-md"
+                  title="End Session"
+                >
+                  <Square size={18} className="fill-current" />
+                </button>
+              )}
+
+              <div className="w-px h-8 bg-border mx-1"></div>
+
+              <button
+                onClick={onClose}
+                className="w-12 h-12 rounded-xl bg-background shadow-sm text-muted-foreground flex items-center justify-center hover:text-foreground hover:bg-accent transition-colors"
+                title="Minimize Overlay"
+              >
+                <Minimize2 size={20} />
+              </button>
+            </div>
+
+            {/* Input Box */}
+            <form onSubmit={handleSubmit} className="flex-1 w-full bg-secondary/80 backdrop-blur-xl rounded-2xl p-2 border border-border shadow-lg flex items-center gap-2">
+              <input
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder={composerPlaceholder}
+                className="flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!draft.trim() || !onSendMessage || isBusy}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:bg-primary/90 transition-colors truncate"
+              >
+                {isBusy ? '...' : 'Send'}
+              </button>
+            </form>
+          </div>
+
+          {/* Transcript Drawer Container */}
           <Drawer
             isOpen={isTranscriptOpen}
             onClose={() => setIsTranscriptOpen(false)}
@@ -343,6 +338,6 @@ export function LiveSessionOverlay({
         </motion.div>
       )}
     </AnimatePresence>,
-    document.body
+    document.body,
   );
 }

@@ -10,8 +10,12 @@ import { createNotification } from './notificationService';
 import { buildTaskNotification } from './notificationFormatter';
 import { getNotificationPrefs } from './notificationPrefsService';
 import type { AgentTask } from './orchestrator';
-import { isTelegramConfigured, postTelegramMessage } from './telegramService';
 import { db } from '../db';
+import { postSlackMessage } from './slackService';
+import { broadcastEvent } from './eventService';
+import { parseReplyTarget } from './channelTasking';
+import { serverConfig } from '../config';
+import { logServerError } from './runtimeLogger';
 
 const SLACK_WEBHOOK_TIMEOUT_MS = 8_000;
 
@@ -21,28 +25,20 @@ function getWorkspaceIdForUser(userId: string): string | null {
 }
 
 function buildTaskLink(taskId: string): string {
-    return `${new URL('/agents', 'http://placeholder').pathname}?task=${encodeURIComponent(taskId)}`;
+    return `${new URL('/tasks', 'http://placeholder').pathname}?task=${encodeURIComponent(taskId)}`;
 }
 
-function buildTelegramTaskMessage(task: AgentTask): string {
-    const statusLabel = task.status === 'completed' ? 'Completed' : task.status === 'failed' ? 'Failed' : 'Updated';
+function buildPublicTaskUrl(taskId: string): string {
+    return new URL(buildTaskLink(taskId), serverConfig.publicWebAppUrl).toString();
+}
+
+function buildChannelCompletionMessage(task: AgentTask): string {
+    const notification = buildTaskNotification(task);
     const lines = [
-        `Crewmate task ${statusLabel}`,
-        task.intent,
+        notification.title,
+        notification.message,
+        `Open: ${buildPublicTaskUrl(task.taskId ?? task.id)}`,
     ];
-
-    if (task.error) {
-        lines.push(`Error: ${task.error}`);
-    }
-
-    if (task.result && typeof task.result === 'object') {
-        const payload = task.result as Record<string, unknown>;
-        if (typeof payload.summary === 'string' && payload.summary.trim()) {
-            lines.push(`Summary: ${payload.summary.trim()}`);
-        }
-    }
-
-    lines.push(`Open: ${new URL(buildTaskLink(task.id), process.env.CORS_ORIGIN ?? 'http://localhost:3000').toString()}`);
     return lines.join('\n');
 }
 
@@ -108,7 +104,10 @@ async function sendSlackWebhook(webhookUrl: string, task: AgentTask): Promise<vo
 
     if (!resp.ok) {
         const errText = await resp.text().catch(() => 'unknown');
-        console.error(`[agentNotifier] Slack webhook returned ${resp.status}: ${errText}`);
+        logServerError('agentNotifier:slack-webhook-response', new Error(`Slack webhook returned ${resp.status}: ${errText}`), {
+            status: resp.status,
+            taskId: task.taskId ?? task.id,
+        });
     }
 }
 
@@ -119,7 +118,8 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
     let prefs;
     try {
         prefs = getNotificationPrefs(userId);
-    } catch {
+    } catch (error) {
+        logServerError('agentNotifier:get-notification-prefs', error, { userId });
         prefs = {
             notifyOnSuccess: true,
             notifyOnError: true,
@@ -135,10 +135,10 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
                 title: inApp.title,
                 message: inApp.message,
                 type: inApp.type,
-                sourcePath: `/agents?task=${task.id}`,
+                sourcePath: `/tasks?task=${task.taskId ?? task.id}`,
             });
         } catch (err) {
-            console.error('[agentNotifier] in-app notification failed:', err);
+            logServerError('agentNotifier:in-app', err, { userId, taskId: task.taskId ?? task.id });
         }
     }
 
@@ -146,23 +146,41 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
     if (task.status === 'completed' && !prefs.notifyOnSuccess) return;
     if (task.status === 'failed' && !prefs.notifyOnError) return;
 
-    // 4. Slack webhook
+    const replyTarget = parseReplyTarget(task.originRef);
+    const workspaceId = getWorkspaceIdForUser(userId);
+
+    if (replyTarget?.channel === 'slack' && workspaceId) {
+        try {
+            await postSlackMessage(workspaceId, {
+                channelId: replyTarget.channelId,
+                threadTs: replyTarget.threadTs ?? undefined,
+                text: buildChannelCompletionMessage(task),
+            });
+        } catch (err) {
+            logServerError('agentNotifier:slack-completion', err, { userId, workspaceId, taskId: task.taskId ?? task.id });
+        }
+        return;
+    }
+
+    if (replyTarget?.channel === 'live_session') {
+        const payload = buildTaskNotification(task);
+        broadcastEvent(userId, 'live_task_update', {
+            sessionId: replyTarget.sessionId,
+            taskId: task.taskId ?? task.id,
+            taskRunId: task.id,
+            title: task.intent,
+            status: task.status === 'failed' ? 'failed' : 'completed',
+            summary: payload.message,
+        });
+        return;
+    }
+
     if (prefs.slackWebhookUrl) {
         try {
             await sendSlackWebhook(prefs.slackWebhookUrl, task);
         } catch (err) {
-            console.error('[agentNotifier] Slack webhook failed:', err);
+            logServerError('agentNotifier:slack-webhook', err, { userId, taskId: task.taskId ?? task.id });
         }
     }
 
-    const workspaceId = getWorkspaceIdForUser(userId);
-    if (workspaceId && isTelegramConfigured(workspaceId)) {
-        try {
-            await postTelegramMessage(workspaceId, {
-                text: buildTelegramTaskMessage(task),
-            });
-        } catch (err) {
-            console.error('[agentNotifier] Telegram message failed:', err);
-        }
-    }
 }

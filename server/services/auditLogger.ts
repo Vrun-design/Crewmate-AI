@@ -7,6 +7,7 @@
  */
 import { db } from '../db';
 import { randomUUID } from 'node:crypto';
+import { logServerError } from './runtimeLogger';
 
 export type AuditEventType =
     | 'skill.run'
@@ -51,8 +52,8 @@ try {
       error_message TEXT
     )
   `);
-} catch {
-    // table may already exist
+} catch (error) {
+    logServerError('auditLogger:schema', error);
 }
 
 // ── Core logger ───────────────────────────────────────────────────────────────
@@ -80,8 +81,8 @@ export function auditLog(entry: Omit<AuditEntry, 'id' | 'timestamp'>): string {
       INSERT INTO audit_log (id, timestamp, type, user_id, workspace_id, resource, action, metadata, duration_ms, status, error_message)
       VALUES (@id, @timestamp, @type, @userId, @workspaceId, @resource, @action, @metadata, @durationMs, @status, @errorMessage)
     `).run(row);
-    } catch {
-        // Non-fatal: don't crash on audit write failure
+    } catch (error) {
+        logServerError('auditLogger:write', error, { type: entry.type, resource: entry.resource });
     }
 
     // Structured log to stdout → GCP Cloud Logging picks this up automatically

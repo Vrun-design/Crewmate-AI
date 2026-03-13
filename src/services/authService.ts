@@ -1,5 +1,6 @@
 import {api} from '../lib/api';
 import type {AuthUser} from '../types';
+import { firebaseAuthService } from './firebaseAuth';
 
 const AUTH_FLAG_KEY = 'crewmate_auth';
 const AUTH_TOKEN_KEY = 'crewmate_auth_token';
@@ -31,7 +32,13 @@ export const authService = {
   me(): Promise<AuthUser> {
     return api.get('/api/auth/me');
   },
-  logout(): Promise<void> {
-    return api.post('/api/auth/logout');
+  async logout(): Promise<void> {
+    try {
+      await api.post('/api/auth/logout');
+    } finally {
+      if (firebaseAuthService.isConfigured()) {
+        await firebaseAuthService.signOut();
+      }
+    }
   },
 };

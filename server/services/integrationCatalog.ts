@@ -4,12 +4,9 @@ import {
   getIntegrationConfiguredVia,
   listIntegrationFieldDefinitions,
 } from './integrationConfigService';
-import { isGithubConfigured } from './githubService';
+import { isGoogleWorkspaceConfigured } from './googleWorkspaceService';
 import { isNotionConfigured } from './notionService';
 import { isSlackConfigured } from './slackService';
-import { isTelegramConfigured } from './telegramService';
-import { isGmailConfigured } from './gmailService';
-import { isCalendarConfigured } from './calendarService';
 import type { IntegrationRecord } from '../types';
 
 interface IntegrationDefinition extends Omit<IntegrationRecord, 'status' | 'missingKeys' | 'configuredVia'> {
@@ -29,48 +26,31 @@ function getMissingKeys(requiredKeys: string[], integrationId: string, userId: s
 
 const integrationDefinitions: IntegrationDefinition[] = [
   {
-    id: 'zapier',
-    name: 'Zapier',
+    id: 'google-workspace',
+    name: 'Google Workspace',
     status: 'disconnected',
-    iconName: 'zap',
-    color: 'text-orange-500 dark:text-orange-400',
-    bgColor: 'bg-orange-500/10 border-orange-500/20',
-    desc: 'Connect to 5,000+ apps instantly. Trigger any Zapier automation — CRM, spreadsheets, WhatsApp, Stripe, Airtable, and more.',
-    docsUrl: 'https://zapier.com/apps/webhook/integrations',
+    iconName: 'google-workspace',
+    color: 'text-slate-700 dark:text-slate-200',
+    bgColor: 'bg-slate-500/10 border-slate-500/20',
+    desc: 'Create Docs, Sheets, Slides, Drive folders, Gmail drafts, and Calendar events from one Google connection.',
+    docsUrl: 'https://developers.google.com/workspace',
+    connectUrl: '/api/integrations/google-workspace/connect',
     capabilities: [
-      'Trigger any Zapier automation via voice',
-      'Save leads to any CRM (HubSpot, Salesforce, Pipedrive)',
-      'Log data to Google Sheets or Airtable',
-      'Send WhatsApp messages or SMS',
-      'Connect to 5,000+ apps with no extra code',
+      'Draft Gmail emails and send after explicit confirmation',
+      'Create and append Google Docs',
+      'Create Sheets and append rows',
+      'Create Slides presentations from outlines',
+      'Search Drive files and create folders',
+      'Create Calendar events with confirmation-aware agents',
     ],
-    requiredKeys: ['webhookUrl'],
     setupSteps: [
-      'Go to zapier.com and create a new Zap.',
-      'Choose "Webhooks by Zapier" as the trigger and select "Catch Hook".',
-      'Copy the generated webhook URL and paste it into the field below.',
-      'Add optional named automation URLs for specific workflows (save-lead, notify-team, etc).',
-      'Now say "trigger my Zapier automation" in a live session to fire it.',
+      'Click Connect with Google and sign in with the workspace account you want Crewmate to use.',
+      'Approve the requested Google Workspace scopes for Gmail, Drive, Docs, Sheets, Slides, and Calendar.',
+      'Choose optional default folder IDs and a default calendar after connecting.',
+      'Now tell an agent to create docs, sheets, decks, drafts, or events in Google Workspace.',
     ],
-    notes: 'Named automations let you trigger different Zaps by name — e.g. "save this lead" vs "notify the team".',
-  },
-  {
-    id: 'github',
-    name: 'GitHub',
-    status: 'disconnected',
-    iconName: 'github',
-    color: 'text-foreground',
-    bgColor: 'bg-foreground/5 border-foreground/10',
-    desc: 'Create issues directly from visual bug reports and engineering conversations.',
-    docsUrl: 'https://docs.github.com/en/rest/issues/issues#create-an-issue',
-    capabilities: ['Create issues', 'Capture bug context', 'Support GitHub-backed engineering triage'],
-    requiredKeys: ['token', 'repoOwner', 'repoName'],
-    setupSteps: [
-      'Create a GitHub token with repository issue access.',
-      'Enter the repository owner and repository name in the connection form.',
-      'Use the live session to ask Crewmate to file an issue from screen context.',
-    ],
-    notes: 'Best first action path because issue creation is deterministic and easy to validate.',
+    notes: 'Gmail sending and Calendar event creation remain confirmation-gated even after OAuth is connected.',
+    requiredKeys: [],
   },
   {
     id: 'slack',
@@ -81,33 +61,15 @@ const integrationDefinitions: IntegrationDefinition[] = [
     bgColor: 'bg-blue-500/10 border-blue-500/20',
     desc: 'Post product updates and async summaries into a real Slack channel.',
     docsUrl: 'https://api.slack.com/methods/chat.postMessage',
+    connectUrl: '/api/integrations/slack/connect',
     capabilities: ['Post team updates', 'Confirm async work', 'Announce completed research'],
-    requiredKeys: ['botToken', 'defaultChannelId'],
+    requiredKeys: [],
     setupSteps: [
-      'Create a Slack app and install it to your workspace.',
-      'Grant the bot permission to post messages to the target channel.',
-      'Save the bot token and default channel ID from the integrations page.',
+      'Click Connect Slack and install Crewmate to your Slack workspace.',
+      'Approve messaging access for the bot.',
+      'Optionally choose a default channel after connection.',
     ],
-    notes: 'Use one default channel per workspace to keep routing simple and reliable.',
-  },
-  {
-    id: 'telegram',
-    name: 'Telegram',
-    status: 'disconnected',
-    iconName: 'telegram',
-    color: 'text-sky-600 dark:text-sky-400',
-    bgColor: 'bg-sky-500/10 border-sky-500/20',
-    desc: 'Use a Telegram bot as a personal command channel for text, voice notes, and delivery updates.',
-    docsUrl: 'https://core.telegram.org/bots/api',
-    capabilities: ['Receive text commands', 'Transcribe voice notes', 'Send task and job updates back to chat'],
-    requiredKeys: ['botToken', 'defaultChatId', 'webhookSecret'],
-    setupSteps: [
-      'Create a Telegram bot with BotFather and copy the bot token.',
-      'Send a message to the bot once, then save the default chat ID for the chat that should control Crewmate.',
-      'Set a webhook secret token and point Telegram webhook delivery at /api/telegram/webhook/<workspaceId> on your backend.',
-      'Now message the bot with a text command or voice note to trigger work and receive updates there.',
-    ],
-    notes: 'Best suited for a single-owner command channel in this build. Configure one default chat per workspace.',
+    notes: 'OAuth install gives Crewmate a bot token automatically. You only choose a default channel after connecting.',
   },
   {
     id: 'notion',
@@ -118,14 +80,15 @@ const integrationDefinitions: IntegrationDefinition[] = [
     bgColor: 'bg-foreground/5 border-foreground/10',
     desc: 'Generate PRDs, teardown notes, and meeting summaries as real Notion pages.',
     docsUrl: 'https://developers.notion.com/reference/post-page',
+    connectUrl: '/api/integrations/notion/connect',
     capabilities: ['Create pages', 'Write summaries', 'Store async deliverables'],
-    requiredKeys: ['token', 'parentPageId'],
+    requiredKeys: [],
     setupSteps: [
-      'Create a Notion internal integration and copy the API token.',
-      'Share the target parent page with the integration inside Notion.',
-      'Save the token and parent page ID from the integrations page.',
+      'Click Connect Notion and approve access to your Notion workspace.',
+      'After connecting, optionally choose a default page or database destination.',
+      'Now the agent can create pages and store async deliverables in Notion.',
     ],
-    notes: 'This is the cleanest async artifact path for research handoff and PRD generation.',
+    notes: 'OAuth replaces manual token setup. A default destination can be selected after connecting.',
   },
   {
     id: 'clickup',
@@ -136,82 +99,33 @@ const integrationDefinitions: IntegrationDefinition[] = [
     bgColor: 'bg-purple-500/10 border-purple-500/20',
     desc: 'Create structured tasks from bugs, requests, and spoken follow-ups.',
     docsUrl: 'https://developer.clickup.com/reference/createtask',
+    connectUrl: '/api/integrations/clickup/connect',
     capabilities: ['Create tasks', 'Track bugs', 'Capture follow-up work from live sessions'],
-    requiredKeys: ['token', 'listId'],
-    setupSteps: [
-      'Create or copy a ClickUp API token for the target workspace.',
-      'Find the destination List ID where Crewmate should create tasks.',
-      'Save the token and list ID from the integrations page.',
-    ],
-    notes: 'Strong demo choice when you want product-ops actions outside GitHub.',
-  },
-  {
-    id: 'gmail',
-    name: 'Gmail',
-    status: 'disconnected',
-    iconName: 'gmail',
-    color: 'text-red-600 dark:text-red-400',
-    bgColor: 'bg-red-500/10 border-red-500/20',
-    desc: 'Send emails, draft responses, and read your inbox proactively during live sessions.',
-    docsUrl: 'https://developers.google.com/gmail/api',
-    capabilities: ['Read inbox', 'Send emails', 'Create drafts', 'Reply to threads'],
     requiredKeys: [],
     setupSteps: [
-      'Click Connect to authorize Crewmate via Google OAuth.',
-      'Allow the requested Gmail permissions (read + send).',
-      'Crewmate will now be able to read your inbox and send emails on your command.',
+      'Click Connect ClickUp and approve Crewmate in your ClickUp workspace.',
+      'After connecting, optionally choose a default destination list.',
+      'Now the agent can create and review ClickUp tasks without manual API keys.',
     ],
-    notes: 'Uses Google OAuth2 — no API keys required. Connect via the button below.',
-    connectUrl: '/api/auth/gmail',
-  },
-  {
-    id: 'calendar',
-    name: 'Google Calendar',
-    status: 'disconnected',
-    iconName: 'calendar',
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-500/10 border-blue-500/20',
-    desc: 'Schedule meetings, find free time, and see your agenda — all via voice command.',
-    docsUrl: 'https://developers.google.com/calendar/api',
-    capabilities: ['Create events with Meet link', 'Find free time slots', 'List agenda', 'Smart scheduling'],
-    requiredKeys: [],
-    setupSteps: [
-      'Click Connect to authorize Crewmate via Google OAuth.',
-      'Allow the requested Calendar permissions (read + write events).',
-      'Crewmate will schedule meetings and find free slots on your behalf.',
-    ],
-    notes: 'Uses Google OAuth2 — no API keys required. Connect via the button below.',
-    connectUrl: '/api/auth/calendar',
+    notes: 'OAuth replaces manual API token entry. A default list can be selected after connecting.',
   },
 ];
 
 function getConnectedStatus(workspaceId: string, integrationId: string): IntegrationRecord['status'] {
-  if (integrationId === 'github') {
-    return isGithubConfigured(workspaceId) ? 'connected' : 'disconnected';
-  }
-
   if (integrationId === 'slack') {
     return isSlackConfigured(workspaceId) ? 'connected' : 'disconnected';
-  }
-
-  if (integrationId === 'telegram') {
-    return isTelegramConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
   if (integrationId === 'notion') {
     return isNotionConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
+  if (integrationId === 'google-workspace') {
+    return isGoogleWorkspaceConfigured(workspaceId) ? 'connected' : 'disconnected';
+  }
+
   if (integrationId === 'clickup') {
     return isClickUpConfigured(workspaceId) ? 'connected' : 'disconnected';
-  }
-
-  if (integrationId === 'gmail') {
-    return isGmailConfigured(workspaceId) ? 'connected' : 'disconnected';
-  }
-
-  if (integrationId === 'calendar') {
-    return isCalendarConfigured(workspaceId) ? 'connected' : 'disconnected';
   }
 
   return 'disconnected';

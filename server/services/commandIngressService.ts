@@ -1,11 +1,10 @@
 import { db } from '../db';
-import { enqueueWorkflowRunJob } from './delegationService';
 import { insertActivity } from './activityService';
 import { orchestrate } from './orchestrator';
-import type { JobRecord } from '../types';
+import { createWorkspaceTask } from '../repositories/workspaceRepository';
+import { buildReplyTarget, type TaskIngressMode } from './channelTasking';
 
-export type CommandChannel = 'live_session' | 'slack' | 'email' | 'telegram' | 'webhook' | 'api';
-export type CommandExecutionMode = 'sync' | 'async';
+export type CommandChannel = 'live_session' | 'slack' | 'email' | 'webhook' | 'api';
 
 interface CommandTarget {
   userId: string;
@@ -16,11 +15,14 @@ interface CommandSource {
   channel: CommandChannel;
   senderName?: string;
   sourceRef?: string;
+  sessionId?: string;
+  slackChannelId?: string;
+  slackThreadTs?: string | null;
 }
 
 interface DispatchCommandInput {
   deliverToNotion?: boolean;
-  mode?: CommandExecutionMode;
+  mode?: TaskIngressMode | 'sync' | 'async';
   notifyInSlack?: boolean;
   text: string;
   title?: string;
@@ -28,10 +30,10 @@ interface DispatchCommandInput {
 
 interface DispatchCommandResult {
   id: string;
-  kind: 'agent_task' | 'job';
+  kind: 'agent_task' | 'task';
   message: string;
-  mode: CommandExecutionMode;
-  status: 'queued';
+  mode: TaskIngressMode;
+  status: 'queued' | 'pending';
 }
 
 interface WorkspaceMemberRow {
@@ -52,7 +54,7 @@ function buildAsyncTitle(title: string | undefined, text: string, channel: Comma
   return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
 }
 
-function getOriginType(channel: CommandChannel): JobRecord['originType'] {
+function getOriginType(channel: CommandChannel): 'live_session' | 'slack' | 'email' | 'system' {
   switch (channel) {
     case 'live_session':
       return 'live_session';
@@ -60,8 +62,6 @@ function getOriginType(channel: CommandChannel): JobRecord['originType'] {
       return 'slack';
     case 'email':
       return 'email';
-    case 'telegram':
-      return 'telegram';
     default:
       return 'system';
   }
@@ -75,13 +75,19 @@ function getChannelLabel(channel: CommandChannel): string {
       return 'Slack';
     case 'email':
       return 'email';
-    case 'telegram':
-      return 'Telegram';
     case 'api':
       return 'authenticated API';
     default:
       return 'webhook';
   }
+}
+
+function normalizeMode(mode?: DispatchCommandInput['mode']): TaskIngressMode {
+  if (mode === 'track') {
+    return 'track';
+  }
+
+  return 'delegate';
 }
 
 export function findCommandTargetByEmail(email: string): CommandTarget | null {
@@ -137,61 +143,67 @@ export async function dispatchCommand(
     throw new Error('text is required');
   }
 
-  const mode = input.mode === 'async' ? 'async' : 'sync';
+  const mode = normalizeMode(input.mode);
   const channelLabel = getChannelLabel(source.channel);
+  const originType = getOriginType(source.channel);
+  const originRef = buildReplyTarget(source.channel, {
+    sourceRef: source.sourceRef,
+    sessionId: source.sessionId,
+    slackChannelId: source.slackChannelId,
+    slackThreadTs: source.slackThreadTs,
+    userName: source.senderName,
+  });
 
-  if (mode === 'async') {
+  if (mode === 'track') {
     const title = buildAsyncTitle(input.title, text, source.channel);
-    const job = enqueueWorkflowRunJob(
-      target.workspaceId,
-      target.userId,
-      {
-        title,
-        intent: text,
-        deliverToNotion: Boolean(input.deliverToNotion),
-        notifyInSlack: Boolean(input.notifyInSlack),
-      },
-      {
-        actor: source.senderName ?? channelLabel,
-        handoffSummary: `Queued from ${channelLabel}${source.senderName ? ` by ${source.senderName}` : ''}`,
-        originRef: source.sourceRef ?? null,
-        originType: getOriginType(source.channel),
-      },
-    );
+    const task = createWorkspaceTask(target.userId, {
+      title,
+      description: text,
+      tool: channelLabel,
+      priority: 'Medium',
+      status: 'pending',
+      sourceKind: 'integration',
+    });
 
     insertActivity(
-      'Inbound command queued',
-      `Crewmate queued background work from ${channelLabel}: "${title}".`,
+      'Inbound task tracked',
+      `Crewmate tracked work from ${channelLabel}: "${title}".`,
       'communication',
       target.userId,
     );
 
     return {
-      id: job.id,
-      kind: 'job',
-      message: `Queued background execution from ${channelLabel}.`,
+      id: task.id,
+      kind: 'task',
+      message: `Task tracked from ${channelLabel}.`,
+      mode,
+      status: 'pending',
+    };
+  }
+
+  if (mode === 'delegate') {
+    const title = buildAsyncTitle(input.title, text, source.channel);
+    const orchestration = await orchestrate(text, {
+      userId: target.userId,
+      workspaceId: target.workspaceId,
+      originType,
+      originRef: originRef ?? null,
+      taskTitle: title,
+    });
+
+    insertActivity(
+      'Inbound task started',
+      `Crewmate started a task from ${channelLabel}: "${title}".`,
+      'communication',
+      target.userId,
+    );
+
+    return {
+      id: orchestration.taskId,
+      kind: 'agent_task',
+      message: `Task started from ${channelLabel}.`,
       mode,
       status: 'queued',
     };
   }
-
-  const orchestration = await orchestrate(text, {
-    userId: target.userId,
-    workspaceId: target.workspaceId,
-  });
-
-  insertActivity(
-    'Inbound command received',
-    `Crewmate started an agent task from ${channelLabel}.`,
-    'communication',
-    target.userId,
-  );
-
-  return {
-    id: orchestration.taskId,
-    kind: 'agent_task',
-    message: `Started an agent task from ${channelLabel}.`,
-    mode,
-    status: 'queued',
-  };
 }

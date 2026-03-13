@@ -17,6 +17,7 @@ describe('uiNavigatorExecutor', () => {
   test('executes safe planner actions until finish', async () => {
     const page = {
       url: vi.fn().mockReturnValue('https://example.com'),
+      waitForSelector: vi.fn().mockResolvedValue(undefined),
       click: vi.fn().mockResolvedValue(undefined),
       title: vi.fn().mockResolvedValue('Example'),
       setViewportSize: vi.fn().mockResolvedValue(undefined),
@@ -48,7 +49,8 @@ describe('uiNavigatorExecutor', () => {
 
     expect(result.status).toBe('completed');
     expect(result.steps).toHaveLength(2);
-    expect(page.click).toHaveBeenCalledWith('#signup');
+    expect(page.waitForSelector).toHaveBeenCalledWith('#signup', { timeout: 2000, state: 'visible' });
+    expect(page.click).toHaveBeenCalledWith('#signup', { timeout: 3000 });
   });
 
   test('blocks confirmation-required planner actions before execution', async () => {
@@ -82,6 +84,7 @@ describe('uiNavigatorExecutor', () => {
   test('returns failed when action execution throws', async () => {
     const page = {
       url: vi.fn().mockReturnValue('https://example.com'),
+      waitForSelector: vi.fn().mockResolvedValue(undefined),
       click: vi.fn().mockRejectedValue(new Error('selector not found')),
     };
 

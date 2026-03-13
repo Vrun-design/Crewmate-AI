@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 
-export type AccountTabId = 'profile' | 'ai-models' | 'preferences' | 'shortcuts' | 'personas' | 'sessions' | 'activity';
+export type AccountTabId = 'profile' | 'ai-models' | 'preferences' | 'shortcuts' | 'sessions' | 'activity';
 
 export type AccountUser = {
   id: string;

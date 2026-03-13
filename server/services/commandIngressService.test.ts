@@ -2,15 +2,15 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-const enqueueWorkflowRunJob = vi.fn();
 const orchestrate = vi.fn();
-
-vi.mock('./delegationService', () => ({
-  enqueueWorkflowRunJob,
-}));
+const createWorkspaceTask = vi.fn();
 
 vi.mock('./orchestrator', () => ({
   orchestrate,
+}));
+
+vi.mock('../repositories/workspaceRepository', () => ({
+  createWorkspaceTask,
 }));
 
 vi.mock('./activityService', () => ({
@@ -21,11 +21,11 @@ const { dispatchCommand } = await import('./commandIngressService');
 
 describe('commandIngressService', () => {
   beforeEach(() => {
-    enqueueWorkflowRunJob.mockReset();
     orchestrate.mockReset();
+    createWorkspaceTask.mockReset();
   });
 
-  test('starts a synchronous orchestrated task for inbound commands', async () => {
+  test('delegates inbound commands into the shared task runtime by default', async () => {
     orchestrate.mockResolvedValue({ taskId: 'agt_123' });
 
     const result = await dispatchCommand(
@@ -37,57 +37,80 @@ describe('commandIngressService', () => {
     expect(orchestrate).toHaveBeenCalledWith('Summarize the latest issues and post next steps.', {
       userId: 'USR-1',
       workspaceId: 'WS-1',
+      originType: 'system',
+      originRef: JSON.stringify({
+        channel: 'webhook',
+        sourceRef: null,
+      }),
+      taskTitle: 'Summarize the latest issues and post next steps.',
     });
     expect(result).toEqual({
       id: 'agt_123',
       kind: 'agent_task',
-      message: 'Started an agent task from webhook.',
-      mode: 'sync',
+      message: 'Task started from webhook.',
+      mode: 'delegate',
       status: 'queued',
     });
   });
 
-  test('queues async background work with channel-aware metadata', async () => {
-    enqueueWorkflowRunJob.mockReturnValue({
-      id: 'JOB-1',
-      title: 'Review Q2 pipeline',
-      status: 'queued',
-    });
+  test('queues delegated tasks with channel-aware Slack metadata', async () => {
+    orchestrate.mockResolvedValue({ taskId: 'agt_async_1' });
 
     const result = await dispatchCommand(
       { userId: 'USR-1', workspaceId: 'WS-1' },
-      { channel: 'telegram', senderName: 'founder@example.com', sourceRef: 'chat-123:456' },
+      {
+        channel: 'slack',
+        senderName: 'founder@example.com',
+        slackChannelId: 'C123',
+        slackThreadTs: '123.456',
+      },
       {
         text: 'Review the pipeline, identify blockers, and send the result later.',
         title: 'Review Q2 pipeline',
-        mode: 'async',
+        mode: 'delegate',
         deliverToNotion: true,
         notifyInSlack: true,
       },
     );
 
-    expect(enqueueWorkflowRunJob).toHaveBeenCalledWith(
-      'WS-1',
-      'USR-1',
-      {
-        title: 'Review Q2 pipeline',
-        intent: 'Review the pipeline, identify blockers, and send the result later.',
-        deliverToNotion: true,
-        notifyInSlack: true,
-      },
-      {
-        actor: 'founder@example.com',
-        handoffSummary: 'Queued from Telegram by founder@example.com',
-        originRef: 'chat-123:456',
-        originType: 'telegram',
-      },
-    );
+    expect(orchestrate).toHaveBeenCalledWith('Review the pipeline, identify blockers, and send the result later.', {
+      userId: 'USR-1',
+      workspaceId: 'WS-1',
+      originRef: JSON.stringify({
+        channel: 'slack',
+        channelId: 'C123',
+        threadTs: '123.456',
+        userName: 'founder@example.com',
+      }),
+      originType: 'slack',
+      taskTitle: 'Review Q2 pipeline',
+    });
     expect(result).toEqual({
-      id: 'JOB-1',
-      kind: 'job',
-      message: 'Queued background execution from Telegram.',
-      mode: 'async',
+      id: 'agt_async_1',
+      kind: 'agent_task',
+      message: 'Task started from Slack.',
+      mode: 'delegate',
       status: 'queued',
+    });
+  });
+
+  test('creates a tracked task without orchestration when mode is track', async () => {
+    createWorkspaceTask.mockReturnValue({ id: 'TSK-1' });
+
+    const result = await dispatchCommand(
+      { userId: 'USR-1', workspaceId: 'WS-1' },
+      { channel: 'slack', senderName: 'founder', slackChannelId: 'C123', slackThreadTs: '123.456' },
+      { text: 'Capture the launch blockers', mode: 'track' },
+    );
+
+    expect(orchestrate).not.toHaveBeenCalled();
+    expect(createWorkspaceTask).toHaveBeenCalled();
+    expect(result).toEqual({
+      id: 'TSK-1',
+      kind: 'task',
+      message: 'Task tracked from Slack.',
+      mode: 'track',
+      status: 'pending',
     });
   });
 });

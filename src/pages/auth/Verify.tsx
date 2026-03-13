@@ -4,6 +4,8 @@ import { ArrowLeft } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '../../components/ui/Button';
 import { authService, authStorage } from '../../services/authService';
+import { firebaseAuthService } from '../../services/firebaseAuth';
+import { onboardingFlowService } from '../../services/onboardingFlowService';
 
 export function Verify() {
   const [code, setCode] = useState(['', '', '', '', '', '']);
@@ -15,6 +17,9 @@ export function Verify() {
   const email = location.state?.email || 'you@example.com';
   const [devCode, setDevCode] = useState(location.state?.devCode || '');
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [emailLinkAddress, setEmailLinkAddress] = useState(location.state?.email || firebaseAuthService.getPendingEmail() || '');
+  const isFirebaseMode = firebaseAuthService.isConfigured();
+  const isEmailLinkFlow = isFirebaseMode && firebaseAuthService.isEmailLink(window.location.href);
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
@@ -36,6 +41,29 @@ export function Verify() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isEmailLinkFlow) {
+      if (!emailLinkAddress.trim()) {
+        setError('Enter the email address that received the magic link.');
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const firebaseUser = await firebaseAuthService.completeEmailLink(emailLinkAddress.trim(), window.location.href);
+        const token = await firebaseUser.getIdToken();
+        authStorage.saveSession(token, firebaseUser.email ?? emailLinkAddress.trim());
+        onboardingFlowService.reset();
+        navigate('/onboarding');
+      } catch (verifyError) {
+        setError(verifyError instanceof Error ? verifyError.message : 'Unable to complete sign-in');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
     if (code.join('').length !== 6) return;
     setIsLoading(true);
     setError(null);
@@ -44,6 +72,7 @@ export function Verify() {
       const response = await authService.verifyCode(email, code.join(''));
       authStorage.saveSession(response.token, response.user.email);
       localStorage.setItem('crewmate_user_email', response.user.email);
+      onboardingFlowService.reset();
       navigate('/onboarding');
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : 'Unable to verify code');
@@ -58,11 +87,16 @@ export function Verify() {
     setResendMessage(null);
 
     try {
-      const response = await authService.requestCode(email);
-      setDevCode(response.devCode);
-      setCode(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
-      setResendMessage(response.devCode ? 'A fresh verification code is ready.' : 'A fresh verification code was sent.');
+      if (isFirebaseMode) {
+        await firebaseAuthService.sendEmailLink(emailLinkAddress || email);
+        setResendMessage('A fresh magic link was sent.');
+      } else {
+        const response = await authService.requestCode(email);
+        setDevCode(response.devCode);
+        setCode(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+        setResendMessage(response.devCode ? 'A fresh verification code is ready.' : 'A fresh verification code was sent.');
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Unable to resend code');
     } finally {
@@ -90,31 +124,54 @@ export function Verify() {
           <img src="/Crewmate.svg" alt="Crewmate" className="h-14 w-14 object-contain shadow-[0_8px_20px_rgba(0,0,0,0.08)]" />
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Check your email</h1>
-            <p className="text-sm text-muted-foreground">Enter the 6-digit code for <span className="font-medium text-foreground">{email}</span></p>
+            <p className="text-sm text-muted-foreground">
+              {isEmailLinkFlow
+                ? <>Complete the magic link sign-in for <span className="font-medium text-foreground">{emailLinkAddress || email}</span></>
+                : <>Enter the 6-digit code for <span className="font-medium text-foreground">{email}</span></>}
+            </p>
           </div>
         </div>
 
         <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-6 shadow-2xl shadow-black/5">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="flex justify-between gap-2">
-              {code.map((digit, index) => (
+            {isEmailLinkFlow ? (
+              <div className="space-y-2">
+                <label htmlFor="email-link-address" className="text-xs font-medium text-foreground/80 uppercase tracking-wider">Email Address</label>
                 <input
-                  key={index}
-                  ref={el => { inputRefs.current[index] = el; }}
-                  type="text"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="w-12 h-14 text-center text-xl font-medium bg-background/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground transition-all text-foreground shadow-sm"
+                  id="email-link-address"
+                  type="email"
+                  value={emailLinkAddress}
+                  onChange={(event) => setEmailLinkAddress(event.target.value)}
+                  className="w-full bg-background/50 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground transition-all text-foreground placeholder:text-muted-foreground/50"
+                  placeholder="name@example.com"
+                  required
                 />
-              ))}
-            </div>
-            <Button variant="primary" className="w-full justify-center py-5 text-sm font-medium shadow-[0_1px_2px_rgba(0,0,0,0.1)]" disabled={isLoading || code.join('').length !== 6}>
-              {isLoading ? 'Verifying...' : 'Verify & Continue'}
+              </div>
+            ) : (
+              <div className="flex justify-between gap-2">
+                {code.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={el => { inputRefs.current[index] = el; }}
+                    type="text"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleChange(index, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(index, e)}
+                    className="w-12 h-14 text-center text-xl font-medium bg-background/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground transition-all text-foreground shadow-sm"
+                  />
+                ))}
+              </div>
+            )}
+            <Button
+              variant="primary"
+              className="w-full justify-center py-5 text-sm font-medium shadow-[0_1px_2px_rgba(0,0,0,0.1)]"
+              disabled={isLoading || (!isEmailLinkFlow && code.join('').length !== 6)}
+            >
+              {isLoading ? 'Verifying...' : isEmailLinkFlow ? 'Complete sign-in' : 'Verify & Continue'}
             </Button>
             {error ? <div className="text-sm text-red-500">{error}</div> : null}
-            {devCode ? (
+            {!isFirebaseMode && devCode ? (
               <div className="rounded-lg border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
                 Local preview code: <span className="font-mono text-foreground">{devCode}</span>
               </div>

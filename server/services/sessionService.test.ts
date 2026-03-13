@@ -11,7 +11,7 @@ const {endSession, startSession} = await import('./sessionService');
 const {getDashboardPayload} = await import('../repositories/dashboardRepository');
 const {requestLoginCode, verifyLoginCode} = await import('./authService');
 const {createTask, getTask, listTasks: listAgentTasks} = await import('./orchestrator');
-const {ingestMemoryNode, listMemoryNodesForUser, retrieveRelevantMemories} = await import('./memoryService');
+const {ingestKnowledgeMemory, searchMemoryRecords, retrieveRelevantMemories} = await import('./memoryService');
 
 function createUser(email: string): {id: string; workspaceId: string} {
   const {devCode} = requestLoginCode(email);
@@ -31,10 +31,11 @@ function resetDatabase(): void {
     DELETE FROM user_preferences;
     DELETE FROM notifications;
     DELETE FROM tasks;
+    DELETE FROM task_runs;
     DELETE FROM activities;
-    DELETE FROM agent_tasks;
     DELETE FROM integrations;
-    DELETE FROM memory_nodes;
+    DELETE FROM memory_records;
+    DELETE FROM screenshot_artifacts;
     DELETE FROM users;
   `);
 }
@@ -98,7 +99,7 @@ describe('sessionService', () => {
     db.prepare(`
       INSERT INTO tasks (id, user_id, title, status, time, tool_name, priority)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('TSK-A', alpha.id, 'Alpha task', 'completed', 'Today', 'GitHub', 'High');
+    `).run('TSK-A', alpha.id, 'Alpha task', 'completed', 'Today', 'ClickUp', 'High');
     db.prepare(`
       INSERT INTO tasks (id, user_id, title, status, time, tool_name, priority)
       VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -146,23 +147,23 @@ describe('sessionService', () => {
     const alpha = createUser('alpha@example.com');
     const beta = createUser('beta@example.com');
 
-    ingestMemoryNode({
+    ingestKnowledgeMemory({
       userId: alpha.id,
       workspaceId: alpha.workspaceId,
       title: 'Alpha launch notes',
-      type: 'document',
-      searchText: 'Launch notes for alpha workspace',
+      summary: 'Launch notes for alpha workspace',
+      contentText: 'Launch notes for alpha workspace',
     });
-    ingestMemoryNode({
+    ingestKnowledgeMemory({
       userId: beta.id,
       workspaceId: beta.workspaceId,
       title: 'Beta launch notes',
-      type: 'document',
-      searchText: 'Launch notes for beta workspace',
+      summary: 'Launch notes for beta workspace',
+      contentText: 'Launch notes for beta workspace',
     });
 
-    const alphaNodes = listMemoryNodesForUser(alpha.id);
-    const betaNodes = listMemoryNodesForUser(beta.id);
+    const alphaNodes = searchMemoryRecords(alpha.id);
+    const betaNodes = searchMemoryRecords(beta.id);
     const alphaMatches = await retrieveRelevantMemories(alpha.id, 'launch notes', 10);
     const betaMatches = await retrieveRelevantMemories(beta.id, 'launch notes', 10);
 

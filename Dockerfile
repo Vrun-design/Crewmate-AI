@@ -1,51 +1,42 @@
-### Stage 1 — Build frontend assets
-FROM node:20-slim AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy manifests first for layer caching
+# Copy package files
 COPY package*.json ./
-RUN npm ci --include=dev
+RUN npm ci
 
-# Copy all source
+# Copy source
 COPY . .
 
-# Build frontend
+# Build the frontend (Vite)
 RUN npm run build
 
-### Stage 2 — Runtime image
-FROM node:20-slim AS runner
-
-# Install chromium deps for Playwright browser skills
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
-    libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
-    && rm -rf /var/lib/apt/lists/*
+# ─── Runtime stage ──────────────────────────────────────────────────────────
+FROM node:22-alpine AS runtime
 
 WORKDIR /app
 
-# Runtime keeps tsx available because the server is executed directly from TypeScript.
+# Install only production deps + tsx for running TS server
 COPY package*.json ./
-RUN npm ci --include=dev
+RUN npm ci --omit=dev && npm install tsx
 
-# Copy built assets from builder
+# Copy built frontend assets
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/tsconfig*.json ./
 
-# Install playwright chromium browsers
-RUN npx playwright install chromium --with-deps || true
+# Copy server source (tsx compiles on the fly)
+COPY server ./server
+COPY tsconfig.json ./
 
-# Data directory for SQLite (will be mounted as volume on Cloud Run)
-RUN mkdir -p /app/data && chmod 777 /app/data
+# Create data directory for SQLite & artifacts
+RUN mkdir -p data/artifacts
 
+# Expose port
 EXPOSE 8787
 
-# Health check
+# Health check (uses existing /api/health/live endpoint)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:8787/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+  CMD wget -qO- http://localhost:8787/api/health/live || exit 1
 
-ENV NODE_ENV=production
-ENV PORT=8787
-
-CMD ["node", "--import", "tsx", "server/index.ts"]
+# Start the server (tsx runs TypeScript directly, no separate compile step)
+CMD ["npx", "tsx", "server/index.ts"]

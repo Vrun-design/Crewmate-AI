@@ -1,18 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck } from 'lucide-react';
+import { Mail, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '../../components/ui/Button';
 import { authService, authStorage } from '../../services/authService';
+import { firebaseAuthService } from '../../services/firebaseAuth';
+import { onboardingFlowService } from '../../services/onboardingFlowService';
+import { integrationsService } from '../../services/integrationsService';
+
+function buildWorkspaceConnectUrl(connectUrl: string, redirectPath: string): string {
+  const base = import.meta.env.VITE_API_URL ?? '';
+  const separator = connectUrl.includes('?') ? '&' : '?';
+  return `${base}${connectUrl}${separator}redirectPath=${encodeURIComponent(redirectPath)}`;
+}
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+  const isFirebaseMode = firebaseAuthService.isConfigured();
 
   useEffect(() => {
     authStorage.clearSession();
+    void firebaseAuthService.signOut().catch(() => undefined);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,12 +32,54 @@ export function Login() {
     if (!email) return;
     setIsLoading(true);
     setError(null);
+    setMessage(null);
 
     try {
+      if (isFirebaseMode) {
+        await firebaseAuthService.sendEmailLink(email);
+        setMessage('Magic sign-in link sent. Open it on this device to continue.');
+        navigate('/verify', { state: { email } });
+        return;
+      }
+
       const response = await authService.requestCode(email);
       navigate('/verify', { state: { email: response.email, devCode: response.devCode } });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Unable to request verification code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const firebaseUser = await firebaseAuthService.signInWithGoogle();
+      const token = await firebaseUser.getIdToken();
+      authStorage.saveSession(token, firebaseUser.email ?? '');
+      onboardingFlowService.markComplete();
+
+      // Check if Google Workspace is already connected.
+      // If not, redirect straight into the workspace OAuth flow so the user
+      // connects in one seamless step — no separate onboarding screen needed.
+      try {
+        const integrations = await integrationsService.getIntegrations();
+        const gws = integrations.find((i) => i.id === 'google-workspace');
+        const isConnected = gws?.status === 'connected';
+        if (!isConnected && gws?.connectUrl) {
+          window.location.href = buildWorkspaceConnectUrl(gws.connectUrl, '/dashboard');
+          return;
+        }
+      } catch {
+        // If the check fails for any reason, fall through to dashboard gracefully.
+      }
+
+      navigate('/dashboard');
+    } catch (signInError) {
+      setError(signInError instanceof Error ? signInError.message : 'Unable to sign in with Google');
     } finally {
       setIsLoading(false);
     }
@@ -47,7 +101,11 @@ export function Login() {
           <img src="/Crewmate.svg" alt="Crewmate" className="h-14 w-14 object-contain shadow-[0_8px_20px_rgba(0,0,0,0.08)]" />
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Log in to Crewmate</h1>
-            <p className="text-sm text-muted-foreground">Enter your email to continue into the local workspace preview.</p>
+            <p className="text-sm text-muted-foreground">
+              {isFirebaseMode
+                ? 'Use Google or a magic email link to access the beta workspace.'
+                : 'Enter your email to continue into the local workspace preview.'}
+            </p>
           </div>
         </div>
 
@@ -55,9 +113,16 @@ export function Login() {
           <div className="mb-4 flex items-start gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
             <ShieldCheck size={16} className="mt-0.5 shrink-0 text-foreground" />
             <div>
-              This build uses local email-code auth for development. Hosted auth providers are not enabled here yet.
+              {isFirebaseMode
+                ? 'Production-ready Firebase Auth is enabled for this build. Your backend session is derived from the verified Firebase identity token.'
+                : 'This build uses local email-code auth for development. Hosted auth providers are not enabled here yet.'}
             </div>
           </div>
+          {isFirebaseMode ? (
+            <Button variant="primary" className="w-full justify-center py-5 text-sm font-medium mb-4" disabled={isLoading} onClick={() => void handleGoogleSignIn()}>
+              Continue with Google
+            </Button>
+          ) : null}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="text-xs font-medium text-foreground/80 uppercase tracking-wider">Email Address</label>
@@ -72,9 +137,15 @@ export function Login() {
               />
             </div>
             <Button variant="primary" className="w-full justify-center py-5 text-sm font-medium shadow-[0_1px_2px_rgba(0,0,0,0.1)]" disabled={isLoading}>
-              {isLoading ? 'Sending code...' : 'Continue with Email'}
+              {isLoading ? 'Sending link...' : isFirebaseMode ? 'Send magic link' : 'Continue with Email'}
             </Button>
             {error ? <div className="text-sm text-red-500">{error}</div> : null}
+            {message ? (
+              <div className="flex items-center gap-2 text-sm text-emerald-600">
+                <Mail size={14} />
+                {message}
+              </div>
+            ) : null}
           </form>
         </div>
 

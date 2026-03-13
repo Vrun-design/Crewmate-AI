@@ -37,8 +37,8 @@ export function buildLiveConnectConfig(input: {
       automaticActivityDetection: {
         disabled: false,
         startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_HIGH,
-        prefixPaddingMs: 120,
-        silenceDurationMs: 400,
+        prefixPaddingMs: 80,
+        silenceDurationMs: 220,
       },
     },
     contextWindowCompression: {

@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { EmitStep } from '../../types/agentEvents';
 
+const generateContent = vi.fn();
 const runSkill = vi.fn();
 const isFeatureEnabled = vi.fn();
+
+vi.mock('../geminiClient', () => ({
+    createGeminiClient: () => ({
+        models: {
+            generateContent,
+        },
+    }),
+}));
 
 vi.mock('../../skills/registry', () => ({
     runSkill,
@@ -14,6 +23,7 @@ vi.mock('../featureFlagService', () => ({
 
 describe('runUiNavigatorAgent', () => {
     beforeEach(() => {
+        generateContent.mockReset();
         runSkill.mockReset();
         isFeatureEnabled.mockReset();
     });
@@ -22,6 +32,7 @@ describe('runUiNavigatorAgent', () => {
         const { runUiNavigatorAgent } = await import('./uiNavigatorAgent');
 
         isFeatureEnabled.mockReturnValue(true);
+        generateContent.mockResolvedValue({ text: '1. Open page\n2. Click signup\n3. Finish' });
         runSkill.mockResolvedValue({
             result: {
                 success: true,
@@ -37,16 +48,29 @@ describe('runUiNavigatorAgent', () => {
             emitStep,
         );
 
-        expect(runSkill).toHaveBeenCalledWith(
+        expect(runSkill).toHaveBeenNthCalledWith(
+            1,
+            'browser.inspect-visible-ui',
+            { userId: 'user-1', workspaceId: 'workspace-1' },
+            { url: 'https://example.com' },
+        );
+        expect(runSkill).toHaveBeenNthCalledWith(
+            2,
             'browser.ui-navigate',
             { userId: 'user-1', workspaceId: 'workspace-1' },
-            {
-                intent: 'Click the signup button',
+            expect.objectContaining({
+                intent: expect.stringContaining('Click the signup button'),
                 startUrl: 'https://example.com',
-                maxSteps: 8,
-            },
+                maxSteps: 30,
+            }),
         );
-        expect(result).toEqual({ status: 'completed', summary: 'Done' });
+        expect(result).toEqual(expect.objectContaining({
+            success: true,
+            output: { status: 'completed', summary: 'Done' },
+            summary: 'Done',
+            executionPlan: '1. Open page\n2. Click signup\n3. Finish',
+        }));
+        expect(result.durationMs).toEqual(expect.any(Number));
     });
 
     test('fails fast when the feature flag is disabled', async () => {

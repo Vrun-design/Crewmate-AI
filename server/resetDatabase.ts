@@ -8,10 +8,9 @@ const tables = [
   'notifications',
   'integration_connections',
   'user_preferences',
-  'jobs',
   'activities',
   'tasks',
-  'memory_nodes',
+  'memory_records',
   'integrations',
   'users',
 ] as const;

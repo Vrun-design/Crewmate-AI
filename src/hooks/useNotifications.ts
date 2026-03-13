@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { notificationService } from '../services/notificationService';
+import { getUserFacingErrorMessage } from '../utils/errorHandling';
 import { useLiveEvents } from './useLiveEvents';
 import type { Notification } from '../types';
 
@@ -21,7 +22,7 @@ export function useNotifications(): UseNotificationsResult {
       setNotifications(payload);
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Unable to load notifications');
+      setError(getUserFacingErrorMessage(loadError, 'Unable to load notifications'));
     } finally {
       setIsLoading(false);
     }
@@ -34,7 +35,10 @@ export function useNotifications(): UseNotificationsResult {
   useLiveEvents({
     onNotification: () => {
       void loadNotifications();
-    }
+    },
+    onError: (message) => {
+      setError(message);
+    },
   });
 
   const markAllRead = useCallback(async () => {

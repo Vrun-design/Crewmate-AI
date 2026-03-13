@@ -3,7 +3,13 @@ import {Badge} from '../ui/Badge';
 import type {Task} from '../../types';
 
 export function getTaskStatusBadge(status: Task['status']): React.ReactNode {
-  const variant = status === 'completed' ? 'success' : status === 'in_progress' ? 'info' : 'default';
+  const variant = status === 'completed'
+    ? 'success'
+    : status === 'in_progress'
+      ? 'info'
+      : status === 'failed'
+        ? 'danger'
+        : 'default';
   return <Badge variant={variant}>{status.replace('_', ' ')}</Badge>;
 }
 

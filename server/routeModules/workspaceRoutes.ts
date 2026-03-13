@@ -1,17 +1,18 @@
 import type { Express, Request, Response } from 'express';
 import { db } from '../db';
 import { getDashboardPayload } from '../repositories/dashboardRepository';
-import { createWorkspaceTask, listActivities, listSessionHistory, listTasks } from '../repositories/workspaceRepository';
+import { createWorkspaceTask, getTaskDetail, getTaskRuns, listActivities, listSessionHistory, listTasks } from '../repositories/workspaceRepository';
 import { listCapabilities } from '../services/capabilityService';
-import { generateCreativeArtifact } from '../services/creativeStudioService';
 import { addSseClient } from '../services/eventService';
-import { getActivePersona, listPersonas, setActivePersona } from '../services/personaService';
 import { getOnboardingProfile, saveOnboardingProfile } from '../services/onboardingProfileService';
 import { getUserPreferences, saveUserPreferences } from '../services/preferencesService';
 import { getFeatureFlags } from '../services/featureFlagService';
 import { createClickUpTask, isClickUpConfigured } from '../services/clickupService';
 import { createNotionPage, isNotionConfigured } from '../services/notionService';
-import { createGithubIssue, isGithubConfigured } from '../services/githubService';
+import { ingestArtifactLink } from '../services/memoryIngestor';
+import { cancelTask } from '../services/orchestrator';
+import { delegateSkillExecution, orchestrate } from '../services/orchestrator';
+import { createErrorResponse, logServerError } from '../services/runtimeLogger';
 import type { UserPreferencesRecord } from '../types';
 import type { RequireAuth } from './types';
 
@@ -25,10 +26,6 @@ async function executeIntegrationTask(tool: string, workspaceId: string, title: 
       if (!isClickUpConfigured(workspaceId)) throw new Error('ClickUp integration is not configured.');
       const clickupResult = await createClickUpTask(workspaceId, { name: title, description });
       return clickupResult.url;
-    case 'GitHub':
-      if (!isGithubConfigured(workspaceId)) throw new Error('GitHub integration is not configured.');
-      const githubResult = await createGithubIssue(workspaceId, { title, body: description });
-      return githubResult.url;
     case 'Crewmate':
       // Local workspace task only, no external sync needed
       return undefined;
@@ -50,7 +47,12 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
-      res.status(500).json({ ok: false, error: String(err) });
+      logServerError('workspaceRoutes:health', err);
+      const errorResponse = createErrorResponse('Health check failed.', {
+        code: 'health_check_failed',
+        retryable: true,
+      });
+      res.status(errorResponse.status).json({ ok: false, ...errorResponse.body });
     }
   });
 
@@ -61,7 +63,8 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     try {
       const { listAuditLog } = require('../services/auditLogger') as typeof import('../services/auditLogger');
       res.json(listAuditLog(limit, user.id));
-    } catch {
+    } catch (error) {
+      logServerError('workspaceRoutes:audit-log', error, { userId: user.id, limit });
       res.json([]);
     }
   });
@@ -88,10 +91,59 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     res.json(listTasks(user.id));
   });
 
+  app.get('/api/tasks/:id', (req: Request, res: Response) => {
+    const user = requireAuth(req, res);
+    if (!user) return;
+
+    const task = getTaskDetail(req.params.id, user.id);
+    if (!task) {
+      res.status(404).json({ message: 'Task not found' });
+      return;
+    }
+
+    res.json(task);
+  });
+
+  app.get('/api/tasks/:id/runs', (req: Request, res: Response) => {
+    const user = requireAuth(req, res);
+    if (!user) return;
+    res.json(getTaskRuns(req.params.id, user.id));
+  });
+
+  app.post('/api/tasks/:id/cancel', (req: Request, res: Response) => {
+    const user = requireAuth(req, res);
+    if (!user) return;
+
+    const task = getTaskDetail(req.params.id, user.id);
+    if (!task) {
+      res.status(404).json({ message: 'Task not found' });
+      return;
+    }
+
+    const activeRunId = task.runs.find((run) => run.status === 'queued' || run.status === 'running')?.id
+      ?? task.latestRun?.id
+      ?? task.currentRunId
+      ?? null;
+    if (!activeRunId) {
+      res.status(400).json({ message: 'This task cannot be cancelled from the current runtime path yet.' });
+      return;
+    }
+
+    const cancelled = cancelTask(activeRunId, user.id);
+    if (!cancelled) {
+      res.status(404).json({ message: 'Task run not found' });
+      return;
+    }
+
+    const nextTask = getTaskDetail(req.params.id, user.id);
+    res.json(nextTask ?? task);
+  });
+
   app.post('/api/tasks', async (req: Request, res: Response) => {
     const user = requireAuth(req, res);
     if (!user) return;
 
+    const mode = req.body?.mode === 'delegated' ? 'delegated' : 'manual';
     const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
     const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
     const tool = typeof req.body?.tool === 'string' ? req.body.tool.trim() : '';
@@ -113,7 +165,57 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     }
 
     try {
+      if (mode === 'delegated') {
+        const intent = description ? `${title}\n\n${description}` : title;
+        let taskId: string;
+
+        if (tool === 'Notion') {
+          const delegated = await delegateSkillExecution(
+            'notion.create-page',
+            { userId: user.id, workspaceId: user.workspaceId, originType: 'app' },
+            { title, content: description || title },
+            { intent: `Create Notion Page: ${title}`, originType: 'app' },
+          );
+          taskId = delegated.taskId;
+        } else if (tool === 'ClickUp') {
+          const delegated = await delegateSkillExecution(
+            'clickup.create-task',
+            { userId: user.id, workspaceId: user.workspaceId, originType: 'app' },
+            { name: title, description },
+            { intent: `Create ClickUp Task: ${title}`, originType: 'app' },
+          );
+          taskId = delegated.taskId;
+        } else {
+          const delegated = await orchestrate(intent, {
+            userId: user.id,
+            workspaceId: user.workspaceId,
+            originType: 'app',
+          });
+          taskId = delegated.taskId;
+        }
+
+        const task = getTaskDetail(taskId, user.id);
+        if (!task) {
+          res.status(500).json({ message: 'Delegated task was created but could not be loaded.' });
+          return;
+        }
+
+        res.status(201).json(task);
+        return;
+      }
+
       const url = await executeIntegrationTask(tool, user.workspaceId, title, description);
+
+      if (url) {
+        ingestArtifactLink({
+          userId: user.id,
+          workspaceId: user.workspaceId,
+          title,
+          url,
+          provider: tool,
+          summary: description || `${tool} artifact created from Crewmate`,
+        });
+      }
 
       const task = createWorkspaceTask(user.id, {
         title,
@@ -125,7 +227,15 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
 
       res.status(201).json(task);
     } catch (error) {
-      res.status(500).json({ message: error instanceof Error ? error.message : `Failed to create task in ${tool}` });
+      logServerError('workspaceRoutes:create-task', error, { userId: user.id, mode, tool });
+      const errorResponse = createErrorResponse(
+        error instanceof Error ? error.message : `Failed to create task in ${tool}`,
+        {
+          code: 'task_create_failed',
+          retryable: true,
+        },
+      );
+      res.status(errorResponse.status).json(errorResponse.body);
     }
   });
 
@@ -148,7 +258,11 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     db.prepare('DELETE FROM session_messages WHERE session_id = ?').run(id);
     const result = db.prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?').run(id, user.id);
     if (result.changes === 0) {
-      res.status(404).json({ error: 'Session not found' });
+      res.status(404).json(createErrorResponse('Session not found', {
+        status: 404,
+        code: 'session_not_found',
+        retryable: false,
+      }).body);
       return;
     }
     res.status(204).send();
@@ -164,26 +278,6 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     const user = requireAuth(req, res);
     if (!user) return;
     res.json(getFeatureFlags());
-  });
-
-  app.post('/api/creative/generate', async (req: Request, res: Response) => {
-    const user = requireAuth(req, res);
-    if (!user) return;
-
-    const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
-    const context = typeof req.body?.context === 'string' ? req.body.context.trim() : '';
-    const outputStyle = typeof req.body?.outputStyle === 'string' ? req.body.outputStyle.trim() : '';
-
-    if (!prompt) {
-      res.status(400).json({ message: 'prompt is required' });
-      return;
-    }
-
-    try {
-      res.json(await generateCreativeArtifact(user.id, { prompt, context, outputStyle }));
-    } catch (error) {
-      res.status(500).json({ message: error instanceof Error ? error.message : 'Creative generation failed' });
-    }
   });
 
   app.get('/api/preferences', (req: Request, res: Response) => {
@@ -217,30 +311,5 @@ export function registerWorkspaceRoutes(app: Express, requireAuth: RequireAuth):
     }
 
     res.json(saveOnboardingProfile(user.id, { agentName, voiceModel }));
-  });
-
-  app.get('/api/personas', (req: Request, res: Response) => {
-    const user = requireAuth(req, res);
-    if (!user) return;
-    const personas = listPersonas();
-    const active = getActivePersona(user.id);
-    res.json({ personas, activePersonaId: active.id });
-  });
-
-  app.put('/api/personas/active', (req: Request, res: Response) => {
-    const user = requireAuth(req, res);
-    if (!user) return;
-    const personaId = typeof req.body?.personaId === 'string' ? req.body.personaId.trim() : '';
-
-    if (!personaId) {
-      res.status(400).json({ message: 'personaId is required' });
-      return;
-    }
-
-    try {
-      res.json(setActivePersona(user.id, personaId));
-    } catch (err) {
-      res.status(400).json({ message: err instanceof Error ? err.message : 'Invalid personaId' });
-    }
   });
 }

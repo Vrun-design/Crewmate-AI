@@ -35,6 +35,10 @@ describe('uiNavigatorPlanner', () => {
         mimeType: 'image/jpeg',
       },
     });
+    expect(request.config).toMatchObject({
+      responseMimeType: 'application/json',
+    });
+    expect(request.config?.responseJsonSchema).toBeTruthy();
   });
 
   test('parses fenced JSON and derives safe action policy', () => {
@@ -44,6 +48,21 @@ describe('uiNavigatorPlanner', () => {
 
     expect(plan.action.type).toBe('click');
     expect(plan.action.safety).toBe('safe');
+  });
+
+  test('parses valid JSON surrounded by extra model text', () => {
+    const plan = parseUiPlannerResponse({
+      text: 'Here is the plan:\n{"goal":"Click signup","confidence":0.9,"action":{"type":"click","selector":"#signup","reasoning":"The visible CTA matches the task.","safety":"safe"}}\nDone.',
+    });
+
+    expect(plan.goal).toBe('Click signup');
+    expect(plan.action.type).toBe('click');
+  });
+
+  test('throws a clearer error when the planner returns plain English', () => {
+    expect(() => parseUiPlannerResponse({
+      text: 'I have already completed this task for the user.',
+    })).toThrow(/UI planner returned non-JSON output/);
   });
 
   test('plans the next action through the Gemini client dependency', async () => {

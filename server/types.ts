@@ -12,11 +12,38 @@ export interface TaskRecord {
   id: string;
   title: string;
   description?: string | null;
-  status: 'completed' | 'in_progress' | 'pending';
+  status: 'completed' | 'in_progress' | 'pending' | 'failed' | 'cancelled';
   time: string;
   tool: string;
   priority: 'High' | 'Medium' | 'Low';
   url?: string | null;
+  linkedAgentTaskId?: string | null;
+  sourceKind?: 'manual' | 'live' | 'delegated' | 'integration';
+  currentRunId?: string | null;
+  linkedSessionId?: string | null;
+  artifactCount?: number;
+}
+
+export interface TaskRunRecord {
+  id: string;
+  taskId: string;
+  runType: 'delegated_skill' | 'delegated_agent' | 'manual_sync';
+  agentId?: string | null;
+  skillId?: string | null;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  steps: unknown[];
+  result?: unknown;
+  error?: string | null;
+  originType?: 'app' | 'live_session' | 'command' | 'delegation' | 'slack' | 'email' | 'system' | null;
+  originRef?: string | null;
+  linkedAgentTaskId?: string | null;
+  startedAt: string;
+  completedAt?: string | null;
+}
+
+export interface TaskDetailRecord extends TaskRecord {
+  latestRun?: TaskRunRecord | null;
+  runs: TaskRunRecord[];
 }
 
 export interface IntegrationRecord {
@@ -55,15 +82,15 @@ export interface IntegrationConfigState {
   integrationId: string;
   configuredVia: 'env' | 'vault' | 'none';
   fields: IntegrationConfigFieldState[];
-}
-
-export interface MemoryNodeRecord {
-  id: string;
-  title: string;
-  type: 'document' | 'preference' | 'integration' | 'core';
-  tokens: string;
-  lastSynced: string;
-  active: boolean;
+  connection?: {
+    accountEmail?: string;
+    accountLabel?: string;
+    grantedScopes?: string[];
+    grantedModules?: string[];
+    missingModules?: string[];
+    defaults?: Record<string, string>;
+    status: 'connected' | 'disconnected';
+  };
 }
 
 export interface TranscriptMessage {
@@ -94,8 +121,18 @@ export interface DashboardPayload {
   tasks: TaskRecord[];
   activities: ActivityRecord[];
   integrations: IntegrationRecord[];
-  memoryNodes: MemoryNodeRecord[];
   currentSession: SessionRecord | null;
+  activeTaskSummary?: {
+    count: number;
+    liveOriginCount: number;
+    items: Array<{
+      id: string;
+      intent: string;
+      status: 'queued' | 'running';
+      routeType: 'inline_answer' | 'inline_skill' | 'delegated_skill' | 'delegated_agent';
+      originType?: 'app' | 'live_session' | 'command';
+    }>;
+  };
 }
 
 export interface NotificationRecord {
@@ -132,75 +169,4 @@ export interface UserPreferencesRecord {
   proactiveSuggestions: boolean;
   autoStartScreenShare: boolean;
   blurSensitiveFields: boolean;
-}
-
-export type JobType = 'research_brief' | 'daily_digest' | 'workflow_run';
-export type JobStatus = 'queued' | 'running' | 'completed' | 'failed';
-export type WorkOriginType = 'delegation' | 'live_session' | 'slack' | 'email' | 'telegram' | 'system';
-export type WorkApprovalStatus = 'not_required' | 'pending' | 'approved' | 'rejected';
-export type DeliveryChannelType = 'in_app' | 'slack' | 'email' | 'telegram' | 'notion' | 'github' | 'clickup';
-
-export interface WorkDeliveryRecord {
-  channel: DeliveryChannelType;
-  destinationLabel: string;
-  deliveredAt?: string | null;
-  status: 'pending' | 'delivered' | 'failed';
-}
-
-export interface WorkArtifactRecord {
-  kind: 'brief' | 'summary' | 'notion_page' | 'slack_message' | 'email' | 'issue' | 'doc' | 'digest';
-  label: string;
-  url?: string | null;
-}
-
-export interface WorkHandoffRecord {
-  at: string;
-  type: 'created' | 'started' | 'delivered' | 'approval_requested' | 'approved' | 'failed';
-  actor: string;
-  summary: string;
-}
-
-export interface JobRecord {
-  id: string;
-  type: JobType;
-  status: JobStatus;
-  title: string;
-  summary: string;
-  createdAt: string;
-  updatedAt: string;
-  completedAt?: string | null;
-  originType: WorkOriginType;
-  originRef?: string | null;
-  deliveryChannels: WorkDeliveryRecord[];
-  artifactRefs: WorkArtifactRecord[];
-  approvalStatus: WorkApprovalStatus;
-  approvalRequestedAt?: string | null;
-  approvedAt?: string | null;
-  handoffLog: WorkHandoffRecord[];
-}
-
-export interface CreativeArtifactRecord {
-  title: string;
-  narrative: string;
-  imageData?: string;
-  imageMimeType?: string;
-}
-
-export interface OffshiftWorkItemRecord {
-  id: string;
-  title: string;
-  type: JobType;
-  status: JobStatus;
-  startedFrom: WorkOriginType;
-  startedFromLabel: string;
-  summary: string;
-  deliveryChannels: WorkDeliveryRecord[];
-  artifactRefs: WorkArtifactRecord[];
-  approvalStatus: WorkApprovalStatus;
-  approvalRequestedAt?: string | null;
-  approvedAt?: string | null;
-  handoffLog: WorkHandoffRecord[];
-  createdAt: string;
-  updatedAt: string;
-  completedAt?: string | null;
 }

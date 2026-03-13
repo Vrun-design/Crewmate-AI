@@ -1,5 +1,6 @@
 import type { Skill } from '../types';
 import { getEffectiveIntegrationConfig } from '../../services/integrationConfigService';
+import { isClickUpConfigured } from '../../services/clickupService';
 
 interface ClickUpTask {
     id: string;
@@ -12,10 +13,14 @@ interface ClickUpTask {
 async function listClickUpTasks(workspaceId: string): Promise<ClickUpTask[]> {
     const config = getEffectiveIntegrationConfig(workspaceId, 'clickup');
     const token = config.token ?? '';
-    const listId = config.listId ?? '';
+    const listId = config.defaultListId ?? config.listId ?? '';
 
-    if (!token || !listId) {
-        throw new Error('ClickUp integration is not configured. Save an API token and list ID.');
+    if (!isClickUpConfigured(workspaceId)) {
+        throw new Error('ClickUp is not connected. Connect ClickUp from the Integrations page first.');
+    }
+
+    if (!listId) {
+        throw new Error('ClickUp is connected, but no default list is selected yet. Choose one in Integrations first.');
     }
 
     const response = await fetch(
@@ -58,7 +63,6 @@ export const clickupListTasksSkill: Skill = {
     description: 'List tasks in the configured ClickUp list. Use when the user asks to see open tasks, check backlog, or get a task overview.',
     version: '1.0.0',
     category: 'productivity',
-    personas: ['developer', 'marketer', 'founder', 'sales', 'designer'],
     requiresIntegration: ['clickup'],
     triggerPhrases: [
         'What tasks are in ClickUp?',

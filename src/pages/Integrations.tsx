@@ -3,6 +3,7 @@ import {IntegrationCardGrid} from '../components/integrations/IntegrationCardGri
 import {IntegrationDrawerContent} from '../components/integrations/IntegrationDrawerContent';
 import {Drawer} from '../components/ui/Drawer';
 import {PageHeader} from '../components/ui/PageHeader';
+import {Button} from '../components/ui/Button';
 import {useIntegrations} from '../hooks/useIntegrations';
 import type {Integration} from '../types';
 
@@ -25,7 +26,10 @@ export function Integrations(): React.JSX.Element {
 
       {(isLoading || error) && (
         <div className="glass-panel rounded-2xl px-4 py-3 text-sm text-muted-foreground">
-          {isLoading ? 'Loading integration readiness...' : `Integration status: ${error}`}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{isLoading ? 'Loading integration readiness...' : `Integration status: ${error}`}</span>
+            {error ? <Button variant="secondary" onClick={() => void refresh()}>Retry</Button> : null}
+          </div>
         </div>
       )}
 

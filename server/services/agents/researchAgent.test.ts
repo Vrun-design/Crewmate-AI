@@ -56,10 +56,10 @@ describe('runResearchAgent', () => {
         expect(result.grounded).toBe(true);
         expect(result.sources).toHaveLength(2);
         expect(generateContent).toHaveBeenNthCalledWith(2, expect.objectContaining({
-            contents: expect.stringContaining('Use only the supplied evidence.'),
+            contents: expect.stringContaining('Use ONLY the supplied evidence.'),
         }));
         expect(generateContent).toHaveBeenNthCalledWith(3, expect.objectContaining({
-            contents: expect.stringContaining('Sources:\n1. Source A'),
+            contents: expect.stringContaining('Sources:\n1. **Source A**'),
         }));
     });
 
@@ -82,10 +82,10 @@ describe('runResearchAgent', () => {
         expect(result.grounded).toBe(false);
         expect(result.sources).toEqual([]);
         expect(generateContent).toHaveBeenNthCalledWith(2, expect.objectContaining({
-            contents: expect.stringContaining('External evidence is limited for this run.'),
+            contents: expect.stringContaining('External evidence is limited. Be explicit about uncertainty.'),
         }));
         expect(generateContent).toHaveBeenNthCalledWith(3, expect.objectContaining({
-            contents: expect.stringContaining('Evidence gaps:\nWeb search unavailable.'),
+            contents: expect.stringContaining('Note: Limited web sources — flag knowledge boundaries clearly.'),
         }));
     });
 });

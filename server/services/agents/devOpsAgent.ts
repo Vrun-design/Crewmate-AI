@@ -12,9 +12,9 @@ export const DEVOPS_AGENT_MANIFEST = {
     id: 'crewmate-devops-agent',
     name: 'DevOps Agent',
     department: 'Engineering',
-    description: 'Code review, GitHub operations, terminal commands, CI/CD, architecture decisions.',
-    capabilities: ['code_review', 'github', 'terminal', 'ci_cd', 'architecture'],
-    skills: ['github.create-issue', 'github.create-pr', 'terminal.run-command', 'web.search'],
+    description: 'Code review, terminal commands, CI/CD, and architecture decisions.',
+    capabilities: ['code_review', 'terminal', 'ci_cd', 'architecture'],
+    skills: ['terminal.run-command', 'web.search'],
     model: serverConfig.geminiResearchModel,
     emoji: '⚙️',
 };
@@ -36,7 +36,7 @@ export async function runDevOpsAgent(
     const response = await ai.models.generateContent({
         model: serverConfig.geminiResearchModel,
         contents: `You are an expert Staff Engineer and DevOps specialist.
-You have access to GitHub, terminal commands, and engineering knowledge.
+You have access to terminal commands and engineering knowledge.
 Be direct, concrete, and actionable. Format code with markdown.
 Current workspace: ${ctx.workspaceId}
 
@@ -47,23 +47,6 @@ Task: ${intent}${codeContext}`,
     emitStep('skill_result', 'Analysis complete', { success: true, detail: `${analysis.split(/\s+/).length} words` });
 
     const autoExecutions: unknown[] = [];
-
-    // Auto-create GitHub issue if applicable
-    if (/create.*issue|file.*bug|log.*issue/i.test(intent)) {
-        emitStep('skill_call', 'Creating GitHub issue...', { skillId: 'github.create-issue' });
-        try {
-            const t0 = Date.now();
-            const run = await runSkill('github.create-issue', ctx, {
-                title: intent.slice(0, 100),
-                body: `${analysis}\n\n---\n*Auto-created by DevOps Agent*`,
-                labels: ['agent-created'],
-            });
-            autoExecutions.push({ skill: 'github.create-issue', result: run.result });
-            emitStep('skill_result', 'GitHub issue created', { skillId: 'github.create-issue', durationMs: Date.now() - t0, success: true });
-        } catch {
-            emitStep('skill_result', 'GitHub not configured — skipping issue creation', { skillId: 'github.create-issue', success: false });
-        }
-    }
 
     // Run tests if requested
     if (/run.*test|npm test|check.*test/i.test(intent)) {
