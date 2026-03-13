@@ -1,3 +1,12 @@
+/**
+ * @deprecated
+ * The Gemini-based planner is **no longer used in production**.
+ * Stagehand (stagehandExecutor.ts) now owns the AI planning and action loop
+ * for multi-step browser navigation.
+ *
+ * This file is retained only because uiNavigatorPlanner.test.ts imports from
+ * it directly. Do not add new features here.
+ */
 import { createGeminiClient } from '../geminiClient';
 import { selectModel } from '../modelRouter';
 import { buildUiNavigatorPlanningPrompt } from './uiNavigatorPrompts';
@@ -34,6 +43,25 @@ interface UiNavigatorPlannerDeps {
   createClient?: () => GeminiPlannerClient;
 }
 
+const UI_ACTION_TYPES = [
+  'open_url',
+  'click',
+  'type',
+  'clear_and_type',
+  'select_option',
+  'check',
+  'hover',
+  'press_key',
+  'scroll',
+  'wait_for',
+  'wait_for_url',
+  'dismiss_overlay',
+  'extract_text',
+  'finish',
+  'request_confirmation',
+  'fail',
+] as const;
+
 const UI_NAVIGATOR_PLAN_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -47,24 +75,7 @@ const UI_NAVIGATOR_PLAN_SCHEMA = {
       properties: {
         type: {
           type: 'string',
-          enum: [
-            'open_url',
-            'click',
-            'type',
-            'clear_and_type',
-            'select_option',
-            'check',
-            'hover',
-            'press_key',
-            'scroll',
-            'wait_for',
-            'wait_for_url',
-            'dismiss_overlay',
-            'extract_text',
-            'finish',
-            'request_confirmation',
-            'fail',
-          ],
+          enum: [...UI_ACTION_TYPES],
         },
         reasoning: { type: 'string' },
         safety: { type: 'string', enum: ['safe', 'confirmation_required', 'blocked'] },
@@ -111,8 +122,7 @@ function getPlannerResponsePreview(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 180);
 }
 
-export function buildUiPlannerRequest(intent: string, observation: UiObservation): GenerateContentRequest {
-  const prompt = buildUiNavigatorPlanningPrompt(intent, observation);
+function buildPlannerRequestParts(observation: UiObservation, prompt: string): GenerateContentRequest['contents'][number]['parts'] {
   const parts: GenerateContentRequest['contents'][number]['parts'] = [{ text: prompt }];
 
   if (observation.screenshotBase64 && observation.screenshotMimeType) {
@@ -124,12 +134,18 @@ export function buildUiPlannerRequest(intent: string, observation: UiObservation
     });
   }
 
+  return parts;
+}
+
+export function buildUiPlannerRequest(intent: string, observation: UiObservation): GenerateContentRequest {
+  const prompt = buildUiNavigatorPlanningPrompt(intent, observation);
+
   return {
     model: selectModel('orchestration', 'low', prompt.length),
     contents: [
       {
         role: 'user',
-        parts,
+        parts: buildPlannerRequestParts(observation, prompt),
       },
     ],
     config: {

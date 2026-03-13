@@ -15,6 +15,10 @@ export const slackListChannelsSkill: Skill = {
         'Which channel should I use?',
     ],
     preferredModel: 'quick',
+    executionMode: 'inline',
+    latencyClass: 'quick',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {},

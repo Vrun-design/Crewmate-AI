@@ -13,6 +13,7 @@
  * so the agent can route to the right one ("save-lead", "notify-team", etc.)
  */
 import type { Skill } from '../types';
+import { parseObjectArgument } from '../framework';
 import { getEffectiveIntegrationConfig } from '../../services/integrationConfigService';
 
 const ZAPIER_TIMEOUT_MS = 15_000;
@@ -92,6 +93,10 @@ export const zapierTriggerSkill: Skill = {
         'Fire the workflow',
     ],
     preferredModel: 'quick',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'high',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -100,8 +105,10 @@ export const zapierTriggerSkill: Skill = {
                 description: 'Name of the automation to trigger (e.g. "save-lead", "notify-team"). Omit to use the default webhook.',
             },
             data: {
-                type: 'string',
-                description: 'JSON string of data to send to Zapier. Example: {"name":"Jane","email":"jane@acme.com"}',
+                type: 'object',
+                description: 'Structured data to send to Zapier.',
+                properties: {},
+                additionalProperties: true,
             },
             summary: {
                 type: 'string',
@@ -114,12 +121,9 @@ export const zapierTriggerSkill: Skill = {
         const automation = typeof args.automation === 'string' ? args.automation : undefined;
         const summary = typeof args.summary === 'string' ? args.summary : 'Triggering Zap automation';
 
-        // data arrives as a JSON string (JSONSchema doesn't support object properties)
         let data: Record<string, unknown> = {};
-        if (typeof args.data === 'string' && args.data.trim()) {
-            try { data = JSON.parse(args.data); } catch { /* ignore parse errors — send empty payload */ }
-        } else if (args.data && typeof args.data === 'object') {
-            data = args.data as Record<string, unknown>;
+        if (typeof args.data !== 'undefined') {
+            data = parseObjectArgument(args.data, 'data');
         }
 
         let webhookUrl: string;
@@ -168,6 +172,10 @@ export const zapierListSkill: Skill = {
         'Show my automations',
     ],
     preferredModel: 'quick',
+    executionMode: 'inline',
+    latencyClass: 'quick',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {},

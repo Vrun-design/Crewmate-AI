@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Code2, MessageSquare, Search, LayoutGrid, BarChart3, Globe,
-  Clock, Zap, ArrowRight, CheckCircle2, Loader2, AlertCircle,
+  Clock, Zap, ArrowRight, CheckCircle2, Loader2, AlertCircle, Workflow,
 } from 'lucide-react';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Drawer } from '../components/ui/Drawer';
@@ -17,6 +17,7 @@ const CATEGORY_META: Record<string, { icon: React.ReactNode; label: string; colo
   productivity: { icon: <LayoutGrid size={14} />, label: 'Productivity', color: 'bg-green-500/10 text-green-500 border-green-500/20' },
   data: { icon: <BarChart3 size={14} />, label: 'Data', color: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' },
   browser: { icon: <Globe size={14} />, label: 'Browser', color: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20' },
+  automation: { icon: <Workflow size={14} />, label: 'Automation', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
 };
 
 const ALL_CATEGORIES = ['all', ...Object.keys(CATEGORY_META)];
@@ -65,7 +66,7 @@ export function Skills() {
 
   function handleSelectSkill(skill: (typeof systemSkills)[0]): void {
     setSelectedSkill(skill);
-    setTryItPrompt(skill.triggerPhrases?.[0] ?? `Use ${skill.name} to `);
+    setTryItPrompt(skill.usageExamples?.[0] ?? skill.triggerPhrases?.[0] ?? `Use ${skill.name} to `);
     setTryItStatus('idle');
     setTryItResult(null);
     setTryItTaskId(null);
@@ -183,6 +184,27 @@ export function Skills() {
                   {s.requiresIntegration?.map((int) => (
                     <span key={int} className="rounded-full bg-secondary border border-border px-2 py-0.5 text-[10px] text-muted-foreground uppercase tracking-wider">{int}</span>
                   ))}
+                  {s.exposeInLiveSession && (
+                    <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] text-emerald-400 uppercase tracking-wider">Live Ready</span>
+                  )}
+                  {s.readOnlyHint && (
+                    <span className="rounded-full bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 text-[10px] text-cyan-400 uppercase tracking-wider">Read Only</span>
+                  )}
+                  {s.destructiveHint && (
+                    <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300 uppercase tracking-wider">Writes Data</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Runtime metadata */}
+              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                <div className="rounded-xl border border-border bg-secondary/40 p-3">
+                  <div className="uppercase tracking-wider text-[10px] mb-1">Execution</div>
+                  <div className="text-foreground">{s.executionMode ?? 'n/a'} · {s.latencyClass ?? 'n/a'}</div>
+                </div>
+                <div className="rounded-xl border border-border bg-secondary/40 p-3">
+                  <div className="uppercase tracking-wider text-[10px] mb-1">Model</div>
+                  <div className="text-foreground">{s.preferredModel ?? 'n/a'}</div>
                 </div>
               </div>
 
@@ -192,14 +214,24 @@ export function Skills() {
                 <div className="text-sm text-foreground bg-secondary/50 border border-border rounded-xl p-4 leading-relaxed">{s.description}</div>
               </div>
 
-              {/* Trigger phrases — clickable to pre-fill */}
-              {s.triggerPhrases && s.triggerPhrases.length > 0 && (
+              {s.invokingMessage && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Runtime Status</label>
+                  <div className="rounded-xl border border-border bg-secondary/40 p-4 text-sm text-foreground">
+                    <div>Starts with: {s.invokingMessage}</div>
+                    <div className="mt-1 text-muted-foreground">Default completion: {s.invokedMessage ?? `${s.name} completed.`}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Examples — clickable to pre-fill */}
+              {(s.usageExamples && s.usageExamples.length > 0) || (s.triggerPhrases && s.triggerPhrases.length > 0) ? (
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <Clock size={12} /> Example Phrases
+                    <Clock size={12} /> Example Requests
                   </label>
                   <div className="space-y-1.5">
-                    {s.triggerPhrases.map((phrase) => (
+                    {(s.usageExamples ?? s.triggerPhrases).map((phrase) => (
                       <button
                         key={phrase}
                         type="button"
@@ -211,7 +243,7 @@ export function Skills() {
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Try It Live */}
               <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
@@ -225,7 +257,7 @@ export function Skills() {
                   <textarea
                     value={tryItPrompt}
                     onChange={(e) => setTryItPrompt(e.target.value)}
-                    placeholder={`e.g. "${s.triggerPhrases?.[0] ?? `Use ${s.name} to...`}"`}
+                    placeholder={`e.g. "${s.usageExamples?.[0] ?? s.triggerPhrases?.[0] ?? `Use ${s.name} to...`}"`}
                     rows={3}
                     className="w-full bg-background border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 resize-none"
                   />

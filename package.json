@@ -27,6 +27,7 @@
     "test:smoke": "vitest run server/smoke/productionReadiness.test.ts"
   },
   "dependencies": {
+    "@browserbasehq/stagehand": "^3.1.0",
     "@google/genai": "^1.44.0",
     "@playwright/browser-chromium": "^1.58.2",
     "@tailwindcss/oxide-darwin-arm64": "^4.2.1",

@@ -1,16 +1,11 @@
 import type { Skill } from '../types';
+import { parseStringMatrixArgument, requireExplicitApproval } from '../framework';
 import { createCalendarEvent, listCalendarEvents } from '../../services/calendarService';
 import { createGoogleDocument, appendToGoogleDocument } from '../../services/docsService';
 import { createDriveFolder, searchDriveFiles } from '../../services/driveService';
 import { createGmailDraft, searchGmailMessages, sendGmailMessage } from '../../services/gmailService';
 import { createGoogleSpreadsheet, appendSpreadsheetRows } from '../../services/sheetsService';
 import { createGooglePresentation, addSlidesToPresentation } from '../../services/slidesService';
-
-function requireApproval(args: Record<string, unknown>, action: string): void {
-  if (args.approved !== true) {
-    throw new Error(`${action} requires explicit approval. Re-run this skill with approved=true after confirming the recipients and content.`);
-  }
-}
 
 function parseStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -25,11 +20,11 @@ function parseStringArray(value: unknown): string[] {
 }
 
 function parseRows(value: unknown): string[][] {
-  if (!Array.isArray(value)) {
+  if (typeof value === 'undefined') {
     return [];
   }
 
-  return value.map((row) => Array.isArray(row) ? row.map((cell) => String(cell ?? '')) : [String(row ?? '')]);
+  return parseStringMatrixArgument(value, 'rows');
 }
 
 function parseSlides(value: unknown): Array<{ title: string; body?: string }> {
@@ -86,9 +81,9 @@ export const googleGmailDraftEmailSkill: Skill = {
   inputSchema: {
     type: 'object',
     properties: {
-      to: { type: 'array', description: 'Email recipients.', items: { type: 'string' } },
-      cc: { type: 'array', description: 'Optional cc recipients.', items: { type: 'string' } },
-      bcc: { type: 'array', description: 'Optional bcc recipients.', items: { type: 'string' } },
+      to: { type: 'array', description: 'Email recipients.', items: { type: 'string', description: 'Recipient email address.' } },
+      cc: { type: 'array', description: 'Optional cc recipients.', items: { type: 'string', description: 'CC recipient email address.' } },
+      bcc: { type: 'array', description: 'Optional bcc recipients.', items: { type: 'string', description: 'BCC recipient email address.' } },
       subject: { type: 'string', description: 'Email subject line.' },
       bodyText: { type: 'string', description: 'Plain text email body.' },
     },
@@ -127,16 +122,16 @@ export const googleGmailSendEmailSkill: Skill = {
     type: 'object',
     properties: {
       ...googleBaseFields,
-      to: { type: 'array', description: 'Email recipients.', items: { type: 'string' } },
-      cc: { type: 'array', description: 'Optional cc recipients.', items: { type: 'string' } },
-      bcc: { type: 'array', description: 'Optional bcc recipients.', items: { type: 'string' } },
+      to: { type: 'array', description: 'Email recipients.', items: { type: 'string', description: 'Recipient email address.' } },
+      cc: { type: 'array', description: 'Optional cc recipients.', items: { type: 'string', description: 'CC recipient email address.' } },
+      bcc: { type: 'array', description: 'Optional bcc recipients.', items: { type: 'string', description: 'BCC recipient email address.' } },
       subject: { type: 'string', description: 'Email subject line.' },
       bodyText: { type: 'string', description: 'Plain text email body.' },
     },
     required: ['to', 'subject', 'bodyText'],
   },
   handler: async (ctx, args) => {
-    requireApproval(args, 'Sending Gmail email');
+    requireExplicitApproval(args, 'Sending Gmail email');
     const result = await sendGmailMessage(ctx.workspaceId, {
       to: parseStringArray(args.to),
       cc: parseStringArray(args.cc),
@@ -279,7 +274,15 @@ export const googleSheetsCreateSpreadsheetSkill: Skill = {
     type: 'object',
     properties: {
       title: { type: 'string', description: 'Spreadsheet title.' },
-      rows: { type: 'array', description: 'Optional 2D array of rows.', items: { type: 'array' } },
+      rows: {
+        type: 'array',
+        description: 'Optional 2D array of rows.',
+        items: {
+          type: 'array',
+          description: 'A single row of cells.',
+          items: { type: 'string', description: 'Cell value.' },
+        },
+      },
       folderId: { type: 'string', description: 'Optional Drive folder override.' },
     },
     required: ['title'],
@@ -316,7 +319,15 @@ export const googleSheetsAppendRowsSkill: Skill = {
     type: 'object',
     properties: {
       spreadsheetId: { type: 'string', description: 'Spreadsheet ID. Extract from the URL: /spreadsheets/d/SPREADSHEET_ID/edit' },
-      rows: { type: 'array', description: '2D array of rows to append.', items: { type: 'array' } },
+      rows: {
+        type: 'array',
+        description: '2D array of rows to append.',
+        items: {
+          type: 'array',
+          description: 'A single row of cells.',
+          items: { type: 'string', description: 'Cell value.' },
+        },
+      },
       range: { type: 'string', description: 'Optional A1 range.' },
       screenContext: { type: 'string', description: 'Optional: pass the visible URL from screen if the user is looking at a sheet. The skill will extract the spreadsheet ID automatically.' },
     },
@@ -361,7 +372,19 @@ export const googleSlidesCreatePresentationSkill: Skill = {
     type: 'object',
     properties: {
       title: { type: 'string', description: 'Presentation title.' },
-      slides: { type: 'array', description: 'Optional slide objects with title/body.', items: { type: 'string' } },
+      slides: {
+        type: 'array',
+        description: 'Optional slide objects with title/body.',
+        items: {
+          type: 'object',
+          description: 'A single slide definition.',
+          properties: {
+            title: { type: 'string', description: 'Slide title.' },
+            body: { type: 'string', description: 'Optional slide body.' },
+          },
+          required: ['title'],
+        },
+      },
       folderId: { type: 'string', description: 'Optional Drive folder override.' },
     },
     required: ['title'],
@@ -398,7 +421,19 @@ export const googleSlidesAddSlidesSkill: Skill = {
     type: 'object',
     properties: {
       presentationId: { type: 'string', description: 'Presentation ID. Extract from the URL: /presentation/d/PRESENTATION_ID/edit' },
-      slides: { type: 'array', description: 'Slide objects with title/body.', items: { type: 'string' } },
+      slides: {
+        type: 'array',
+        description: 'Slide objects with title/body.',
+        items: {
+          type: 'object',
+          description: 'A single slide definition.',
+          properties: {
+            title: { type: 'string', description: 'Slide title.' },
+            body: { type: 'string', description: 'Optional slide body.' },
+          },
+          required: ['title'],
+        },
+      },
       screenContext: { type: 'string', description: 'Optional: pass the visible URL from screen if the user is looking at a presentation. The skill will extract the presentation ID automatically.' },
     },
     required: ['slides'],
@@ -510,13 +545,13 @@ export const googleCalendarCreateEventSkill: Skill = {
       description: { type: 'string', description: 'Optional event description.' },
       start: { type: 'string', description: 'RFC3339 event start datetime.' },
       end: { type: 'string', description: 'RFC3339 event end datetime.' },
-      attendees: { type: 'array', description: 'Optional attendee emails.', items: { type: 'string' } },
+      attendees: { type: 'array', description: 'Optional attendee emails.', items: { type: 'string', description: 'Attendee email address.' } },
       calendarId: { type: 'string', description: 'Optional calendar ID override.' },
     },
     required: ['summary', 'start', 'end'],
   },
   handler: async (ctx, args) => {
-    requireApproval(args, 'Creating a Google Calendar event');
+    requireExplicitApproval(args, 'Creating a Google Calendar event');
     const result = await createCalendarEvent(ctx.workspaceId, {
       summary: String(args.summary ?? ''),
       description: typeof args.description === 'string' ? args.description : undefined,

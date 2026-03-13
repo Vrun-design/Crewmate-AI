@@ -12,7 +12,7 @@
 
 **Category: Live Agents 🗣️ + UI Navigator ☸️**
 
-[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-44-and-counting) · [Integrations](#-integrations) · [Deployment](#-google-cloud-deployment)
+[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-51-and-counting) · [Integrations](#-integrations) · [Deployment](#-google-cloud-deployment)
 
 </div>
 
@@ -48,7 +48,7 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 |---|---|
 | **Gemini Live** | Real-time audio conversation with interruption support |
 | **Screen Context** | Screenshot captured and sent as multimodal context each turn |
-| **49 Skills** | Research, browser, productivity, comms, code, live |
+| **51 Skills** | Research, browser, productivity, comms, automation, code, live |
 | **Orchestrator** | Intent-routed A2A dispatch to specialist agents |
 | **Memory** | Vector-embedded session recall + knowledge base |
 | **Tasks** | Real-time streamed background task execution |
@@ -94,7 +94,7 @@ flowchart TD
         subgraph ExecutionLayer["Execution Layer"]
             ORCH[Orchestrator\nIntent Router]
             POLICY[Execution Policy\nInline / Delegated / Either]
-            REG[Skill Registry\n49 Skills]
+            REG[Skill Registry\n51 Skills]
         end
 
         subgraph AgentLayer["Agent Layer"]
@@ -237,7 +237,7 @@ sequenceDiagram
 
 ## 🌐 Browser Navigation — Autonomous Web Agent
 
-Crewmate includes a full **autonomous browser operator** powered by Playwright + Gemini multimodal vision. It can navigate any website, fill forms, click through UIs, dismiss overlays, extract data, and complete multi-step web workflows — all without human guidance.
+Crewmate includes an **autonomous browser operator** powered by Stagehand + Gemini multimodal vision. It can navigate websites, fill forms, click through UIs, dismiss overlays, extract data, and complete multi-step web workflows.
 
 ### How it works
 
@@ -246,10 +246,10 @@ Crewmate uses a **Perceive → Reason → Act** loop, running up to 30 steps:
 ```
 1. PERCEIVE   screenshot + DOM elements + ARIA accessibility tree
        ↓
-2. REASON     Gemini multimodal analyzes the state + full step history
-              → decides the single best next action
+2. REASON     Gemini multimodal analyzes the current state and step history
+              → chooses the next action
        ↓
-3. ACT        Playwright executes the action in a real Chromium browser
+3. ACT        Stagehand executes the action in a real Chromium browser
        ↓
 4. REPEAT     until task is complete, blocked, or max steps reached
 ```
@@ -299,7 +299,7 @@ All browser navigation is **voice-activated via Gemini Live** — say the task o
 
 ---
 
-## ⚡ Skills — 49 and Counting
+## ⚡ Skills — 51 and Counting
 
 Skills are the **single execution primitive** in Crewmate. Every action — from posting a Slack message to filling a web form — is a skill.
 
@@ -307,6 +307,7 @@ Skills are the **single execution primitive** in Crewmate. Every action — from
 |---|---|
 | **Research** | `web.search`, `web.summarize-url` |
 | **Communication** | `slack.post-message`, `slack.list-channels`, `slack.get-messages`, `slack.send-dm` |
+| **Automation** | `zapier.trigger`, `zapier.list` |
 | **Productivity — Notion** | `notion.create-page`, `notion.append-blocks`, `notion.append-screenshot`, `notion.create-database-record`, `notion.list-pages`, `notion.search-pages`, `notion.update-page` |
 | **Productivity — ClickUp** | `clickup.create-task`, `clickup.attach-screenshot`, `clickup.list-tasks` |
 | **Productivity — Google Workspace** | Gmail (draft/send/search), Docs (create/append), Sheets (create/append-rows), Slides (create/add-slides), Drive (search/create-folder), Calendar (create-event/list-events) |
@@ -348,7 +349,7 @@ Every agent follows the same pipeline: **Research → Strategy → Generate → 
 | 📧 **Communications** | Chief Communications Officer | Executive email, press release, internal announcement, newsletter, memo, crisis comms (3 versions), Slack/DM | Slack + Notion |
 | ⚙️ **DevOps** | Staff Engineer & platform expert | Code review, architecture design, GitHub Actions CI/CD YAML, incident runbook, security audit (CVSS), Terraform IaC | Terminal + Notion |
 | 📊 **Data** | Senior Data Scientist & analytics engineer | SQL (CTE-pattern), cohort/funnel analysis, A/B test with power calculation, metrics framework, data story, dashboard design | Notion |
-| 🌐 **UI Navigator** | Autonomous browser operator | Multi-step web automation, data extraction, form filling, login flows, SPA navigation, content scraping | Browser (Playwright) |
+| 🌐 **UI Navigator** | Autonomous browser operator | Multi-step web automation, data extraction, form filling, login flows, SPA navigation, content scraping | Browser (Stagehand + Playwright) |
 
 All agents emit real-time step-by-step trace events streamed to the Tasks UI. Agents use the shared skill registry internally.
 
@@ -548,7 +549,7 @@ crewmate/
 │   │   ├── executionPolicy.ts # Inline vs delegated routing
 │   │   ├── agents/            # Specialist agent definitions
 │   │   └── ...                # Integration services (Notion, Slack, etc.)
-│   ├── skills/                # 49 registered skills
+│   ├── skills/                # 51 registered skills
 │   │   ├── browser/           # Playwright-powered browser skills
 │   │   ├── communication/     # Slack
 │   │   ├── productivity/      # Notion, ClickUp, Google Workspace, Memory
@@ -607,7 +608,8 @@ Powered by:
 - [Google GenAI SDK](https://www.npmjs.com/package/@google/genai)
 - [Firebase](https://firebase.google.com)
 - [React](https://react.dev) + [Vite](https://vitejs.dev)
-- [Playwright](https://playwright.dev) (browser automation)
+- [Stagehand](https://github.com/browserbasehq/stagehand) (AI-native browser automation)
+- [Playwright](https://playwright.dev) (browser foundation)
 - [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
 
 ---

@@ -1,5 +1,6 @@
 import { db } from '../db';
 import type { Skill, SkillRunContext, SkillRunRecord } from './types';
+import { buildSkillDeclarationDescription, hydrateSkillManifest } from './framework';
 import { ingestSkillResult } from '../services/memoryIngestor';
 
 const skills = new Map<string, Skill>();
@@ -26,7 +27,7 @@ export function listSkillsForUser(_userId: string): Skill[] {
 }
 
 export function registerSkill(skill: Skill): void {
-    skills.set(skill.id, skill);
+    skills.set(skill.id, hydrateSkillManifest(skill));
 }
 
 export function getSkill(id: string): Skill | undefined {
@@ -48,7 +49,7 @@ export function getSkillDeclarations(options?: { liveOnly?: boolean }): Array<{
         .filter((skill) => !options?.liveOnly || skill.exposeInLiveSession)
         .map((skill) => ({
         name: skill.id.replace(/\./g, '_'), // Gemini requires no dots in function names
-        description: skill.description,
+        description: buildSkillDeclarationDescription(skill),
         parametersJsonSchema: skill.inputSchema as unknown as Record<string, unknown>,
         behavior: skill.liveFunctionBehavior,
     }));

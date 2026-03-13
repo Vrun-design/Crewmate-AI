@@ -9,6 +9,7 @@
  *   browser.screenshot    — Screenshot a page (for Gemini vision)
  */
 import type { Skill } from '../types';
+import { parseStringMapArgument } from '../framework';
 import {
     clickElement,
     openUrl,
@@ -41,9 +42,11 @@ export const browserOpenUrlSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['open website', 'navigate to', 'go to URL', 'visit page'],
+    preferredModel: 'quick',
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'low',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -68,9 +71,11 @@ export const browserExtractSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['read webpage', 'extract content', 'get page text', 'read article', 'scrape page'],
+    preferredModel: 'quick',
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'none',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -99,21 +104,28 @@ export const browserFillFormSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['fill form', 'submit form', 'fill in fields', 'auto-fill'],
+    preferredModel: 'quick',
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'high',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
             url: { type: 'string', description: 'URL of the page containing the form' },
-            fieldsJson: { type: 'string', description: 'JSON object mapping CSS selectors to values, e.g. {"#email": "user@example.com"}' },
+            fields: {
+                type: 'object',
+                description: 'Object mapping CSS selectors to field values, e.g. {"#email": "user@example.com"}',
+                properties: {},
+                additionalProperties: true,
+            },
             submitSelector: { type: 'string', description: 'CSS selector for the submit button (optional)' },
         },
-        required: ['url', 'fieldsJson'],
+        required: ['url', 'fields'],
     },
     async handler(_ctx, args) {
-        const { url, fieldsJson, submitSelector } = args as { url: string; fieldsJson: string; submitSelector?: string };
-        const fields = JSON.parse(fieldsJson) as Record<string, string>;
+        const { url, submitSelector } = args as { url: string; submitSelector?: string };
+        const fields = parseStringMapArgument(args.fields, 'fields');
         const result = await fillForm({ url, fields, submitSelector });
         return { success: result.success, output: result, message: result.message };
     },
@@ -129,9 +141,11 @@ export const browserSearchGoogleSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['google this', 'search google for', 'look up on google', 'find results for'],
+    preferredModel: 'quick',
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'none',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -160,9 +174,11 @@ export const browserScreenshotSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['screenshot', 'capture page', 'take screenshot of', 'show me what', 'what does the site look like'],
+    preferredModel: 'quick',
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'none',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -195,6 +211,7 @@ export const browserInspectVisibleUiSkill: Skill = {
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'none',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -229,9 +246,11 @@ export const browserClickElementSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['click element', 'click button', 'press ui element'],
+    preferredModel: 'quick',
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'high',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -258,9 +277,11 @@ export const browserTypeIntoSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['type into field', 'enter text', 'fill this input'],
+    preferredModel: 'quick',
     executionMode: 'delegated',
     latencyClass: 'slow',
     sideEffectLevel: 'high',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -288,6 +309,11 @@ export const browserPressKeySkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['press enter', 'press key', 'send keyboard shortcut'],
+    preferredModel: 'quick',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'high',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -314,6 +340,11 @@ export const browserScrollPageSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['scroll down', 'scroll up', 'move page'],
+    preferredModel: 'quick',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'low',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -341,6 +372,11 @@ export const browserExtractTextSkill: Skill = {
     category: 'browser',
     requiresIntegration: [],
     triggerPhrases: ['extract ui text', 'read this button', 'read text from element'],
+    preferredModel: 'quick',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {
@@ -368,6 +404,10 @@ export const browserUiNavigateSkill: Skill = {
     requiresIntegration: [],
     triggerPhrases: ['navigate this ui', 'use the website for me', 'click through the page', 'automate browser steps'],
     preferredModel: 'orchestration',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'high',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {

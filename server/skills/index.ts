@@ -2,6 +2,7 @@
  * Skill Loader — registers all skills into the Skill Registry on server startup.
  * Import this file once during server boot to activate the current skill set.
  */
+import { hydrateSkillManifest } from './framework';
 import { registerSkill } from './registry';
 
 // ── Research Skills ───────────────────────────────────────────────────────────
@@ -12,6 +13,9 @@ import { slackPostMessageSkill } from './communication/slack-post-message.skill'
 import { slackListChannelsSkill } from './communication/slack-list-channels.skill';
 import { slackGetMessagesSkill } from './communication/slack-get-messages.skill';
 import { slackSendDmSkill } from './communication/slack-send-dm.skill';
+
+// ── Automation Skills ─────────────────────────────────────────────────────────
+import { zapierListSkill, zapierTriggerSkill } from './automation/zapier.skills';
 
 // ── Productivity Skills ───────────────────────────────────────────────────────
 import { notionCreatePageSkill } from './productivity/notion-create-page.skill';
@@ -63,7 +67,7 @@ import {
   browserUiNavigateSkill,
 } from './browser/browser.skills';
 
-const ALL_SKILLS = [
+const RAW_SKILLS = [
   // Research
   webSearchSkill,
   webSummarizeUrlSkill,
@@ -72,6 +76,9 @@ const ALL_SKILLS = [
   slackListChannelsSkill,
   slackGetMessagesSkill,
   slackSendDmSkill,
+  // Automation
+  zapierTriggerSkill,
+  zapierListSkill,
   // Productivity
   notionCreatePageSkill,
   notionAppendBlocksSkill,
@@ -120,6 +127,8 @@ const ALL_SKILLS = [
   browserTypeIntoSkill,
   browserUiNavigateSkill,
 ];
+
+const ALL_SKILLS = RAW_SKILLS.map((skill) => hydrateSkillManifest(skill));
 
 for (const skill of ALL_SKILLS) {
   registerSkill(skill);

@@ -1,6 +1,7 @@
 import { createGeminiClient } from './geminiClient';
 import { serverConfig } from '../config';
 import type { SkillRunContext } from '../skills/types';
+import { formatSkillForRouting } from '../skills/framework';
 import { getSkill, listSkillsForUser } from '../skills/registry';
 import { db } from '../db';
 import { isFeatureEnabled } from './featureFlagService';
@@ -96,6 +97,8 @@ export function createStepEmitter(task: AgentTask): { emitStep: EmitStep; getSte
       skillId: options.skillId,
       durationMs: options.durationMs,
       success: options.success,
+      screenshotUrl: options.screenshotUrl,
+      currentUrl: options.currentUrl,
     };
 
     step.stepIndex -= 1;
@@ -411,7 +414,7 @@ export async function routeIntent(intent: string, userId: string): Promise<Routi
   }
 
   const ai = createGeminiClient();
-  const skills = listSkillsForUser(userId).map((skill) => `${skill.id}: ${skill.description}`).join('\n');
+  const skills = listSkillsForUser(userId).map((skill) => formatSkillForRouting(skill)).join('\n\n');
   const response = await ai.models.generateContent({
     model: serverConfig.geminiOrchestrationModel,
     contents: `You are an intent router for a 14-agent AI workforce. Route the user's intent to the most appropriate agent or direct skill.

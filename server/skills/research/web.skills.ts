@@ -438,6 +438,17 @@ export const webSearchSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
+  exposeInLiveSession: false,
+  usageExamples: [
+    'Research and summarize the top AI tools this week',
+    'Find the latest competitive analysis for Notion vs ClickUp',
+    'What changed in the Gemini API recently?',
+  ],
+  invokingMessage: 'Running a multi-angle web intelligence search.',
+  invokedMessage: 'Web intelligence brief ready.',
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: true,
   inputSchema: {
     type: 'object',
     properties: {
@@ -518,6 +529,16 @@ export const webSummarizeUrlSkill: Skill = {
   latencyClass: 'slow',
   sideEffectLevel: 'none',
   exposeInLiveSession: true,
+  usageExamples: [
+    'Summarize this article for me',
+    'Read this documentation page and extract the key points',
+    'Analyze this link with a focus on pricing',
+  ],
+  invokingMessage: 'Reading the URL and extracting the most useful signal.',
+  invokedMessage: 'Deep URL analysis ready.',
+  readOnlyHint: true,
+  destructiveHint: false,
+  openWorldHint: true,
   liveFunctionBehavior: Behavior.NON_BLOCKING,
   inputSchema: {
     type: 'object',

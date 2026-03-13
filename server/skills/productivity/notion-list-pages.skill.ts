@@ -15,6 +15,10 @@ export const notionListPagesSkill: Skill = {
         'Find the Notion page for',
     ],
     preferredModel: 'quick',
+    executionMode: 'inline',
+    latencyClass: 'quick',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {},

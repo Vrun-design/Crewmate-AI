@@ -36,7 +36,7 @@ export const UI_NAVIGATOR_AGENT_MANIFEST = {
     'click_interactions',
     'intelligent_backtracking',
   ],
-  skills: ['browser.ui-navigate', 'browser.inspect-visible-ui', 'browser.click-element', 'browser.type-into', 'browser.extract', 'web.fetch-page'],
+  skills: ['browser.ui-navigate', 'browser.inspect-visible-ui', 'browser.click-element', 'browser.type-into', 'browser.extract', 'web.summarize-url'],
   model: serverConfig.geminiOrchestrationModel,
   emoji: '🌐',
 };

@@ -4,16 +4,16 @@ import type { CapabilityRecord } from '../types';
 
 export function listCapabilities(workspaceId: string, userId: string): CapabilityRecord[] {
   const skillCapabilities: CapabilityRecord[] = listSkills().map((skill) => ({
-    id: `skill - ${skill.id} `,
-    title: `Skill: ${skill.name} `,
-    description: skill.description,
+    id: `skill:${skill.id}`,
+    title: `Skill: ${skill.name}`,
+    description: `${skill.description}${skill.requiresIntegration.length > 0 ? ` Requires: ${skill.requiresIntegration.join(', ')}.` : ''}`,
     status: 'live',
     category: 'action'
   }));
 
   const a2aCapabilities: CapabilityRecord[] = listDiscoveredAgents().map((a) => ({
-    id: `a2a - ${a.id} `,
-    title: `A2A Agent: ${a.name} `,
+    id: `a2a:${a.id}`,
+    title: `A2A Agent: ${a.name}`,
     description: a.description,
     status: a.status === 'online' ? 'live' : 'setup_required',
     category: 'orchestration'

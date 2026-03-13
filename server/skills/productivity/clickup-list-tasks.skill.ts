@@ -71,6 +71,10 @@ export const clickupListTasksSkill: Skill = {
         'What is on our task list?',
     ],
     preferredModel: 'quick',
+    executionMode: 'inline',
+    latencyClass: 'quick',
+    sideEffectLevel: 'none',
+    exposeInLiveSession: true,
     inputSchema: {
         type: 'object',
         properties: {},

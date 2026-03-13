@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { db } from '../db';
 import { AGENT_MANIFESTS, cancelTask, getTask, listTasks as listAgentTasks, orchestrate, subscribeToTask } from '../services/orchestrator';
 import { createErrorResponse, logServerError } from '../services/runtimeLogger';
+import { serializeSkillSummary } from '../skills/framework';
 import { getSkillRunHistory, listSkillsForUser, runSkill } from '../skills/registry';
 import { serverConfig } from '../config';
 import type { RequireAuth } from './types';
@@ -64,19 +65,7 @@ export function registerAgentRoutes(app: Express, requireAuth: RequireAuth): voi
     if (!user) return;
 
     const skillList = listSkillsForUser(user.id);
-    res.json(skillList.map((skill) => ({
-      id: skill.id,
-      name: skill.name,
-      description: skill.description,
-      version: skill.version,
-      category: skill.category,
-      requiresIntegration: skill.requiresIntegration,
-      triggerPhrases: skill.triggerPhrases,
-      preferredModel: skill.preferredModel,
-      executionMode: skill.executionMode,
-      latencyClass: skill.latencyClass,
-      sideEffectLevel: skill.sideEffectLevel,
-    })));
+    res.json(skillList.map((skill) => serializeSkillSummary(skill)));
   });
 
   app.post('/api/skills/:id/run', async (req: Request, res: Response) => {
@@ -203,5 +192,54 @@ export function registerAgentRoutes(app: Express, requireAuth: RequireAuth): voi
 
   app.get('/api/agents', (_req: Request, res: Response) => {
     res.json(AGENT_MANIFESTS);
+  });
+
+  /**
+   * GET /api/agents/tasks/:id/screenshot
+   * Returns the most recent screenshot artifact captured during a UI Navigator task run.
+   * Frontend polls this every 2s to drive the BrowserSessionPiP live view.
+   */
+  app.get('/api/agents/tasks/:id/screenshot', async (req: Request, res: Response) => {
+    const user = requireAuth(req, res);
+    if (!user) return;
+
+    const taskRunId = req.params.id;
+    const task = getTask(taskRunId, user.id);
+
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+
+    // Lazy-import to avoid circular dep
+    const { listRecentScreenshotArtifacts } = await import('../services/screenshotArtifactService');
+
+    // First: try screenshots tagged with this specific task run
+    const byRun = listRecentScreenshotArtifacts(user.id, { taskId: task.workspaceTaskId ?? taskRunId, limit: 1 });
+    const artifact = byRun[0] ?? null;
+
+    if (!artifact) {
+      // No screenshot yet — return status so PiP can show a loading skeleton
+      res.json({
+        screenshotUrl: null,
+        currentUrl: null,
+        stepCount: task.steps?.length ?? 0,
+        status: task.status,
+        intent: task.intent,
+      });
+      return;
+    }
+
+    // Find the most recent step that has a currentUrl
+    const latestUrlStep = [...(task.steps ?? [])].reverse().find((s) => s.currentUrl);
+
+    res.json({
+      screenshotUrl: artifact.publicUrl,
+      currentUrl: latestUrlStep?.currentUrl ?? null,
+      stepCount: task.steps?.length ?? 0,
+      status: task.status,
+      intent: task.intent,
+      capturedAt: artifact.createdAt,
+    });
   });
 }

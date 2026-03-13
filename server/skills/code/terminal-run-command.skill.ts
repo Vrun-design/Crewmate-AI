@@ -336,6 +336,10 @@ Destructive, network, and privilege-escalating commands are always blocked.`,
         'What branches do we have?',
     ],
     preferredModel: 'quick',
+    executionMode: 'delegated',
+    latencyClass: 'slow',
+    sideEffectLevel: 'high',
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {

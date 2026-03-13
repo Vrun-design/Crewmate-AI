@@ -27,11 +27,22 @@ export interface AgentStepEvent {
     skillId?: string;       // Which skill was called (for skill_call / skill_result)
     durationMs?: number;    // How long this step took
     success?: boolean;      // For skill_result / done / error
+    /** Browser session: public URL of the screenshot taken at this step */
+    screenshotUrl?: string;
+    /** Browser session: URL the browser was on when this step occurred */
+    currentUrl?: string;
 }
 
 /** Function signature for the emitStep callback passed to all agents */
 export type EmitStep = (
     type: AgentStepType,
     label: string,
-    options?: { detail?: string; skillId?: string; durationMs?: number; success?: boolean }
+    options?: {
+        detail?: string;
+        skillId?: string;
+        durationMs?: number;
+        success?: boolean;
+        screenshotUrl?: string;
+        currentUrl?: string;
+    }
 ) => void;

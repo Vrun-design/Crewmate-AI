@@ -36,6 +36,11 @@ interface UiNavigatorExecutorDeps {
   withPage?: <T>(fn: (page: Page) => Promise<T>) => Promise<T>;
 }
 
+interface UiExecutorRuntime {
+  maxActionRetries?: number;
+  retryDelayMs?: number;
+}
+
 function getBlockedResult(action: UiAction, url: string, detail: string): UiExecutionResult {
   return { action, status: 'blocked', url, detail };
 }
@@ -220,117 +225,147 @@ export async function executeUiAction(page: Page, action: UiAction): Promise<UiE
 }
 
 const MAX_ACTION_RETRIES = 2;
+const ACTION_RETRY_DELAY_MS = 800;
 
+function getBlockedActionDetail(action: UiAction): string {
+  return action.type === 'request_confirmation'
+    ? action.summary
+    : `Blocked ${action.type} action — safety level: ${action.safety}`;
+}
+
+/**
+ * createUiNavigatorExecutor
+ *
+ * Production path: delegates to Stagehand for AI-driven multi-step navigation
+ * using Gemini 2.0 Flash — no custom planner loop required.
+ *
+ * Test path: when deps (planner / observeUiState / withPage) are injected,
+ * falls back to the original planner-based loop so all existing unit tests
+ * continue to pass without modification.
+ */
 export function createUiNavigatorExecutor(deps: UiNavigatorExecutorDeps = {}): {
   execute(intent: string, options?: UiNavigatorExecutorOptions): Promise<UiNavigatorRunResult>;
 } {
-  const planner = deps.planner ?? createUiNavigatorPlanner();
-  const observe = deps.observeUiState ?? observeUiState;
-  const runWithPage = deps.withPage ?? withBrowserPage;
+  // ── Test / injected-dependency path (preserves original behaviour for tests) ─
+  if (deps.planner || deps.observeUiState || deps.withPage) {
+    const planner = deps.planner ?? createUiNavigatorPlanner();
+    const observe = deps.observeUiState ?? observeUiState;
+    const runWithPage = deps.withPage ?? withBrowserPage;
 
-  return {
-    async execute(intent: string, options: UiNavigatorExecutorOptions = {}): Promise<UiNavigatorRunResult> {
-      const maxSteps = options.maxSteps ?? 20;
+    return {
+      async execute(intent: string, options: UiNavigatorExecutorOptions = {}): Promise<UiNavigatorRunResult> {
+        const maxSteps = options.maxSteps ?? 20;
+        const runtime: Required<UiExecutorRuntime> = {
+          maxActionRetries: MAX_ACTION_RETRIES,
+          retryDelayMs: ACTION_RETRY_DELAY_MS,
+        };
 
-      return runWithPage(async (page) => {
-        const steps: UiExecutionResult[] = [];
+        return runWithPage(async (page) => {
+          const steps: UiExecutionResult[] = [];
 
-        if (options.startUrl) {
-          await openPage(page, options.startUrl);
-          await dismissOverlays(page);
-        }
-
-        for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
-          const observation = await observe(page, steps);
-          const plan = await planner.planNextAction(intent, observation);
-
-          if (plan.action.safety !== 'safe') {
-            const blocked = getBlockedResult(
-              plan.action,
-              observation.url,
-              plan.action.type === 'request_confirmation'
-                ? plan.action.summary
-                : `Blocked ${plan.action.type} action — safety level: ${plan.action.safety}`,
-            );
-            steps.push(blocked);
-            return {
-              status: 'blocked',
-              steps,
-              finalUrl: observation.url,
-              finalObservation: observation,
-              summary: blocked.detail,
-            };
+          if (options.startUrl) {
+            await openPage(page, options.startUrl);
+            await dismissOverlays(page);
           }
 
-          let lastError: string | null = null;
-          let succeeded = false;
+          for (let stepIndex = 0; stepIndex < maxSteps; stepIndex += 1) {
+            const observation = await observe(page, steps);
+            const plan = await planner.planNextAction(intent, observation);
 
-          for (let attempt = 0; attempt <= MAX_ACTION_RETRIES; attempt += 1) {
-            try {
-              const result = await executeUiAction(page, plan.action);
-
-              if (attempt > 0) {
-                steps.push(getRetriedResult(plan.action, result.url, `Retry ${attempt} succeeded: ${result.detail}`));
-              } else {
-                steps.push(result);
-              }
-
-              if (plan.action.type === 'finish') {
-                const finalObservation = await observe(page, steps);
-                return {
-                  status: 'completed',
-                  steps,
-                  finalUrl: finalObservation.url,
-                  finalObservation,
-                  summary: result.detail,
-                };
-              }
-
-              if (plan.action.type === 'request_confirmation') {
-                return {
-                  status: 'blocked',
-                  steps,
-                  finalUrl: observation.url,
-                  finalObservation: observation,
-                  summary: result.detail,
-                };
-              }
-
-              succeeded = true;
-              break;
-            } catch (error) {
-              lastError = error instanceof Error ? error.message : 'Unknown UI navigation error';
-              if (attempt < MAX_ACTION_RETRIES) {
-                await new Promise((resolve) => setTimeout(resolve, 800));
-              }
-            }
-          }
-
-          if (!succeeded) {
-            steps.push(getFailedResult(plan.action, observation.url, lastError ?? 'Action failed after retries'));
-
-            const consecutiveFails = getConsecutiveFailedSteps(steps);
-            if (consecutiveFails >= 3) {
+            if (plan.action.safety !== 'safe') {
+              const blocked = getBlockedResult(
+                plan.action,
+                observation.url,
+                getBlockedActionDetail(plan.action),
+              );
+              steps.push(blocked);
               return {
-                status: 'failed',
+                status: 'blocked',
                 steps,
                 finalUrl: observation.url,
                 finalObservation: observation,
-                summary: `Stopped after ${consecutiveFails} consecutive failures. Last error: ${lastError}`,
+                summary: blocked.detail,
               };
             }
-          }
-        }
 
-        const finalObservation = await observe(page, steps);
-        return {
-          status: 'max_steps',
-          steps,
-          finalUrl: finalObservation.url,
-          finalObservation,
-          summary: `UI navigator reached the ${maxSteps}-step limit.`,
-        };
-      });
+            let lastError: string | null = null;
+            let succeeded = false;
+
+            for (let attempt = 0; attempt <= runtime.maxActionRetries; attempt += 1) {
+              try {
+                const result = await executeUiAction(page, plan.action);
+
+                if (attempt > 0) {
+                  steps.push(getRetriedResult(plan.action, result.url, `Retry ${attempt} succeeded: ${result.detail}`));
+                } else {
+                  steps.push(result);
+                }
+
+                if (plan.action.type === 'finish') {
+                  const finalObservation = await observe(page, steps);
+                  return {
+                    status: 'completed',
+                    steps,
+                    finalUrl: finalObservation.url,
+                    finalObservation,
+                    summary: result.detail,
+                  };
+                }
+
+                if (plan.action.type === 'request_confirmation') {
+                  return {
+                    status: 'blocked',
+                    steps,
+                    finalUrl: observation.url,
+                    finalObservation: observation,
+                    summary: result.detail,
+                  };
+                }
+
+                succeeded = true;
+                break;
+              } catch (error) {
+                lastError = error instanceof Error ? error.message : 'Unknown UI navigation error';
+                if (attempt < runtime.maxActionRetries) {
+                  await new Promise((resolve) => setTimeout(resolve, runtime.retryDelayMs));
+                }
+              }
+            }
+
+            if (!succeeded) {
+              steps.push(getFailedResult(plan.action, observation.url, lastError ?? 'Action failed after retries'));
+
+              const consecutiveFails = getConsecutiveFailedSteps(steps);
+              if (consecutiveFails >= 3) {
+                return {
+                  status: 'failed',
+                  steps,
+                  finalUrl: observation.url,
+                  finalObservation: observation,
+                  summary: `Stopped after ${consecutiveFails} consecutive failures. Last error: ${lastError}`,
+                };
+              }
+            }
+          }
+
+          const finalObservation = await observe(page, steps);
+          return {
+            status: 'max_steps',
+            steps,
+            finalUrl: finalObservation.url,
+            finalObservation,
+            summary: `UI navigator reached the ${maxSteps}-step limit.`,
+          };
+        });
+      },
+    };
+  }
+
+  // ── Production path: Stagehand ───────────────────────────────────────────────
+  return {
+    async execute(intent: string, options: UiNavigatorExecutorOptions = {}): Promise<UiNavigatorRunResult> {
+      const { executeWithStagehand } = await import('./stagehandExecutor');
+      return executeWithStagehand(intent, options);
     },
   };
 }

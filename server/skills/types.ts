@@ -17,15 +17,30 @@ export type SkillExecutionMode = 'inline' | 'delegated' | 'either';
 export type SkillLatencyClass = 'quick' | 'slow';
 export type SkillSideEffectLevel = 'none' | 'low' | 'high';
 
+export type JSONSchemaPropertyType =
+    | 'string'
+    | 'number'
+    | 'integer'
+    | 'boolean'
+    | 'array'
+    | 'object';
+
+export interface JSONSchemaProperty {
+    type: JSONSchemaPropertyType;
+    description: string;
+    properties?: Record<string, JSONSchemaProperty>;
+    items?: JSONSchemaProperty;
+    enum?: string[];
+    required?: string[];
+    additionalProperties?: boolean;
+}
+
 export interface JSONSchema {
     type: 'object';
-    properties: Record<string, {
-        type: 'string' | 'number' | 'boolean' | 'array';
-        description: string;
-        items?: { type: string };
-        enum?: string[];
-    }>;
+    description?: string;
+    properties: Record<string, JSONSchemaProperty>;
     required?: string[];
+    additionalProperties?: boolean;
 }
 
 export interface SkillResult {
@@ -73,6 +88,20 @@ export interface Skill {
     sideEffectLevel?: SkillSideEffectLevel;
     /** Whether this skill should be exposed directly to Gemini Live function calling */
     exposeInLiveSession?: boolean;
+    /** Short high-signal examples that help routing, UI, and tool choice */
+    usageExamples?: string[];
+    /** Brief status text for when the skill is about to start */
+    invokingMessage?: string;
+    /** Brief status text for when the skill completes without a custom message */
+    invokedMessage?: string;
+    /** Hints whether the skill is read-only */
+    readOnlyHint?: boolean;
+    /** Hints whether the skill can make or commit external changes */
+    destructiveHint?: boolean;
+    /** Hints whether the skill reaches into external/open-world systems */
+    openWorldHint?: boolean;
+    /** Optional structured shape for the primary result payload */
+    resultSchema?: JSONSchema;
     /** Optional Live API function behavior override */
     liveFunctionBehavior?: Behavior;
     /** The actual implementation */

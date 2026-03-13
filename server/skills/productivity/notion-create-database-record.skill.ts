@@ -1,20 +1,13 @@
 import type { Skill } from '../types';
+import { parseObjectArgument } from '../framework';
 import { createNotionDatabaseRecord } from '../../services/notionService';
 
 function parseProperties(value: unknown): Record<string, unknown> {
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      return JSON.parse(value) as Record<string, unknown>;
-    } catch {
-      throw new Error('propertiesJson must be valid JSON.');
-    }
+  if (typeof value === 'undefined') {
+    return {};
   }
 
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
+  return parseObjectArgument(value, 'properties');
 }
 
 export const notionCreateDatabaseRecordSkill: Skill = {
@@ -40,7 +33,12 @@ export const notionCreateDatabaseRecordSkill: Skill = {
       databaseIdOrUrl: { type: 'string', description: 'The target Notion database ID or URL.' },
       title: { type: 'string', description: 'Record title.' },
       content: { type: 'string', description: 'Optional body content to include as page blocks.' },
-      propertiesJson: { type: 'string', description: 'Optional JSON object of structured property values keyed by exact Notion property names.' },
+      properties: {
+        type: 'object',
+        description: 'Optional structured property values keyed by exact Notion property names.',
+        properties: {},
+        additionalProperties: true,
+      },
       iconEmoji: { type: 'string', description: 'Optional emoji icon.' },
       coverUrl: { type: 'string', description: 'Optional external cover image URL.' },
     },
@@ -51,7 +49,7 @@ export const notionCreateDatabaseRecordSkill: Skill = {
       databaseIdOrUrl: String(args.databaseIdOrUrl ?? ''),
       title: String(args.title ?? ''),
       content: typeof args.content === 'string' ? args.content : undefined,
-      properties: parseProperties(args.propertiesJson),
+      properties: parseProperties(args.properties),
       iconEmoji: typeof args.iconEmoji === 'string' ? args.iconEmoji : undefined,
       coverUrl: typeof args.coverUrl === 'string' ? args.coverUrl : undefined,
     });

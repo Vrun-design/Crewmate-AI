@@ -13,6 +13,13 @@ export interface SkillSummary {
     executionMode?: string;
     latencyClass?: string;
     sideEffectLevel?: string;
+    exposeInLiveSession?: boolean;
+    usageExamples?: string[];
+    invokingMessage?: string;
+    invokedMessage?: string;
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    openWorldHint?: boolean;
 }
 
 export interface SkillRunResult {

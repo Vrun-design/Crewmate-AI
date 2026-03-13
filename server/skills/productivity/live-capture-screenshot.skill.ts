@@ -18,6 +18,16 @@ export const liveCaptureScreenshotSkill: Skill = {
   latencyClass: 'quick',
   sideEffectLevel: 'low',
   exposeInLiveSession: true,
+  usageExamples: [
+    'Capture a screenshot of this error state',
+    'Save the screen I am sharing',
+    'Take a screenshot for the current task',
+  ],
+  invokingMessage: 'Capturing the latest shared screen frame.',
+  invokedMessage: 'Live screenshot captured.',
+  readOnlyHint: false,
+  destructiveHint: false,
+  openWorldHint: false,
   inputSchema: {
     type: 'object',
     properties: {

@@ -15,6 +15,9 @@ import type { Task, TaskDetail } from '../types';
 import type { AgentTask, AgentStepEvent } from '../components/agents/types';
 import { api } from '../lib/api';
 import { connectAuthenticatedSseStream } from '../lib/sse';
+import { browserSessionStore } from '../stores/browserSessionStore';
+
+const UI_NAVIGATOR_AGENT_ID = 'crewmate-ui-navigator-agent';
 
 type StatusFilter = 'all' | 'in_progress' | 'completed' | 'pending' | 'failed' | 'cancelled';
 
@@ -265,6 +268,13 @@ export function Tasks(): React.JSX.Element {
     setIsDrawerOpen(true);
     if (task.status === 'running' || task.status === 'queued') {
       subscribeToTask(task.id);
+      // Activate PiP for UI Navigator tasks
+      if (task.agentId === UI_NAVIGATOR_AGENT_ID) {
+        browserSessionStore.set({
+          taskId: task.id,
+          intent: task.intent.slice(0, 120),
+        });
+      }
     }
   }
 

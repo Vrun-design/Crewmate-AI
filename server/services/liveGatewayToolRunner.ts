@@ -141,7 +141,7 @@ export async function executeLiveFunctionCalls(input: {
         output = {
           spoken_response: typeof runRecord.result.message === 'string'
             ? runRecord.result.message
-            : `${skill.name} completed.`,
+            : skill.invokedMessage ?? `${skill.name} completed.`,
           inlineSkillResult: runRecord.result.output ?? runRecord.result,
           output: runRecord.result.output ?? runRecord.result,
           message: runRecord.result.message,
