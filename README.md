@@ -48,7 +48,7 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 |---|---|
 | **Gemini Live** | Real-time audio conversation with interruption support |
 | **Screen Context** | Screenshot captured and sent as multimodal context each turn |
-| **44 Skills** | Research, browser, productivity, comms, code, creative |
+| **49 Skills** | Research, browser, productivity, comms, code, live |
 | **Orchestrator** | Intent-routed A2A dispatch to specialist agents |
 | **Memory** | Vector-embedded session recall + knowledge base |
 | **Tasks** | Real-time streamed background task execution |
@@ -94,7 +94,7 @@ flowchart TD
         subgraph ExecutionLayer["Execution Layer"]
             ORCH[Orchestrator\nIntent Router]
             POLICY[Execution Policy\nInline / Delegated / Either]
-            REG[Skill Registry\n44 Skills]
+            REG[Skill Registry\n49 Skills]
         end
 
         subgraph AgentLayer["Agent Layer"]
@@ -299,19 +299,19 @@ All browser navigation is **voice-activated via Gemini Live** — say the task o
 
 ---
 
-## ⚡ Skills — 44 and Counting
+## ⚡ Skills — 49 and Counting
 
 Skills are the **single execution primitive** in Crewmate. Every action — from posting a Slack message to filling a web form — is a skill.
 
 | Category | Skills |
 |---|---|
 | **Research** | `web.search`, `web.summarize-url` |
-| **Communication** | `slack.post-message`, `slack.list-channels` |
+| **Communication** | `slack.post-message`, `slack.list-channels`, `slack.get-messages`, `slack.send-dm` |
 | **Productivity — Notion** | `notion.create-page`, `notion.append-blocks`, `notion.append-screenshot`, `notion.create-database-record`, `notion.list-pages`, `notion.search-pages`, `notion.update-page` |
 | **Productivity — ClickUp** | `clickup.create-task`, `clickup.attach-screenshot`, `clickup.list-tasks` |
 | **Productivity — Google Workspace** | Gmail (draft/send/search), Docs (create/append), Sheets (create/append-rows), Slides (create/add-slides), Drive (search/create-folder), Calendar (create-event/list-events) |
 | **Productivity — Memory** | `memory.store`, `memory.retrieve`, `memory.list` |
-| **Productivity — Tasks** | `task.list-active`, `task.cancel`, `workspace.create-task` |
+| **Productivity — Tasks** | `tasks.list-active`, `tasks.cancel`, `workspace.create-task` |
 | **Browser Automation** | `browser.open-url`, `browser.extract`, `browser.extract-text`, `browser.fill-form`, `browser.click-element`, `browser.inspect-visible-ui`, `browser.press-key`, `browser.search-google`, `browser.scroll-page`, `browser.screenshot`, `browser.type-into`, `browser.ui-navigate` |
 | **Code & DevOps** | `terminal.run-command` (sandboxed) |
 | **Live** | `live.capture-screenshot` |
@@ -327,9 +327,9 @@ The runtime uses these to automatically decide whether to run a skill immediatel
 
 ---
 
-## 🤖 Specialist Agents — 13 World-Class Domain Experts
+## 🤖 Specialist Agents — 14 World-Class Domain Experts
 
-For complex multi-step workflows, Crewmate dispatches to **13 specialist agents**, each with a deep expert persona, multi-step research pipeline, and auto-integration with connected tools.
+For complex multi-step workflows, Crewmate dispatches to **14 specialist agents**, each with a deep expert persona, multi-step research pipeline, and auto-integration with connected tools.
 
 Every agent follows the same pipeline: **Research → Strategy → Generate → Save (Notion/ClickUp/Slack)**.
 
@@ -548,7 +548,7 @@ crewmate/
 │   │   ├── executionPolicy.ts # Inline vs delegated routing
 │   │   ├── agents/            # Specialist agent definitions
 │   │   └── ...                # Integration services (Notion, Slack, etc.)
-│   ├── skills/                # 44 registered skills
+│   ├── skills/                # 49 registered skills
 │   │   ├── browser/           # Playwright-powered browser skills
 │   │   ├── communication/     # Slack
 │   │   ├── productivity/      # Notion, ClickUp, Google Workspace, Memory
