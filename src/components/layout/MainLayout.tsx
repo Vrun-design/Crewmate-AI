@@ -44,6 +44,11 @@ export function MainLayout() {
       return;
     }
 
+    if (!onboardingFlowService.shouldRequireIntegrationOnboarding()) {
+      onboardingFlowService.markComplete();
+      return;
+    }
+
     if (onboardingFlowService.isComplete() || location.pathname === '/onboarding') {
       return;
     }

@@ -51,6 +51,7 @@ export interface NavigateWithUiPlannerOptions {
   startUrl?: string;
   maxSteps?: number;
   onStepScreenshot?: UiPlannerStepScreenshotHandler;
+  userId?: string;
 }
 
 export async function fillForm(options: FillFormOptions): Promise<{ success: boolean; resultUrl: string; message: string }> {

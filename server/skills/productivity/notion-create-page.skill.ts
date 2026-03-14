@@ -1,5 +1,7 @@
 import type { Skill } from '../types';
+import { inferAutoImageQuery } from '../../services/autoVisuals';
 import { createNotionPage } from '../../services/notionService';
+import { searchStockImage } from '../../services/imageSearchService';
 import { resolveRecentScreenshotArtifact } from '../../services/screenshotArtifactService';
 
 export const notionCreatePageSkill: Skill = {
@@ -27,12 +29,23 @@ export const notionCreatePageSkill: Skill = {
             content: { type: 'string', description: 'Page body content. Supports headings (#), bullets (-), numbered lists (1.), to-dos (- [ ]), quotes (>), code fences (```), bookmarks (URL lines), images (image URL lines), and inline links like [label](https://...).' },
             iconEmoji: { type: 'string', description: 'Optional emoji icon for the page.' },
             coverUrl: { type: 'string', description: 'Optional external image URL for the page cover.' },
+            imageQuery: { type: 'string', description: 'Optional stock-image query to use for the page cover and embedded image.' },
             screenshotArtifactId: { type: 'string', description: 'Optional screenshot artifact ID to embed into the page.' },
             screenshotCaption: { type: 'string', description: 'Optional caption to display under the embedded screenshot.' },
         },
         required: ['title', 'content'],
     },
     handler: async (ctx, args) => {
+        const imageQuery = typeof args.imageQuery === 'string' && args.imageQuery.trim()
+            ? args.imageQuery
+            : inferAutoImageQuery({
+                target: 'notion',
+                title: String(args.title ?? ''),
+                content: String(args.content ?? ''),
+            });
+        const stockImage = imageQuery
+            ? await searchStockImage(imageQuery)
+            : null;
         const screenshot = typeof args.screenshotArtifactId === 'string' && args.screenshotArtifactId.trim()
             ? resolveRecentScreenshotArtifact(ctx.userId, {
                 artifactId: args.screenshotArtifactId,
@@ -42,9 +55,9 @@ export const notionCreatePageSkill: Skill = {
             : null;
         const result = await createNotionPage(ctx.workspaceId, {
             title: String(args.title ?? ''),
-            content: String(args.content ?? ''),
+            content: stockImage?.url ? `${String(args.content ?? '')}\n\n${stockImage.url}` : String(args.content ?? ''),
             iconEmoji: typeof args.iconEmoji === 'string' ? args.iconEmoji : undefined,
-            coverUrl: typeof args.coverUrl === 'string' ? args.coverUrl : undefined,
+            coverUrl: typeof args.coverUrl === 'string' ? args.coverUrl : stockImage?.url,
             screenshotUrl: screenshot?.publicUrl,
             screenshotCaption: typeof args.screenshotCaption === 'string' ? args.screenshotCaption : screenshot?.caption ?? screenshot?.title ?? undefined,
         });

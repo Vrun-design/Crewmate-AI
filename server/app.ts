@@ -8,6 +8,31 @@ import { registerRoutes } from './routes';
 import { resolveAuthUserFromToken } from './services/authService';
 import { withRequestContext } from './services/requestContext';
 
+function isPublicHostedUrl(value: string): boolean {
+  return Boolean(value.trim()) && !/localhost|127\.0\.0\.1/i.test(value);
+}
+
+function getReadinessStatus(): {
+  ok: boolean;
+  env: string;
+  firebaseAuthEnabled: boolean;
+  checks: Record<string, boolean>;
+} {
+  const checks = {
+    database: true,
+    geminiApiKey: !serverConfig.isProduction || Boolean(serverConfig.geminiApiKey.trim()),
+    publicAppUrl: !serverConfig.isProduction || isPublicHostedUrl(serverConfig.publicAppUrl),
+    publicWebAppUrl: !serverConfig.isProduction || isPublicHostedUrl(serverConfig.publicWebAppUrl),
+  };
+
+  return {
+    ok: Object.values(checks).every(Boolean),
+    env: serverConfig.appEnv,
+    firebaseAuthEnabled: Boolean(serverConfig.firebaseProjectId.trim()),
+    checks,
+  };
+}
+
 export function createApp(): express.Express {
   const app = express();
   app.set('trust proxy', 1);
@@ -37,11 +62,8 @@ export function createApp(): express.Express {
   });
 
   app.get('/api/health/ready', (_req, res) => {
-    res.json({
-      ok: true,
-      env: serverConfig.appEnv,
-      firebaseAuthEnabled: Boolean(serverConfig.firebaseProjectId.trim()),
-    });
+    const readiness = getReadinessStatus();
+    res.status(readiness.ok ? 200 : 503).json(readiness);
   });
 
   app.use(async (req, _res, next) => {

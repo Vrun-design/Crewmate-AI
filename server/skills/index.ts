@@ -21,6 +21,7 @@ import { zapierListSkill, zapierTriggerSkill } from './automation/zapier.skills'
 import { notionCreatePageSkill } from './productivity/notion-create-page.skill';
 import { notionAppendBlocksSkill } from './productivity/notion-append-blocks.skill';
 import { notionAppendScreenshotSkill } from './productivity/notion-append-screenshot.skill';
+import { notionUploadImageSkill } from './productivity/notion-upload-image.skill';
 import { notionCreateDatabaseRecordSkill } from './productivity/notion-create-database-record.skill';
 import { notionListPagesSkill } from './productivity/notion-list-pages.skill';
 import { notionSearchPagesSkill } from './productivity/notion-search-pages.skill';
@@ -83,6 +84,7 @@ const RAW_SKILLS = [
   notionCreatePageSkill,
   notionAppendBlocksSkill,
   notionAppendScreenshotSkill,
+  notionUploadImageSkill,
   notionCreateDatabaseRecordSkill,
   notionListPagesSkill,
   notionSearchPagesSkill,

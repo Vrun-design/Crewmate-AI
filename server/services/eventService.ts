@@ -49,6 +49,14 @@ interface Client {
 
 let clients: Client[] = [];
 
+// Keep SSE connections alive through proxies and load balancers.
+// Most proxies time out idle connections at 60–120 s; we ping every 25 s.
+setInterval(() => {
+  clients.forEach((client) => {
+    client.res.write(': heartbeat\n\n');
+  });
+}, 25_000);
+
 export function addSseClient(id: string, userId: string, req: Request, res: Response): void {
   clients.push({ id, userId, res });
 

@@ -139,4 +139,5 @@ export interface FeatureFlags {
   approvalGates: boolean;
   uiNavigator: boolean;
   researchGrounding: boolean;
+  skillsHub: boolean;
 }

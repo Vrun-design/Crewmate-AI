@@ -8,6 +8,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { Drawer } from '../components/ui/Drawer';
 import { Button } from '../components/ui/Button';
 import { useSkills } from '../hooks/useSkills';
+import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { api } from '../lib/api';
 
 const CATEGORY_META: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
@@ -24,8 +25,24 @@ const ALL_CATEGORIES = ['all', ...Object.keys(CATEGORY_META)];
 
 type TryItStatus = 'idle' | 'loading' | 'success' | 'error';
 
+function getSkillExamplePhrases(skill: {
+  usageExamples?: string[];
+  triggerPhrases?: string[];
+}): string[] {
+  if ((skill.usageExamples?.length ?? 0) > 0) {
+    return skill.usageExamples ?? [];
+  }
+
+  if ((skill.triggerPhrases?.length ?? 0) > 0) {
+    return skill.triggerPhrases ?? [];
+  }
+
+  return [];
+}
+
 export function Skills() {
   const { skills: systemSkills, isLoading: sysLoading, error } = useSkills();
+  const { flags, isLoading: isFlagsLoading } = useFeatureFlags();
 
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSkill, setSelectedSkill] = useState<(typeof systemSkills)[0] | null>(null);
@@ -65,8 +82,9 @@ export function Skills() {
   }
 
   function handleSelectSkill(skill: (typeof systemSkills)[0]): void {
+    const examplePhrases = getSkillExamplePhrases(skill);
     setSelectedSkill(skill);
-    setTryItPrompt(skill.usageExamples?.[0] ?? skill.triggerPhrases?.[0] ?? `Use ${skill.name} to `);
+    setTryItPrompt(examplePhrases[0] ?? `Use ${skill.name} to `);
     setTryItStatus('idle');
     setTryItResult(null);
     setTryItTaskId(null);
@@ -80,6 +98,27 @@ export function Skills() {
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-32 rounded-2xl bg-card animate-pulse border border-border" />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isFlagsLoading && !flags.skillsHub) {
+    return (
+      <div className="space-y-6 pb-10">
+        <PageHeader
+          title="Skills Hub"
+          description="This internal tool surface is disabled in the current environment to keep the demo path tighter and more reliable."
+        />
+
+        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-secondary">
+            <Zap size={20} className="text-muted-foreground" />
+          </div>
+          <div className="mb-2 text-sm font-medium text-foreground">Skills Hub is disabled here</div>
+          <div className="mx-auto max-w-lg text-sm text-muted-foreground">
+            Re-enable `FEATURE_SKILLS_HUB` if you want to inspect the internal skill catalog in this environment.
+          </div>
         </div>
       </div>
     );
@@ -171,6 +210,7 @@ export function Skills() {
       >
         {selectedSkill && (() => {
           const s = selectedSkill;
+          const examplePhrases = getSkillExamplePhrases(s);
           return (
             <div className="space-y-6">
               {/* Header */}
@@ -225,13 +265,13 @@ export function Skills() {
               )}
 
               {/* Examples — clickable to pre-fill */}
-              {(s.usageExamples && s.usageExamples.length > 0) || (s.triggerPhrases && s.triggerPhrases.length > 0) ? (
+              {examplePhrases.length > 0 ? (
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                     <Clock size={12} /> Example Requests
                   </label>
                   <div className="space-y-1.5">
-                    {(s.usageExamples ?? s.triggerPhrases).map((phrase) => (
+                    {examplePhrases.map((phrase) => (
                       <button
                         key={phrase}
                         type="button"
@@ -249,15 +289,15 @@ export function Skills() {
               <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                  <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Try It Live</span>
+                  <span className="text-xs font-semibold text-foreground uppercase tracking-wider">Send To Orchestrator</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Send a prompt directly to the orchestrator — it will route to this skill and run it.</p>
+                <p className="text-xs text-muted-foreground">Send a prompt to the orchestrator. It may choose this skill or a different route based on the intent.</p>
 
                 <form onSubmit={(e) => void handleTryIt(e)} className="space-y-2">
                   <textarea
                     value={tryItPrompt}
                     onChange={(e) => setTryItPrompt(e.target.value)}
-                    placeholder={`e.g. "${s.usageExamples?.[0] ?? s.triggerPhrases?.[0] ?? `Use ${s.name} to...`}"`}
+                    placeholder={`e.g. "${examplePhrases[0] ?? `Use ${s.name} to...`}"`}
                     rows={3}
                     className="w-full bg-background border border-border rounded-xl px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 resize-none"
                   />
@@ -270,7 +310,7 @@ export function Skills() {
                     {tryItStatus === 'loading' ? (
                       <><Loader2 size={14} className="animate-spin" />Running...</>
                     ) : (
-                      <><Zap size={14} />Run Skill</>
+                      <><Zap size={14} />Dispatch Prompt</>
                     )}
                   </Button>
                 </form>

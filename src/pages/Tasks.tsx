@@ -417,12 +417,21 @@ export function Tasks(): React.JSX.Element {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset to page 1 whenever filter or search changes
+  useEffect(() => { setCurrentPage(1); }, [statusFilter, searchQuery]);
+  const PAGE_SIZE = 25;
 
   const filteredStandard = allTasks.filter((t) => {
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
     const matchesSearch = matchesTaskSearch(t, searchQuery);
     return matchesStatus && matchesSearch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredStandard.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedTasks = filteredStandard.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const inProgressCount = allTasks.filter((t) => t.status === 'in_progress' || t.status === 'pending').length;
 
@@ -497,8 +506,56 @@ export function Tasks(): React.JSX.Element {
                 <Button variant="secondary" onClick={() => window.location.reload()}>Reload</Button>
               </div>
             </div>
-          ) : filteredStandard.length > 0 ? (
-            <TaskList tasks={filteredStandard} onOpenTask={(task) => void handleOpenTask(task)} />
+          ) : paginatedTasks.length > 0 ? (
+            <>
+              <TaskList tasks={paginatedTasks} onOpenTask={(task) => void handleOpenTask(task)} />
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                  <span className="text-xs text-muted-foreground">
+                    {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filteredStandard.length)} of {filteredStandard.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={safePage <= 1}
+                      onClick={() => setCurrentPage((p) => p - 1)}
+                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                      .reduce<Array<number | '…'>>((acc, p, idx, arr) => {
+                        if (idx > 0 && (arr[idx - 1] as number) < p - 1) acc.push('…');
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((item, idx) =>
+                        item === '…' ? (
+                          <span key={`ellipsis-${idx}`} className="px-2 text-xs text-muted-foreground">…</span>
+                        ) : (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setCurrentPage(item as number)}
+                            className={`min-w-[30px] rounded-lg border px-2 py-1.5 text-xs transition-colors ${item === safePage ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-accent'}`}
+                          >
+                            {item}
+                          </button>
+                        ),
+                      )}
+                    <button
+                      type="button"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                      className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <EmptyStateCard
               title={statusFilter === 'all' ? 'No tasks yet' : `No ${statusFilter.replace('_', ' ')} tasks`}

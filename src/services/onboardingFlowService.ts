@@ -1,3 +1,5 @@
+import { firebaseAuthService } from './firebaseAuth';
+
 const ONBOARDING_COMPLETE_KEY = 'crewmate_onboarding_complete';
 
 export const onboardingFlowService = {
@@ -9,5 +11,8 @@ export const onboardingFlowService = {
   },
   isComplete(): boolean {
     return localStorage.getItem(ONBOARDING_COMPLETE_KEY) === 'true';
+  },
+  shouldRequireIntegrationOnboarding(): boolean {
+    return firebaseAuthService.isConfigured();
   },
 };

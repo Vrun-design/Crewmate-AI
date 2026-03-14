@@ -223,35 +223,47 @@ Be concise — this is an internal plan, not the final output.`,
     const searchContexts: string[] = [];
     const groundedResearchEnabled = isFeatureEnabled('researchGrounding');
 
-    emitStep('skill_call', `Running ${searchQueries.length} targeted searches...`, { skillId: 'web.search' });
+    emitStep('skill_call', `Running ${searchQueries.length} targeted searches in parallel...`, { skillId: 'web.search' });
 
-    for (let i = 0; i < searchQueries.length; i++) {
-        const query = searchQueries[i];
-        try {
+    const t0All = Date.now();
+    const searchSettled = await Promise.allSettled(
+        searchQueries.map(async (query, i) => {
             const t0 = Date.now();
             const searchRun = await runSkill('web.search', ctx, { query, maxResults: 5 });
-            const sources = normalizeResearchSources(searchRun.result.output);
-            const message = typeof searchRun.result.message === 'string' ? searchRun.result.message : '';
-
-            // Deduplicate sources by URL
-            sources.forEach((s) => {
-                if (!allSources.find((existing) => existing.url === s.url)) {
-                    allSources.push(s);
-                }
-            });
-
-            if (message) searchContexts.push(`[Search ${i + 1}: "${query}"]\n${message}`);
-
-            emitStep('skill_result', `Search ${i + 1}/${searchQueries.length}: ${sources.length} unique sources`, {
-                skillId: 'web.search',
+            return {
+                query,
+                index: i,
+                sources: normalizeResearchSources(searchRun.result.output),
+                message: typeof searchRun.result.message === 'string' ? searchRun.result.message : '',
                 durationMs: Date.now() - t0,
-                success: sources.length > 0,
-                detail: `"${query.slice(0, 60)}"`,
-            });
-        } catch {
-            // Non-fatal — continue with other searches
+            };
+        }),
+    );
+
+    // Merge results in order, deduplicating by URL
+    const seenUrls = new Set<string>();
+    searchSettled.forEach((settled, i) => {
+        if (settled.status === 'rejected') {
+            return; // Non-fatal — skip failed searches
         }
-    }
+        const { query, index, sources, message, durationMs } = settled.value;
+        const newSources = sources.filter((s) => !seenUrls.has(s.url));
+        newSources.forEach((s) => {
+            seenUrls.add(s.url);
+            allSources.push(s);
+        });
+        if (message) searchContexts.push(`[Search ${index + 1}: "${query}"]\n${message}`);
+        emitStep('skill_result', `Search ${i + 1}/${searchQueries.length}: ${newSources.length} new sources`, {
+            skillId: 'web.search',
+            durationMs,
+            success: newSources.length > 0,
+            detail: `"${query.slice(0, 60)}"`,
+        });
+    });
+
+    emitStep('thinking', `All ${searchQueries.length} searches completed in ${((Date.now() - t0All) / 1000).toFixed(1)}s`, {
+        detail: `${allSources.length} total unique sources found`,
+    });
 
     // Step 3: Deep-dive: try to extract content from top 2 sources
     if (groundedResearchEnabled && allSources.length > 0) {
@@ -287,7 +299,7 @@ Be concise — this is an internal plan, not the final output.`,
 
     // Step 4: Deep synthesis across all sources
     const evidenceBlock = groundedResearchEnabled && totalSources > 0
-        ? `Use ONLY the supplied evidence. Cite sources inline by title when making claims. If evidence is incomplete or contradictory, say so explicitly with confidence levels (✅/⚠️/❓).\n\nEvidence:\n${totalContext.slice(0, 6000)}`
+        ? `Use ONLY the supplied evidence. Cite sources inline by title when making claims. If evidence is incomplete or contradictory, say so explicitly with confidence levels (✅/⚠️/❓).\n\nEvidence:\n${totalContext.slice(0, 14000)}`
         : `External evidence is limited. Be explicit about uncertainty. Clearly label any claim as provisional if unsupported.\n${totalSources === 0 ? 'No web sources retrieved — draw from training knowledge and flag this clearly.' : `Sources available: ${totalSources}`}`;
 
     const findingPrompts: Record<string, string> = {
@@ -424,7 +436,7 @@ Required sections:
 Raw findings to synthesize:
 ${findings}
 
-${totalSources > 0 ? `Sources:\n${formatSources(allSources.slice(0, 10))}` : 'Note: Limited web sources — flag knowledge boundaries clearly.'}`,
+${totalSources > 0 ? `Sources:\n${formatSources(allSources.slice(0, 15))}` : 'Note: Limited web sources — flag knowledge boundaries clearly.'}`,
     });
     const brief = findingsResponse.text ? (briefResponse.text ?? '') : '';
 

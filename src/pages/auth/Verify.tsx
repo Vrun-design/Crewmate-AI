@@ -72,8 +72,8 @@ export function Verify() {
       const response = await authService.verifyCode(email, code.join(''));
       authStorage.saveSession(response.token, response.user.email);
       localStorage.setItem('crewmate_user_email', response.user.email);
-      onboardingFlowService.reset();
-      navigate('/onboarding');
+      onboardingFlowService.markComplete();
+      navigate('/dashboard');
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : 'Unable to verify code');
     } finally {

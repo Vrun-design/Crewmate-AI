@@ -15,6 +15,14 @@ import { useDashboard } from '../hooks/useDashboard';
 import { useLiveSessionContext } from '../contexts/LiveSessionContext';
 import { getDisplayNameFromEmail } from '../utils/userName';
 
+const SUGGESTED_PROMPTS = [
+  'Check my Gmail for unread messages from today',
+  "What's on my calendar for the next few hours?",
+  'Search the web and write a brief report on a topic of my choice',
+  'Draft a Slack message to my team',
+  'Create a new Google Doc with meeting notes',
+];
+
 export function Dashboard() {
   const [userName, setUserName] = useState('User');
   const [isRecentDrawerOpen, setIsRecentDrawerOpen] = useState(false);
@@ -63,6 +71,15 @@ export function Dashboard() {
     setIsOverlayOpen(false);
   }
 
+  async function handlePromptClick(prompt: string): Promise<void> {
+    if (!isSessionActive) {
+      await startSession();
+      // Brief delay for the session to establish before sending
+      await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+    }
+    void sendMessage(prompt);
+  }
+
   return (
     <div className="h-full flex flex-col gap-4 pb-2">
       <PageHeader
@@ -107,6 +124,19 @@ export function Dashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div className="flex flex-wrap gap-2">
+        {SUGGESTED_PROMPTS.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            onClick={() => void handlePromptClick(prompt)}
+            className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-muted-foreground/40 hover:text-foreground"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
 
       <div className="min-h-0 flex-1">
         <LiveSessionCard

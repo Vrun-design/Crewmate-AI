@@ -2,6 +2,8 @@ import { db } from '../db';
 import { listIntegrationCatalog } from './integrationCatalog';
 import { listActiveTasks } from './orchestrator';
 import { retrieveRelevantMemories } from './memoryService';
+import { getOnboardingProfile } from './onboardingProfileService';
+import { getTaskRecord, listTaskRunsForUser } from '../repositories/workspaceRepository';
 
 const DEFAULT_SYSTEM_IDENTITY = `You are the user's live work partner inside this session.
 
@@ -110,6 +112,55 @@ function buildActiveTaskContext(userId: string): string {
     .join('\n');
 }
 
+function buildRecentSessionSummariesContext(userId: string): string {
+  try {
+    const rows = db.prepare(`
+      SELECT title, summary
+      FROM memory_records
+      WHERE user_id = ? AND kind = 'session'
+      ORDER BY created_at DESC
+      LIMIT 3
+    `).all(userId) as Array<{ title: string; summary: string | null }>;
+
+    if (rows.length === 0) return '';
+    return rows
+      .map((row) => `- ${row.title}: ${row.summary ?? ''}`)
+      .join('\n');
+  } catch {
+    return '';
+  }
+}
+
+function buildRecentCompletedTaskContext(userId: string): string {
+  try {
+    const runs = listTaskRunsForUser(userId, {
+      limit: 5,
+      statuses: ['completed', 'failed'],
+      includeRunTypes: ['delegated_skill', 'delegated_agent'],
+    });
+    if (runs.length === 0) return '';
+    return runs
+      .map((r) => {
+        const task = getTaskRecord(r.taskId, userId);
+        const label = task?.title ?? r.skillId ?? 'task';
+        const when = r.completedAt ? new Date(r.completedAt).toLocaleDateString() : 'recently';
+        return `- ${label} [${r.status}] on ${when}`;
+      })
+      .join('\n');
+  } catch {
+    return '';
+  }
+}
+
+function buildUserNameContext(userId: string): string {
+  try {
+    const profile = getOnboardingProfile(userId);
+    return profile.agentName && profile.agentName !== 'Crewmate' ? profile.agentName : '';
+  } catch {
+    return '';
+  }
+}
+
 function buildConnectedIntegrationContext(workspaceId: string, userId: string): string {
   const integrations = listIntegrationCatalog(workspaceId, userId);
   return integrations
@@ -147,18 +198,30 @@ export async function buildUserSystemInstruction(userId: string, options?: { liv
   }
 
   const activeTaskContext = buildActiveTaskContext(userId);
+  const recentTaskContext = buildRecentCompletedTaskContext(userId);
+  const userName = buildUserNameContext(userId);
+  const sessionSummaries = buildRecentSessionSummariesContext(userId);
+
+  const userNameLine = userName ? `\n**User's name:** ${userName}` : '';
+  const recentTasksSection = recentTaskContext
+    ? `\n\n**Recently completed tasks (for continuity):**\n${recentTaskContext}`
+    : '';
+  const sessionSummariesSection = sessionSummaries
+    ? `\n\n**Recent session history:**\n${sessionSummaries}`
+    : '';
 
   return `${DEFAULT_SYSTEM_IDENTITY}${buildSystemAppendix(options)}
 
 ---
 
 ## Live Context
+${userNameLine}
 
 **Relevant memory (from past sessions):**
 ${memoryContext}
 
 **Active background tasks:**
-${activeTaskContext}
+${activeTaskContext}${recentTasksSection}${sessionSummariesSection}
 
 **Connected integrations:**
 ${connected || 'No external integrations connected yet. If the user asks to use a tool, tell them specifically which integration to connect in Settings.'}

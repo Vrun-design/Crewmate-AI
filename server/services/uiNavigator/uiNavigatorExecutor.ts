@@ -25,6 +25,7 @@ interface UiNavigatorExecutorOptions {
   startUrl?: string;
   maxSteps?: number;
   onStepScreenshot?: (base64: string, mimeType: string, currentUrl: string, stepIndex: number) => void;
+  userId?: string;
 }
 
 interface UiNavigatorPlanner {
@@ -366,7 +367,11 @@ export function createUiNavigatorExecutor(deps: UiNavigatorExecutorDeps = {}): {
   return {
     async execute(intent: string, options: UiNavigatorExecutorOptions = {}): Promise<UiNavigatorRunResult> {
       const { executeWithStagehand } = await import('./stagehandExecutor');
-      return executeWithStagehand(intent, options, options.onStepScreenshot);
+      return executeWithStagehand(
+        intent,
+        { startUrl: options.startUrl, maxSteps: options.maxSteps, userId: options.userId },
+        options.onStepScreenshot,
+      );
     },
   };
 }

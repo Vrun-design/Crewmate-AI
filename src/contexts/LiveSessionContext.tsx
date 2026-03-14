@@ -162,14 +162,18 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   });
 
   React.useEffect(() => {
-    // Keep 'running' cues visible indefinitely — they will be replaced by completed/failed
-    if (!liveTaskCue || liveTaskCue.status === 'running') {
+    if (!liveTaskCue) {
       return;
     }
 
+    // Terminal states: clear after 7 seconds
+    // Running state: safety cap of 5 minutes — if the task is still "running"
+    // after this long, the SSE completion event was likely missed.
+    const timeoutMs = liveTaskCue.status === 'running' ? 5 * 60 * 1000 : 7000;
+
     const timer = window.setTimeout(() => {
       setLiveTaskCue(null);
-    }, 7000);
+    }, timeoutMs);
 
     return () => window.clearTimeout(timer);
   }, [liveTaskCue]);

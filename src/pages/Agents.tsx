@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AgentDrawerContent } from '../components/agents/AgentDrawerContent';
 import { AgentNodeMap } from '../components/agents/AgentNodeMap';
@@ -10,6 +10,17 @@ import { api } from '../lib/api';
 import { onboardingService, type OnboardingProfile } from '../services/onboardingService';
 import { SoulDrawerContent } from '../components/agents/SoulDrawerContent';
 import { getUserFacingErrorMessage } from '../utils/errorHandling';
+import { useLiveEvents } from '../hooks/useLiveEvents';
+
+// Map skill-route tasks (no agentId) to a pseudo-agent by skill category prefix
+const SKILL_PREFIX_TO_AGENT: Record<string, string> = {
+  'browser': 'crewmate-ui-navigator-agent',
+  'web': 'crewmate-research-agent',
+  'google': 'crewmate-communications-agent',
+  'slack': 'crewmate-communications-agent',
+  'notion': 'crewmate-content-agent',
+  'terminal': 'crewmate-devops-agent',
+};
 
 export function Agents(): React.JSX.Element {
   const [agents, setAgents] = useState<AgentManifest[]>([]);
@@ -45,14 +56,22 @@ export function Agents(): React.JSX.Element {
     }
   }
 
+  function resolveAgentIdFromTask(task: AgentTask): string | null {
+    if (task.agentId) return task.agentId;
+    // For skill-routed tasks, infer the agent from the skill prefix
+    const skillId = (task as AgentTask & { delegatedSkillId?: string }).delegatedSkillId ?? '';
+    const prefix = skillId.split('.')[0] ?? '';
+    return SKILL_PREFIX_TO_AGENT[prefix] ?? null;
+  }
+
   async function loadActiveAgents(): Promise<void> {
     try {
       const tasks = await api.get<AgentTask[]>('/api/agents/tasks');
       const runningAgentIds = new Set(
         (tasks ?? [])
           .filter((task) => task.status === 'running' || task.status === 'queued')
-          .map((task) => task.agentId)
-          .filter(Boolean),
+          .map(resolveAgentIdFromTask)
+          .filter((id): id is string => Boolean(id)),
       );
       setActiveAgentIds(runningAgentIds);
     } catch {
@@ -65,9 +84,31 @@ export function Agents(): React.JSX.Element {
     void loadProfile();
     void loadActiveAgents();
 
-    const interval = setInterval(() => void loadActiveAgents(), 15000);
-    return () => clearInterval(interval);
+    // Fallback polling every 10 s (catches tasks that finish between SSE events)
+    const interval = setInterval(() => void loadActiveAgents(), 10_000);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, []);
+
+  // Real-time: update active set immediately on SSE task events
+  useLiveEvents({
+    onLiveTaskUpdate: (event) => {
+      const agentId = event.agentId ?? null;
+      if (!agentId) return;
+
+      if (event.status === 'running') {
+        setActiveAgentIds((prev) => new Set([...prev, agentId]));
+      } else {
+        setActiveAgentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(agentId);
+          return next;
+        });
+      }
+    },
+  });
 
   const description = `Your ${agents.length} crew specialists are ready. Click any node to inspect capabilities and routing roles.`;
 

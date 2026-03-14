@@ -114,6 +114,7 @@ describe('browser UI skills', () => {
       startUrl: 'https://example.com',
       maxSteps: 4,
       onStepScreenshot: undefined,
+      userId: 'user-1',
     });
   });
 });

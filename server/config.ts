@@ -7,22 +7,25 @@ function parseBooleanEnv(name: string, fallback = false): boolean {
   return value === 'true';
 }
 
+const forceLocalPreview = parseBooleanEnv('VITE_FORCE_LOCAL_PREVIEW') || parseBooleanEnv('CREWMATE_FORCE_LOCAL_PREVIEW');
 const port = Number.parseInt(process.env.PORT ?? '8787', 10);
-const appEnv = process.env.NODE_ENV ?? 'development';
+const appEnv = forceLocalPreview ? 'development' : (process.env.NODE_ENV ?? 'development');
 const isProduction = appEnv === 'production';
+const localhostOrigin = 'http://localhost:3000';
 
 export const serverConfig = {
   appEnv,
   isProduction,
   port,
-  corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-  publicAppUrl: process.env.PUBLIC_APP_URL ?? `http://localhost:${port}`,
-  publicWebAppUrl: process.env.PUBLIC_WEB_APP_URL ?? process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+  forceLocalPreview,
+  corsOrigin: forceLocalPreview ? localhostOrigin : (process.env.CORS_ORIGIN ?? localhostOrigin),
+  publicAppUrl: forceLocalPreview ? localhostOrigin : (process.env.PUBLIC_APP_URL ?? `http://localhost:${port}`),
+  publicWebAppUrl: forceLocalPreview ? localhostOrigin : (process.env.PUBLIC_WEB_APP_URL ?? process.env.CORS_ORIGIN ?? localhostOrigin),
   requestBodyLimit: process.env.REQUEST_BODY_LIMIT ?? '25mb',
   databasePath: process.env.CREWMATE_DB_PATH ?? 'data/crewmate.db',
   artifactStoragePath: process.env.CREWMATE_ARTIFACTS_PATH ?? 'data/artifacts',
   encryptionKey: process.env.CREWMATE_ENCRYPTION_KEY ?? '',
-  exposeDevAuthCode: parseBooleanEnv('AUTH_EXPOSE_DEV_CODE', !isProduction),
+  exposeDevAuthCode: forceLocalPreview ? true : parseBooleanEnv('AUTH_EXPOSE_DEV_CODE', !isProduction),
   inboundCommandToken: process.env.CREWMATE_COMMAND_TOKEN ?? '',
   screenshotShareTtlMs: Number.parseInt(process.env.SCREENSHOT_SHARE_TTL_MS ?? `${60 * 60 * 1000}`, 10),
   geminiApiKey: process.env.GOOGLE_API_KEY ?? process.env.GEMINI_API_KEY ?? '',
@@ -40,6 +43,7 @@ export const serverConfig = {
     approvalGates: parseBooleanEnv('FEATURE_APPROVAL_GATES'),
     uiNavigator: parseBooleanEnv('FEATURE_UI_NAVIGATOR', true),
     researchGrounding: parseBooleanEnv('FEATURE_RESEARCH_GROUNDING', true),
+    skillsHub: parseBooleanEnv('FEATURE_SKILLS_HUB', !isProduction),
   },
 
   // ── Model routing ──────────────────────────────────────────────────────────
@@ -82,4 +86,5 @@ export const serverConfig = {
   googleWorkspaceClientId: process.env.GOOGLE_WORKSPACE_CLIENT_ID ?? process.env.GOOGLE_CLIENT_ID ?? '',
   googleWorkspaceClientSecret: process.env.GOOGLE_WORKSPACE_CLIENT_SECRET ?? process.env.GOOGLE_CLIENT_SECRET ?? '',
   googleWorkspaceRedirectUri: process.env.GOOGLE_WORKSPACE_REDIRECT_URI ?? process.env.GOOGLE_REDIRECT_URI ?? '',
+  pexelsApiKey: process.env.PEXELS_API_KEY ?? '',
 };

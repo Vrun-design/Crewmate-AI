@@ -31,6 +31,7 @@ import {
   saveScreenshotArtifact,
 } from '../services/screenshotArtifactService';
 import { createRateLimitMiddleware } from '../services/rateLimit';
+import { generateAndSaveSessionSummary } from '../services/liveSessionSummaryService';
 
 const liveSessionCreateLimiter = createRateLimitMiddleware({
   windowMs: 60 * 1000,
@@ -439,11 +440,14 @@ export function registerLiveSessionRoutes(app: Express, requireAuth: RequireAuth
     const user = requireAuth(req, res);
     if (!user) return;
 
-    const session = endGeminiLiveSession(req.params.sessionId) ?? endSession(req.params.sessionId);
+    const { sessionId } = req.params;
+    const session = endGeminiLiveSession(sessionId) ?? endSession(sessionId);
     if (!session) {
       res.status(404).json({ message: 'Session not found' });
       return;
     }
+
+    void generateAndSaveSessionSummary(sessionId, user.id).catch(() => undefined);
 
     res.json(session);
   });

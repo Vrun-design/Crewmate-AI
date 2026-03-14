@@ -9,6 +9,7 @@
  */
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
+import { inferAutoImageQuery } from '../autoVisuals';
 import { runSkill } from '../../skills/registry';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
@@ -133,7 +134,7 @@ async function convertToSheets(
     `Research intent: "${intent.slice(0, 120)}"`,
     '',
     'Content to convert:',
-    content.slice(0, 5000),
+    content.slice(0, 12000),
   ].join('\n');
 
   try {
@@ -157,23 +158,25 @@ async function convertToSlides(
   ai: ReturnType<typeof createGeminiClient>,
 ): Promise<SlidesConversion | null> {
   const slidesPrompt = [
-    'Convert the following research/analysis output into a Google Slides presentation.',
+    'Convert the following research/analysis output into a professional Google Slides presentation.',
     '',
     'OUTPUT FORMAT: Return ONLY valid JSON — no markdown, no explanation, no code fences.',
-    'Shape: {"title":"<deck title>","slides":[{"title":"Slide Title","body":"bullet 1\\nbullet 2\\nbullet 3"},...]}',
+    'Shape: {"title":"<deck title>","slides":[{"title":"Slide Title","body":"bullet 1\\nbullet 2\\nbullet 3\\nbullet 4"},...]}',
     '',
     'RULES:',
-    '- Create one slide per major section or finding',
-    '- Maximum 12 slides, minimum 2',
-    '- Each body should be 3-5 concise bullet points as plain text separated by newlines',
-    '- No markdown inside slide body — plain text only',
-    '- First slide should be a title/overview slide',
-    '- Last slide should be recommendations or next steps',
+    '- Create one slide per major section, theme, or key finding',
+    '- Minimum 4 slides, maximum 14 slides',
+    '- Each body MUST have 4-6 substantive bullet points — not vague summaries',
+    '- Include specific data points, statistics, or concrete facts in bullet points wherever available',
+    '- No markdown inside slide body — plain text only, each bullet on its own line',
+    '- First slide: overview / executive summary of the entire presentation',
+    '- Last slide: key recommendations, action items, or next steps',
+    '- Slide titles should be short (5 words max) and punchy — state the finding, not the topic',
     '',
     `Research intent: "${intent.slice(0, 120)}"`,
     '',
-    'Content to convert:',
-    content.slice(0, 5000),
+    'Content to convert (use ALL the content below — do not truncate your analysis):',
+    content.slice(0, 14000),
   ].join('\n');
 
   try {
@@ -210,11 +213,21 @@ export async function saveAgentOutputToWorkspace(
   const ai = createGeminiClient();
 
   if (target === 'google.docs-create-document') {
+    // Docs can accept the full research output — no truncation needed
     return runWorkspaceCreateSkill({
       target,
       ctx,
       emitStep,
-      args: { title: buildWorkspaceTitle(intent), content },
+      args: {
+        title: buildWorkspaceTitle(intent),
+        content: content.slice(0, 40000),
+        imageQuery: inferAutoImageQuery({
+          target: 'docs',
+          title: buildWorkspaceTitle(intent),
+          content,
+          intent,
+        }),
+      },
       startMessage: 'Creating Google Doc with research output...',
       successMessage: (url) => `Google Doc created${url ? '' : ' (no URL returned)'}`,
     });
@@ -254,7 +267,18 @@ export async function saveAgentOutputToWorkspace(
       target,
       ctx,
       emitStep,
-      args: { title: converted.title, slides: converted.slides },
+      args: {
+        title: converted.title,
+        slides: converted.slides.map((slide) => ({
+          ...slide,
+          imageQuery: inferAutoImageQuery({
+            target: 'slides',
+            title: slide.title,
+            content: slide.body,
+            intent,
+          }),
+        })),
+      },
       startMessage: `Creating Google Slides: "${converted.title}" (${converted.slides.length} slides)...`,
       successMessage: (url) => `Slides deck created with ${converted.slides.length} slides${url ? '' : ' (no URL returned)'}`,
     });

@@ -57,6 +57,17 @@ const preloadRoutes = [
 
 export default function App() {
   useEffect(() => {
+    // Redirect to login whenever an API call receives a 401 and the
+    // api.ts layer fires this event after clearing the local session.
+    function handleAuthExpired() {
+      window.location.href = '/login';
+    }
+
+    window.addEventListener('crewmate:auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('crewmate:auth-expired', handleAuthExpired);
+  }, []);
+
+  useEffect(() => {
     const preloadAll = () => {
       preloadRoutes.forEach((route) => {
         void route.preload();

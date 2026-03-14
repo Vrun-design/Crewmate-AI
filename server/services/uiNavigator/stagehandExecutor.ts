@@ -12,11 +12,19 @@
  */
 import { Stagehand } from '@browserbasehq/stagehand';
 import { serverConfig } from '../../config';
+import { createGeminiClient } from '../geminiClient';
+import {
+  extractApexDomain,
+  loadUserCookies,
+  saveUserCookies,
+  type StoredCookie,
+} from './browserSessionManager';
 import type { UiExecutionResult, UiNavigatorRunResult } from './uiNavigatorTypes';
 
 interface StagehandExecutorOptions {
   startUrl?: string;
   maxSteps?: number;
+  userId?: string; // Used to load/save per-user cookies
 }
 
 interface StagehandActResult {
@@ -66,6 +74,54 @@ function getStagehandModel(): string {
 function buildSummary(intent: string, steps: UiExecutionResult[], finalUrl: string): string {
   const successCount = steps.filter((s) => s.status === 'completed').length;
   return `Completed "${intent}" in ${successCount} step${successCount !== 1 ? 's' : ''}. Final URL: ${finalUrl}`;
+}
+
+/**
+ * Use Gemini Vision to verify whether the task appears to have succeeded
+ * based on the final page screenshot. Returns a short verification note.
+ */
+async function verifyTaskCompletion(
+  intent: string,
+  screenshotBase64: string,
+): Promise<string | null> {
+  if (!screenshotBase64) return null;
+
+  try {
+    const ai = createGeminiClient();
+    const response = await ai.models.generateContent({
+      model: serverConfig.geminiBrowserModel.trim().includes('/')
+        ? serverConfig.geminiBrowserModel.trim()
+        : `google/${serverConfig.geminiBrowserModel.trim()}`,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data: screenshotBase64,
+              },
+            },
+            {
+              text: `You are verifying whether a browser automation task completed successfully.
+
+Task: "${intent}"
+
+Look at this screenshot of the final page state and answer in ONE sentence:
+- If you see a success message, confirmation, or clear evidence the task worked: "Task completed successfully — [what you see]"
+- If you see an error, still on the original page, or the task clearly failed: "Task may have failed — [what you see]"
+- If it's unclear: "Result is unclear — [what you see]"
+
+Be specific and brief.`,
+            },
+          ],
+        },
+      ],
+    });
+    return response.text?.trim() ?? null;
+  } catch {
+    return null; // Non-fatal — don't break task reporting if vision fails
+  }
 }
 
 function describeActResult(result: StagehandActResult): string {
@@ -162,12 +218,22 @@ export async function executeWithStagehand(
     verbose: 0,
     disablePino: true,
     localBrowserLaunchOptions: {
+      // Use the new headless mode — harder to detect than the old --headless flag
       headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        // Remove the most common bot-detection signal: navigator.webdriver = true
+        '--disable-blink-features=AutomationControlled',
+        // Avoid renderer crashpad that leaks automation signals
+        '--disable-crash-reporter',
+        '--disable-extensions',
+        // Realistic window size (avoids 0x0 or unusual viewport flags)
+        '--window-size=1366,768',
+        // Hide infobars ("Chrome is being controlled by automated software")
+        '--disable-infobars',
       ],
     },
   });
@@ -179,6 +245,19 @@ export async function executeWithStagehand(
     const activePage = stagehand.context.activePage();
     if (!activePage) {
       throw new Error('Stagehand: no active page after init');
+    }
+
+    // Restore saved cookies for the target domain before navigating
+    if (options.userId && options.startUrl) {
+      const domain = extractApexDomain(options.startUrl);
+      const savedCookies = loadUserCookies(options.userId, domain);
+      if (savedCookies.length > 0) {
+        try {
+          await stagehand.context.addCookies(savedCookies as Parameters<typeof stagehand.context.addCookies>[0]);
+        } catch {
+          // Non-fatal — if cookies are stale or malformed just proceed fresh
+        }
+      }
     }
 
     // Navigate to start URL if provided
@@ -288,11 +367,26 @@ export async function executeWithStagehand(
       }
 
       if (terminalStatus === 'completed') {
+        // Capture final screenshot for vision verification
+        let finalScreenshotBase64 = '';
+        try {
+          const buf = await activePage.screenshot({ type: 'jpeg', quality: 75 });
+          finalScreenshotBase64 = Buffer.isBuffer(buf) ? buf.toString('base64') : '';
+        } catch {
+          // Non-fatal
+        }
+
+        const baseSummary = buildSummary(intent, steps, lastUrl);
+        const verificationNote = await verifyTaskCompletion(intent, finalScreenshotBase64);
+        const summary = verificationNote
+          ? `${baseSummary}\n\nVerification: ${verificationNote}`
+          : baseSummary;
+
         return {
           status: 'completed',
           steps,
           finalUrl: lastUrl,
-          summary: buildSummary(intent, steps, lastUrl),
+          summary,
         };
       }
     }
@@ -301,9 +395,28 @@ export async function executeWithStagehand(
       status: 'max_steps',
       steps,
       finalUrl: lastUrl,
-      summary: `UI navigator reached the ${maxSteps}-step limit.`,
+      summary: `UI navigator reached the ${maxSteps}-step limit. Consider breaking the task into smaller steps.`,
     };
   } finally {
+    // Save cookies for any domains visited so next task can reuse sessions
+    if (options.userId) {
+      try {
+        const allCookies = await stagehand.context.cookies() as StoredCookie[];
+        // Group cookies by apex domain and save each group
+        const byDomain = new Map<string, StoredCookie[]>();
+        for (const cookie of allCookies) {
+          const apex = extractApexDomain(cookie.domain.replace(/^\./, ''));
+          if (!byDomain.has(apex)) byDomain.set(apex, []);
+          byDomain.get(apex)!.push(cookie);
+        }
+        for (const [domain, cookies] of byDomain) {
+          saveUserCookies(options.userId, domain, cookies);
+        }
+      } catch {
+        // Non-fatal — browser may have already closed
+      }
+    }
+
     try {
       await stagehand.close();
     } catch {

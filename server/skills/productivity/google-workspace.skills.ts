@@ -3,10 +3,12 @@ import { parseStringMatrixArgument, requireExplicitApproval } from '../framework
 import { createCalendarEvent, listCalendarEvents } from '../../services/calendarService';
 import { createGoogleDocument, appendToGoogleDocument } from '../../services/docsService';
 import { createDriveFolder, searchDriveFiles } from '../../services/driveService';
+import { inferAutoImageQuery } from '../../services/autoVisuals';
 import { resolveGoogleResourceId } from '../../services/googleResourceResolver';
 import { createGmailDraft, searchGmailMessages, sendGmailMessage } from '../../services/gmailService';
 import { createGoogleSpreadsheet, appendSpreadsheetRows } from '../../services/sheetsService';
 import { createGooglePresentation, addSlidesToPresentation } from '../../services/slidesService';
+import { searchStockImage } from '../../services/imageSearchService';
 
 function parseStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -47,6 +49,94 @@ function parseSlides(value: unknown): Array<{ title: string; body?: string }> {
       body: String(item ?? ''),
     };
   });
+}
+
+type ImageInput = { url: string; altText?: string };
+type SlideInput = { title: string; body?: string; imageUrl?: string; imageQuery?: string };
+
+function parseImageInputs(value: unknown): ImageInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const record = item as Record<string, unknown>;
+    const url = typeof record.url === 'string' ? record.url.trim() : '';
+    if (!url) {
+      return [];
+    }
+
+    return [{
+      url,
+      altText: typeof record.altText === 'string' ? record.altText : undefined,
+    }];
+  });
+}
+
+function parseSlidesWithImages(value: unknown): SlideInput[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((item, index) => {
+    if (item && typeof item === 'object') {
+      const record = item as Record<string, unknown>;
+      return {
+        title: String(record.title ?? `Slide ${index + 1}`),
+        body: typeof record.body === 'string' ? record.body : undefined,
+        imageUrl: typeof record.imageUrl === 'string' ? record.imageUrl : undefined,
+        imageQuery: typeof record.imageQuery === 'string' ? record.imageQuery : undefined,
+      };
+    }
+
+    return {
+      title: `Slide ${index + 1}`,
+      body: String(item ?? ''),
+    };
+  });
+}
+
+async function resolveImageInputs(images: ImageInput[], imageQuery?: string): Promise<ImageInput[]> {
+  if (images.length > 0) {
+    return images;
+  }
+
+  if (!imageQuery?.trim()) {
+    return [];
+  }
+
+  const image = await searchStockImage(imageQuery);
+  return image ? [{ url: image.url, altText: image.altText }] : [];
+}
+
+async function resolveSlidesWithImages(slides: SlideInput[]): Promise<Array<{ title: string; body?: string; imageUrl?: string }>> {
+  return Promise.all(slides.map(async (slide) => {
+    if (slide.imageUrl?.trim()) {
+      return {
+        title: slide.title,
+        body: slide.body,
+        imageUrl: slide.imageUrl.trim(),
+      };
+    }
+
+    if (!slide.imageQuery?.trim()) {
+      return {
+        title: slide.title,
+        body: slide.body,
+      };
+    }
+
+    const image = await searchStockImage(slide.imageQuery);
+    return {
+      title: slide.title,
+      body: slide.body,
+      imageUrl: image?.url,
+    };
+  }));
 }
 
 type GoogleWorkspaceFileKind = 'document' | 'presentation' | 'spreadsheet';
@@ -222,15 +312,41 @@ export const googleDocsCreateDocumentSkill: Skill = {
     properties: {
       title: { type: 'string', description: 'Document title.' },
       content: { type: 'string', description: 'Optional initial document text.' },
+      imageQuery: { type: 'string', description: 'Optional stock-image query to add one relevant image to the doc.' },
+      images: {
+        type: 'array',
+        description: 'Optional explicit image URLs to insert into the document.',
+        items: {
+          type: 'object',
+          description: 'A single image definition.',
+          properties: {
+            url: { type: 'string', description: 'Public image URL.' },
+            altText: { type: 'string', description: 'Optional accessible alt text.' },
+          },
+          required: ['url'],
+        },
+      },
       folderId: { type: 'string', description: 'Optional Drive folder override.' },
     },
     required: ['title'],
   },
   handler: async (ctx, args) => {
     const title = String(args.title ?? '');
+    const imageQuery = typeof args.imageQuery === 'string' && args.imageQuery.trim()
+      ? args.imageQuery
+      : inferAutoImageQuery({
+          target: 'docs',
+          title,
+          content: typeof args.content === 'string' ? args.content : undefined,
+        });
+    const images = await resolveImageInputs(
+      parseImageInputs(args.images),
+      imageQuery,
+    );
     const result = await createGoogleDocument(ctx.workspaceId, {
       title,
       content: typeof args.content === 'string' ? args.content : undefined,
+      images,
       folderId: typeof args.folderId === 'string' ? args.folderId : undefined,
     });
     const docUrl = getGoogleWorkspaceFileUrl(result, 'document');
@@ -444,6 +560,8 @@ export const googleSlidesCreatePresentationSkill: Skill = {
           properties: {
             title: { type: 'string', description: 'Slide title.' },
             body: { type: 'string', description: 'Optional slide body.' },
+            imageUrl: { type: 'string', description: 'Optional explicit public image URL for this slide.' },
+            imageQuery: { type: 'string', description: 'Optional stock-image query for this slide.' },
           },
           required: ['title'],
         },
@@ -453,7 +571,14 @@ export const googleSlidesCreatePresentationSkill: Skill = {
     required: ['title'],
   },
   handler: async (ctx, args) => {
-    const slides = parseSlides(args.slides);
+    const slides = await resolveSlidesWithImages(parseSlidesWithImages(args.slides).map((slide) => ({
+      ...slide,
+      imageQuery: slide.imageQuery ?? inferAutoImageQuery({
+        target: 'slides',
+        title: slide.title,
+        content: slide.body,
+      }),
+    })));
     const title = String(args.title ?? '');
     const emptyNote = buildEmptyCreateNote(slides.length, 'slide', 'google.slides-add-slides');
     const result = await createGooglePresentation(ctx.workspaceId, {
@@ -503,6 +628,8 @@ export const googleSlidesAddSlidesSkill: Skill = {
           properties: {
             title: { type: 'string', description: 'Slide title.' },
             body: { type: 'string', description: 'Optional slide body.' },
+            imageUrl: { type: 'string', description: 'Optional explicit public image URL for this slide.' },
+            imageQuery: { type: 'string', description: 'Optional stock-image query for this slide.' },
           },
           required: ['title'],
         },
@@ -525,7 +652,14 @@ export const googleSlidesAddSlidesSkill: Skill = {
     });
     const result = await addSlidesToPresentation(ctx.workspaceId, {
       presentationId,
-      slides: parseSlides(args.slides),
+      slides: await resolveSlidesWithImages(parseSlidesWithImages(args.slides).map((slide) => ({
+        ...slide,
+        imageQuery: slide.imageQuery ?? inferAutoImageQuery({
+          target: 'slides',
+          title: slide.title,
+          content: slide.body,
+        }),
+      }))),
     });
     return {
       success: true,

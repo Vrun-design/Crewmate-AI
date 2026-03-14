@@ -683,6 +683,34 @@ export async function appendToNotionPage(
   };
 }
 
+export async function uploadImageToNotionPage(
+  workspaceId: string,
+  userId: string,
+  input: {
+    imageUrl: string;
+    pageIdOrUrl?: string;
+    caption?: string;
+  },
+  options?: { sessionId?: string },
+): Promise<NotionPageResult> {
+  const pageId = input.pageIdOrUrl
+    ? extractPageId(input.pageIdOrUrl)
+    : await resolveRecentNotionPageId(workspaceId, userId, options?.sessionId);
+
+  const children: NotionBlock[] = [imageBlock(input.imageUrl, input.caption)];
+
+  await notionRequest<{ results: Array<{ id: string }> }>(workspaceId, `/blocks/${pageId}/children`, {
+    method: 'PATCH',
+    body: JSON.stringify({ children }),
+  });
+
+  return {
+    id: pageId,
+    url: `https://www.notion.so/${pageId.replace(/-/g, '')}`,
+    title: 'Updated Notion page',
+  };
+}
+
 export async function appendScreenshotToNotionPage(
   workspaceId: string,
   userId: string,

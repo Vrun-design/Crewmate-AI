@@ -8,6 +8,7 @@ describe('featureFlagService', () => {
     expect(flags).toEqual({
       approvalGates: expect.any(Boolean),
       researchGrounding: expect.any(Boolean),
+      skillsHub: expect.any(Boolean),
       slackInbound: expect.any(Boolean),
       uiNavigator: expect.any(Boolean),
     });

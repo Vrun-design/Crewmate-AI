@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { db } from '../../db';
-import { googleCalendarCreateEventSkill, googleGmailSendEmailSkill, googleSheetsAppendRowsSkill } from './google-workspace.skills';
+import { googleCalendarCreateEventSkill, googleDocsCreateDocumentSkill, googleGmailSendEmailSkill, googleSheetsAppendRowsSkill, googleSlidesCreatePresentationSkill } from './google-workspace.skills';
 
 vi.mock('../../services/gmailService', () => ({
   sendGmailMessage: vi.fn(async () => ({ id: 'msg-1', threadId: 'thread-1' })),
@@ -32,6 +32,14 @@ vi.mock('../../services/sheetsService', () => ({
 vi.mock('../../services/slidesService', () => ({
   createGooglePresentation: vi.fn(),
   addSlidesToPresentation: vi.fn(),
+}));
+
+vi.mock('../../services/imageSearchService', () => ({
+  searchStockImage: vi.fn(async (query: string) => ({
+    url: `https://images.example.com/${encodeURIComponent(query)}.jpg`,
+    altText: `${query} visual`,
+    source: 'pexels',
+  })),
 }));
 
 const ctx = {
@@ -111,5 +119,70 @@ describe('googleWorkspace skills', () => {
       rows: [['Ticker', 'Price'], ['RELIANCE', '1380.70']],
       range: undefined,
     });
+  });
+
+  test('resolves image queries for docs before creation', async () => {
+    const { createGoogleDocument } = await import('../../services/docsService');
+    vi.mocked(createGoogleDocument).mockResolvedValue({
+      id: 'doc-123',
+      title: 'Launch Brief',
+      url: 'https://docs.google.com/document/d/doc-123/edit',
+    });
+
+    await googleDocsCreateDocumentSkill.handler(ctx, {
+      title: 'Launch Brief',
+      content: 'Summary',
+      imageQuery: 'product launch hero',
+    });
+
+    expect(createGoogleDocument).toHaveBeenCalledWith(ctx.workspaceId, expect.objectContaining({
+      images: [{
+        url: 'https://images.example.com/product%20launch%20hero.jpg',
+        altText: 'product launch hero visual',
+      }],
+    }));
+  });
+
+  test('resolves slide image queries before presentation creation', async () => {
+    const { createGooglePresentation } = await import('../../services/slidesService');
+    vi.mocked(createGooglePresentation).mockResolvedValue({
+      id: 'deck-123',
+      title: 'Deck',
+      url: 'https://docs.google.com/presentation/d/deck-123/edit',
+    });
+
+    await googleSlidesCreatePresentationSkill.handler(ctx, {
+      title: 'Deck',
+      slides: [{ title: 'Overview', body: 'Body', imageQuery: 'market growth chart' }],
+    });
+
+    expect(createGooglePresentation).toHaveBeenCalledWith(ctx.workspaceId, expect.objectContaining({
+      slides: [{
+        title: 'Overview',
+        body: 'Body',
+        imageUrl: 'https://images.example.com/market%20growth%20chart.jpg',
+      }],
+    }));
+  });
+
+  test('auto-adds a visual to slides when no explicit image query is provided', async () => {
+    const { createGooglePresentation } = await import('../../services/slidesService');
+    vi.mocked(createGooglePresentation).mockResolvedValue({
+      id: 'deck-123',
+      title: 'Deck',
+      url: 'https://docs.google.com/presentation/d/deck-123/edit',
+    });
+
+    await googleSlidesCreatePresentationSkill.handler(ctx, {
+      title: 'Deck',
+      slides: [{ title: 'Market Outlook', body: 'Growth, adoption, demand, spend' }],
+    });
+
+    expect(createGooglePresentation).toHaveBeenCalledWith(ctx.workspaceId, expect.objectContaining({
+      slides: [expect.objectContaining({
+        title: 'Market Outlook',
+        imageUrl: 'https://images.example.com/Market%20Outlook%20Growth%2C%20adoption%2C%20demand%2C%20spend.jpg',
+      })],
+    }));
   });
 });

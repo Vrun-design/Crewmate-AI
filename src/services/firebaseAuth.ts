@@ -25,7 +25,15 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+function isForceLocalAuthEnabled(): boolean {
+  return import.meta.env.VITE_FORCE_LOCAL_AUTH === 'true' || import.meta.env.VITE_FORCE_LOCAL_PREVIEW === 'true';
+}
+
 function hasFirebaseConfig(): boolean {
+  if (isForceLocalAuthEnabled()) {
+    return false;
+  }
+
   return Boolean(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.appId);
 }
 

@@ -60,4 +60,26 @@ describe('slidesService', () => {
       },
     }));
   });
+
+  test('adds slide images when image urls are provided', async () => {
+    googleWorkspaceApiRequest.mockResolvedValueOnce({});
+    const { addSlidesToPresentation } = await import('./slidesService');
+
+    await addSlidesToPresentation('WS-1', {
+      presentationId: 'deck-123',
+      slides: [{ title: 'Market Overview', body: 'Top 10 NSE stocks', imageUrl: 'https://images.example.com/chart.png' }],
+    });
+
+    expect(googleWorkspaceApiRequest).toHaveBeenCalledWith(expect.objectContaining({
+      body: {
+        requests: expect.arrayContaining([
+          expect.objectContaining({
+            createImage: expect.objectContaining({
+              url: 'https://images.example.com/chart.png',
+            }),
+          }),
+        ]),
+      },
+    }));
+  });
 });

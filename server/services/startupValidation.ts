@@ -1,5 +1,9 @@
 import { serverConfig } from '../config';
 
+function isLocalhostUrl(value: string): boolean {
+  return /localhost|127\.0\.0\.1/i.test(value);
+}
+
 export function validateStartupConfig(): void {
   if (!serverConfig.isProduction) {
     return;
@@ -15,6 +19,10 @@ export function validateStartupConfig(): void {
     errors.push('CREWMATE_ENCRYPTION_KEY is required in production.');
   }
 
+  if (!serverConfig.geminiApiKey.trim()) {
+    errors.push('GOOGLE_API_KEY or GEMINI_API_KEY is required in production.');
+  }
+
   if (!serverConfig.firebaseProjectId.trim()) {
     errors.push('FIREBASE_PROJECT_ID is required in production.');
   }
@@ -25,6 +33,14 @@ export function validateStartupConfig(): void {
 
   if (serverConfig.featureFlags.slackInbound && !serverConfig.slackSigningSecret.trim()) {
     errors.push('SLACK_SIGNING_SECRET is required when FEATURE_SLACK_INBOUND=true in production.');
+  }
+
+  if (!serverConfig.publicAppUrl.trim() || isLocalhostUrl(serverConfig.publicAppUrl)) {
+    errors.push('PUBLIC_APP_URL must be set to a non-localhost URL in production.');
+  }
+
+  if (!serverConfig.publicWebAppUrl.trim() || isLocalhostUrl(serverConfig.publicWebAppUrl)) {
+    errors.push('PUBLIC_WEB_APP_URL must be set to a non-localhost URL in production.');
   }
 
   if (errors.length > 0) {

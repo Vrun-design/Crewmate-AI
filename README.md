@@ -12,7 +12,7 @@
 
 **Category: Live Agents 🗣️ + UI Navigator ☸️**
 
-[Quick Start](#-quick-start) · [Friend Testing](#-friend-testing-runbook) · [Architecture](#-architecture) · [Skills](#-skills-51-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment-path)
+[Quick Start](#-quick-start) · [Friend Testing](#-friend-testing-runbook) · [Architecture](#-architecture) · [Skills](#-skills-52-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment-path)
 
 </div>
 
@@ -48,7 +48,7 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 |---|---|
 | **Gemini Live** | Real-time audio conversation with interruption support |
 | **Screen Context** | Screenshot captured and sent as multimodal context each turn |
-| **51 Skills** | Research, browser, productivity, comms, automation, code, live |
+| **52 Skills** | Research, browser, productivity, comms, automation, code, live |
 | **Orchestrator** | Intent-routed A2A dispatch to specialist agents |
 | **Memory** | Vector-embedded session recall + knowledge base |
 | **Tasks** | Real-time streamed background task execution |
@@ -94,7 +94,7 @@ flowchart TD
         subgraph ExecutionLayer["Execution Layer"]
             ORCH[Orchestrator\nIntent Router]
             POLICY[Execution Policy\nInline / Delegated / Either]
-            REG[Skill Registry\n51 Skills]
+            REG[Skill Registry\n52 Skills]
         end
 
         subgraph AgentLayer["Agent Layer"]
@@ -299,7 +299,7 @@ All browser navigation is **voice-activated via Gemini Live** — say the task o
 
 ---
 
-## ⚡ Skills — 51 and Counting
+## ⚡ Skills — 52 and Counting
 
 Skills are the **single execution primitive** in Crewmate. Every action — from posting a Slack message to filling a web form — is a skill.
 
@@ -417,14 +417,32 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` and fill in at minimum:
+Edit `.env` and fill in at minimum for the smallest local preview:
 
 ```env
-# Required
+# Minimum local mode
 GOOGLE_API_KEY=your_gemini_api_key_here
-CREWMATE_ENCRYPTION_KEY=your_32_char_secret_here  # openssl rand -hex 16
+```
 
-# Recommended for shared friend testing
+That is enough to boot the app locally with:
+- local dev email-code auth
+- dashboard, tasks, memory, sessions, skills, agents pages
+- Gemini-powered chat/live flows
+- local browser skills
+- SQLite-backed state on your machine
+
+You do **not** need Firebase or Google Workspace just to explore the product locally.
+
+Optional but recommended even in local mode:
+
+```env
+CREWMATE_ENCRYPTION_KEY=your_32_char_secret_here  # openssl rand -hex 16
+PEXELS_API_KEY=your_pexels_api_key_here           # enables automatic stock images in Docs/Slides/Notion outputs
+```
+
+Add these later when you want hosted/shared auth or real external integrations:
+
+```env
 FIREBASE_PROJECT_ID=your_firebase_project_id
 VITE_FIREBASE_API_KEY=your_firebase_web_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
@@ -444,6 +462,48 @@ This starts:
 - **Backend API** on `http://localhost:8787`
 
 On first run, the database is auto-created and migrated at `data/crewmate.db`.
+
+### Minimum Local Mode
+
+If you only set `GOOGLE_API_KEY`, Crewmate runs in a true local preview mode:
+
+- sign in with the built-in dev email-code flow
+- no Firebase setup required
+- no Google Workspace OAuth required
+- integrations stay optional and can be connected later from the Integrations page
+
+If you keep Firebase values in `.env` for other workflows, you can still force
+local preview auth with:
+
+```env
+VITE_FORCE_LOCAL_PREVIEW=true
+```
+
+That single flag is the easiest way to switch your existing `.env` into local
+preview mode without deleting hosted Firebase / Cloud Run values.
+
+It will:
+- force local email-code auth
+- ignore Firebase auth mode in the frontend
+- use localhost assumptions for backend CORS/public URLs
+- keep integrations optional
+
+Then restart `npm run dev`.
+
+What works in this mode:
+
+- dashboard, tasks, sessions, memory, agents, and skills UI
+- Gemini text/live workflows that only need your Gemini key
+- local browser automation skills
+- local workspace task creation and memory storage
+- Notion / Google Workspace UI surfaces as optional setup targets
+
+What does **not** work until you configure integrations:
+
+- Firebase shared login
+- Gmail / Docs / Sheets / Slides / Drive / Calendar actions
+- Notion / Slack / ClickUp real external writes
+- shared/public OAuth-based team testing
 
 ### 4. Shared Friend Testing
 
@@ -470,7 +530,7 @@ npm run seed
 
 This inserts 3 sample tasks, 3 memory records, and 4 activity log entries — so the dashboard never looks empty during a demo.
 
-In development mode, use any email only when `AUTH_EXPOSE_DEV_CODE=true`. For shared friend testing, switch to Firebase Auth and disable dev-code auth.
+In development mode, use any email only when `AUTH_EXPOSE_DEV_CODE=true`. In minimum local mode this is the default path. For shared friend testing, switch to Firebase Auth and disable dev-code auth.
 
 ---
 

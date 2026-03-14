@@ -426,6 +426,7 @@ export const browserUiNavigateSkill: Skill = {
           startUrl,
           maxSteps,
           onStepScreenshot: createUiNavigatorStepScreenshotHandler(ctx),
+          userId: ctx.userId,
         };
         const result = await navigateWithUiPlanner(intent, options);
         return {

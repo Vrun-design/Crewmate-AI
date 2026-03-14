@@ -7,6 +7,7 @@ const defaultFlags: FeatureFlags = {
   approvalGates: false,
   uiNavigator: false,
   researchGrounding: false,
+  skillsHub: false,
 };
 
 interface UseFeatureFlagsResult {

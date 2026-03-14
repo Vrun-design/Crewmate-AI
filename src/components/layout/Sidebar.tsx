@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { api } from '../../lib/api';
+import type { AgentTask } from '../agents/types';
 import {
   Grid2x2Plus, LayoutDashboard, CheckSquare, Settings, MonitorUp, Network,
   MoreHorizontal, X, BrainCircuit, Moon, Sun, LogOut, User, Cpu
@@ -7,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { authService, authStorage } from '../../services/authService';
 import type { AuthUser } from '../../types';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 
 interface SidebarProps {
   isMobileMenuOpen: boolean;
@@ -22,6 +25,7 @@ interface NavItemProps {
   to: string;
   currentPath: string;
   onClick: () => void;
+  badge?: number;
 }
 
 interface NavSection {
@@ -29,7 +33,7 @@ interface NavSection {
   items: Array<Pick<NavItemProps, 'icon' | 'label' | 'to'>>;
 }
 
-const NAV_SECTIONS: NavSection[] = [
+const BASE_NAV_SECTIONS: NavSection[] = [
   {
     title: 'Operate',
     items: [
@@ -72,8 +76,33 @@ export function Sidebar({
   user,
 }: SidebarProps): React.JSX.Element {
   const location = useLocation();
+  const { flags } = useFeatureFlags();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
+  const [activeTaskCount, setActiveTaskCount] = useState(0);
+  const navSections = BASE_NAV_SECTIONS
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.to !== '/skills' || flags.skillsHub),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  useEffect(() => {
+    async function fetchActiveTaskCount(): Promise<void> {
+      try {
+        const tasks = await api.get<AgentTask[]>('/api/agents/tasks');
+        setActiveTaskCount(
+          (tasks ?? []).filter((t) => t.status === 'running' || t.status === 'queued').length,
+        );
+      } catch {
+        // Non-fatal — badge just shows 0
+      }
+    }
+
+    void fetchActiveTaskCount();
+    const interval = setInterval(() => void fetchActiveTaskCount(), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -94,7 +123,6 @@ export function Sidebar({
               <img src="/Crewmate.svg" alt="Crewmate" className="h-full w-full object-contain" />
             </div>
             Crewmate
-            <span className="ml-1 px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider border border-primary/20">MVP</span>
           </div>
           <button className="md:hidden text-muted-foreground" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={20} />
@@ -102,7 +130,7 @@ export function Sidebar({
         </div>
 
         <div className="p-4">
-          {NAV_SECTIONS.map((section, index) => (
+          {navSections.map((section, index) => (
             <div key={section.title} className={index === 0 ? '' : 'mt-8'}>
               <div className="mb-3 px-2 font-mono text-xs uppercase tracking-wider text-muted-foreground">{section.title}</div>
               <nav className="space-y-1">
@@ -114,6 +142,7 @@ export function Sidebar({
                     label={item.label}
                     currentPath={location.pathname}
                     onClick={() => setIsMobileMenuOpen(false)}
+                    badge={item.to === '/tasks' && activeTaskCount > 0 ? activeTaskCount : undefined}
                   />
                 ))}
               </nav>
@@ -137,10 +166,6 @@ export function Sidebar({
                 <div className="text-xs text-muted-foreground">{user?.email ?? 'local@example.com'}</div>
               </div>
               <div className="p-1.5">
-                <Link to="/account" onClick={() => setIsProfileMenuOpen(false)} className="w-full flex items-center gap-2 px-2.5 py-2 text-sm text-foreground hover:bg-accent rounded-lg transition-colors">
-                  <User size={16} className="text-muted-foreground" />
-                  Profile Details
-                </Link>
                 <Link to="/account" onClick={() => setIsProfileMenuOpen(false)} className="w-full flex items-center gap-2 px-2.5 py-2 text-sm text-foreground hover:bg-accent rounded-lg transition-colors">
                   <Settings size={16} className="text-muted-foreground" />
                   Account Settings
@@ -194,7 +219,7 @@ export function Sidebar({
   );
 }
 
-function NavItem({ icon: Icon, label, to, currentPath, onClick }: NavItemProps): React.JSX.Element {
+function NavItem({ icon: Icon, label, to, currentPath, onClick, badge }: NavItemProps): React.JSX.Element {
   const active = currentPath === to;
 
   return (
@@ -210,6 +235,11 @@ function NavItem({ icon: Icon, label, to, currentPath, onClick }: NavItemProps):
         <Icon size={16} className={active ? 'text-foreground' : 'text-muted-foreground'} />
         <span className="text-sm font-medium">{label}</span>
       </div>
+      {badge != null && badge > 0 && (
+        <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </Link>
   );
 }
