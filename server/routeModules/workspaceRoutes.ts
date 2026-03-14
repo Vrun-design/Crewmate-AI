@@ -159,6 +159,8 @@ async function executeIntegrationTask(tool: string, workspaceId: string, title: 
     case 'Crewmate':
       // Local workspace task only, no external sync needed
       return undefined;
+    default:
+      throw new Error(`Unsupported task tool: ${tool}`);
   }
 }
 

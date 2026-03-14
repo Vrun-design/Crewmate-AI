@@ -14,6 +14,25 @@ function getToolErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown tool execution error';
 }
 
+function getSkillFailureMessage(result: unknown): string {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    return 'Tool execution failed.';
+  }
+
+  const record = result as Record<string, unknown>;
+  const error = typeof record.error === 'string' ? record.error.trim() : '';
+  if (error) {
+    return error;
+  }
+
+  const message = typeof record.message === 'string' ? record.message.trim() : '';
+  if (message) {
+    return message;
+  }
+
+  return 'Tool execution failed.';
+}
+
 const DELEGATION_TEMPLATES = [
   (skillName: string) => `On it — running ${skillName} in the background. I'll keep listening while that runs.`,
   (_skillName: string) => `Kicked that off — you'll see the result in the Tasks panel when it's done.`,
@@ -142,6 +161,10 @@ export async function executeLiveFunctionCalls(input: {
         );
       } else {
         const runRecord = await runSkill(skillId, { userId: input.userId, workspaceId, sessionId: input.sessionId }, args);
+        if (runRecord.result.success === false) {
+          throw new Error(getSkillFailureMessage(runRecord.result));
+        }
+
         output = {
           spoken_response: typeof runRecord.result.message === 'string'
             ? runRecord.result.message

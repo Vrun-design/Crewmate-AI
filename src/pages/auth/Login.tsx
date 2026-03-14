@@ -64,8 +64,8 @@ export function Login(): React.JSX.Element {
       const firebaseUser = await firebaseAuthService.signInWithGoogle();
       const token = await firebaseUser.getIdToken();
       authStorage.saveSession(token, firebaseUser.email ?? '');
-
-      navigate('/onboarding');
+      onboardingFlowService.reset();
+      navigate('/dashboard');
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : 'Unable to sign in with Google');
     } finally {

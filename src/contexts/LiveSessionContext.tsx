@@ -8,6 +8,8 @@ import { useLiveEvents } from '../hooks/useLiveEvents';
 import type { LiveSession, MicrophoneStatus, ScreenShareStatus } from '../types/live';
 import type { LiveTaskCue } from '../types/liveTaskCue';
 import { liveSessionService } from '../services/liveSessionService';
+import { api } from '../lib/api';
+import type { AgentTask } from '../components/agents/types';
 
 interface LiveSessionContextValue {
   session: LiveSession | null;
@@ -27,7 +29,8 @@ interface LiveSessionContextValue {
   previewStream: MediaStream | null;
   captureScreenshotArtifact: (options?: { title?: string; caption?: string }) => Promise<{ id: string; publicUrl: string } | null>;
   liveTaskCue: LiveTaskCue | null;
-  
+  updateLiveTaskCue: (cue: LiveTaskCue | null) => void;
+
   isOverlayOpen: boolean;
   setIsOverlayOpen: (open: boolean) => void;
   
@@ -143,6 +146,23 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
     void startScreenShare();
   }, [isSessionActive, preferences?.autoStartScreenShare, screenShareStatus, startScreenShare]);
 
+  // On mount: hydrate liveTaskCue from any already-running agent task so the
+  // badge survives a page refresh or re-login.
+  React.useEffect(() => {
+    async function hydrate() {
+      try {
+        const tasks = await api.get<AgentTask[]>('/api/agents/tasks');
+        const running = tasks?.find((t) => t.status === 'running' || t.status === 'queued');
+        if (running) {
+          setLiveTaskCue({ title: running.intent.slice(0, 80), status: 'running', summary: null });
+        }
+      } catch {
+        // Non-critical — badge just won't show on first load
+      }
+    }
+    void hydrate();
+  }, []);
+
   useLiveEvents({
     enabled: true,
     onLiveTaskUpdate: (event) => {
@@ -166,10 +186,10 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
       return;
     }
 
-    // Terminal states: clear after 7 seconds
-    // Running state: safety cap of 5 minutes — if the task is still "running"
-    // after this long, the SSE completion event was likely missed.
-    const timeoutMs = liveTaskCue.status === 'running' ? 5 * 60 * 1000 : 7000;
+    // Terminal states: clear after 7 seconds.
+    // Running state: safety cap of 45s — if the terminal live_task_update event
+    // was missed (e.g. network drop), the badge won't stay stuck indefinitely.
+    const timeoutMs = liveTaskCue.status === 'running' ? 45_000 : 7000;
 
     const timer = window.setTimeout(() => {
       setLiveTaskCue(null);
@@ -200,29 +220,30 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
     error: liveSessionError,
     elapsedLabel,
     isAssistantSpeaking,
-    
+
     microphoneStatus,
     microphoneError,
     isMicrophoneSupported,
-    
+
     screenShareStatus,
     screenShareError,
     isScreenShareSupported,
     previewStream,
     captureScreenshotArtifact,
     liveTaskCue,
-    
+    updateLiveTaskCue: setLiveTaskCue,
+
     isOverlayOpen,
     setIsOverlayOpen,
-    
+
     startSession,
     endSession,
     sendMessage,
-    
+
     startMicrophone,
     stopMicrophone,
     toggleMicrophone,
-    
+
     startScreenShare,
     stopScreenShare,
   };

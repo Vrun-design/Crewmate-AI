@@ -247,12 +247,13 @@ Be concise — this is an internal execution plan, not user-facing.`,
             }
         }
     }
+  const inspectionUrl = startUrl ?? inferredStartUrl;
   let pageContext = '';
-  if (startUrl) {
-    emitStep('skill_call', `Fetching initial page context from ${startUrl}...`, { skillId: 'browser.inspect-visible-ui' });
+  if (inspectionUrl) {
+    emitStep('skill_call', `Fetching initial page context from ${inspectionUrl}...`, { skillId: 'browser.inspect-visible-ui' });
     try {
       const t0 = Date.now();
-      const inspection = await runSkill('browser.inspect-visible-ui', ctx, { url: startUrl });
+      const inspection = await runSkill('browser.inspect-visible-ui', ctx, { url: inspectionUrl });
       pageContext = typeof (inspection.result as { message?: string }).message === 'string'
         ? (inspection.result as { message: string }).message
         : '';

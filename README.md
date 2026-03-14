@@ -12,7 +12,7 @@
 
 **Category: Live Agents 🗣️ + UI Navigator ☸️**
 
-[Quick Start](#-quick-start) · [Friend Testing](#-friend-testing-runbook) · [Architecture](#-architecture) · [Skills](#-skills-52-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment-path)
+[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-52-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment) · [Full Architecture Diagrams](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -51,7 +51,8 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 | **52 Skills** | Research, browser, productivity, comms, automation, code, live |
 | **Orchestrator** | Intent-routed A2A dispatch to specialist agents |
 | **Memory** | Vector-embedded session recall + knowledge base |
-| **Tasks** | Real-time streamed background task execution |
+| **Tasks** | Real-time streamed background task execution with SSE |
+| **Task Cue Badge** | Live "Working on it" badge — survives page refresh, clears on completion/failure |
 | **Integrations** | Notion, Slack, ClickUp, Google Workspace, GitHub |
 | **Auth** | Firebase Auth (production) + dev magic-code login |
 | **Audit Log** | Every skill run is recorded with timing, result, and origin |
@@ -61,6 +62,8 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 ## 🏗️ Architecture
 
 ![Crewmate AI — System Architecture](public/architecture.png)
+
+> 📐 **Full architecture diagrams** (Mermaid flowcharts, sequence diagrams, memory flow, browser loop, execution policy): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
 > **A2A Discoverable:** Crewmate exposes `/.well-known/agent.json` per Google's Agent-to-Agent protocol. Any A2A-compliant agent can discover Crewmate's 14 agents, skills, and API endpoints automatically.
 
@@ -81,7 +84,7 @@ flowchart TD
 
     FE --> DASH & TASKS & MEMORY & SKILLS & SESSIONS
 
-    subgraph Backend["Backend  (Node.js + Express)"]
+    subgraph Backend["Backend · Google Cloud Run  (Node.js + Express)"]
         API[REST API: 8 route modules]
         
         subgraph LiveLayer["Live Layer"]
@@ -112,7 +115,7 @@ flowchart TD
         end
 
         subgraph DataLayer["Data Layer"]
-            DB[(SQLite\n16 Tables)]
+            DB[(SQLite\n19 Tables)]
             SSE[EventService\nSSE Broadcast]
         end
 
@@ -373,7 +376,7 @@ All integration credentials are encrypted at rest using AES encryption (`CREWMAT
 
 ## 🗄️ Database Schema
 
-Crewmate uses **SQLite with 16 tables** for a zero-dependency, portable data layer:
+Crewmate uses **SQLite with 19 tables** for a zero-dependency, portable data layer:
 
 ```
 users                   → User accounts
@@ -381,15 +384,18 @@ workspaces              → Team workspaces
 workspace_members       → Membership + roles
 sessions                → Live session records
 session_messages        → Transcript per session
-agent_tasks             → Task run registry
+tasks                   → Task registry (delegated + manual)
 task_runs               → Detailed run records with step JSON
 activities              → Activity log feed
 notifications           → In-app notification inbox
 memory_records          → Vector-embedded memory store
-integration_connections → Encrypted integration configs
+integrations            → Installed integration metadata
+integration_connections → Encrypted per-user integration configs
 oauth_states            → OAuth PKCE state table
 user_preferences        → Model + UX preferences per user
+onboarding_profiles     → Onboarding completion state per user
 screenshot_artifacts    → Screenshot metadata + access tokens
+auth_codes              → Dev email-code auth tokens
 auth_sessions           → Server-side session tokens
 schema_migrations       → Applied migration tracking
 ```
@@ -534,11 +540,11 @@ In development mode, use any email only when `AUTH_EXPOSE_DEV_CODE=true`. In min
 
 ---
 
-## 🤝 Friend Testing Runbook
+## 🤝 Local Development & Testing
 
-The default rollout path for this repo is:
+For local development and testing with friends before deploying:
 
-1. local frontend + local backend
+1. local frontend + local backend (`npm run dev`)
 2. one HTTPS tunnel on the frontend port
 3. Firebase Auth for shared login
 4. Google Workspace OAuth as the baseline integration
@@ -549,45 +555,58 @@ Detailed setup, env matrix, callback rules, smoke checks, and rollback steps:
 
 ---
 
-## ☁️ Deployment Path
+## ☁️ Deployment
 
-Crewmate is currently optimized for a **single backend instance** because it stores SQLite data on local disk, artifacts on local disk, and live runtime session state in memory.
+Crewmate is deployed on **Google Cloud** with a split-hosting architecture:
 
-### Phase 1: Friend testing now
+| Layer | Platform | Details |
+|---|---|---|
+| **Frontend** | Firebase Hosting | React + Vite SPA, global CDN, HTTPS |
+| **Backend API** | Google Cloud Run | Node.js + Express container, auto-scaling, HTTPS |
+| **Auth** | Firebase Authentication | JWT verification on every API request |
+| **Live AI** | Gemini Live API (`gemini-2.5-flash-native-audio`) | Real-time audio + vision |
+| **Text / Routing** | Gemini Pro via Google GenAI SDK | Orchestration, agents, embeddings |
+| **Integrations** | Google Workspace APIs | Gmail, Calendar, Docs, Sheets, Slides, Drive |
 
-- keep frontend + backend local
-- share one HTTPS tunnel to `http://localhost:3000`
-- leave `VITE_API_URL` blank so Vite proxies `/api` to the local backend
-- use Firebase Auth and Google Workspace OAuth
+### Deploy your own
 
-### Phase 2: Hosted staging later
+**Backend → Google Cloud Run:**
 
-- deploy the frontend to **Firebase Hosting**
-- keep the backend on one hosted service
-- keep `AUTH_EXPOSE_DEV_CODE=false`
-- satisfy the Firebase startup validation env requirements before `NODE_ENV=production`
+```bash
+# Build and push container
+gcloud builds submit --tag gcr.io/$PROJECT_ID/crewmate-api
 
-### Firebase Hosting frontend
+# Deploy to Cloud Run
+gcloud run deploy crewmate-api \
+  --image gcr.io/$PROJECT_ID/crewmate-api \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-secrets="GOOGLE_API_KEY=crewmate-gemini-key:latest,CREWMATE_ENCRYPTION_KEY=crewmate-enc-key:latest"
+```
 
-This repo includes a minimal `firebase.json` for SPA hosting of the built frontend:
+Or use the included script:
+
+```bash
+bash scripts/deploy-cloud-run.sh
+```
+
+**Frontend → Firebase Hosting:**
 
 ```bash
 npm run build
 firebase deploy --only hosting
 ```
 
-If the frontend is hosted separately, set:
-
-- `VITE_API_URL` to the backend origin
-
-If you later choose a single-domain setup, extend Firebase Hosting rewrites to proxy `/api` to your backend.
+Set `VITE_API_URL` to your Cloud Run service URL.
 
 ### Google Cloud services used
 
 | Service | Usage |
 |---|---|
-| **Firebase Hosting** | Frontend hosting for hosted staging later |
-| **Firebase Authentication** | Shared-test and production user identity / JWT verification |
+| **Google Cloud Run** | Backend API container hosting |
+| **Firebase Hosting** | Frontend SPA hosting (global CDN) |
+| **Firebase Authentication** | User identity + JWT verification |
 | **Google Gemini API** | Live audio/vision model, text models, embeddings |
 | **Google GenAI SDK** | `@google/genai` v1.44.0 — all Gemini API calls |
 | **Google Workspace APIs** | Gmail, Calendar, Docs, Sheets, Slides, Drive via OAuth |

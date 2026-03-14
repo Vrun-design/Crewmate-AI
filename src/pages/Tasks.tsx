@@ -14,10 +14,11 @@ import { useWorkspaceCollection } from '../hooks/useWorkspaceCollection';
 import { workspaceService } from '../services/workspaceService';
 import type { Task, TaskDetail } from '../types';
 import type { AgentTask, AgentStepEvent } from '../components/agents/types';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { connectAuthenticatedSseStream } from '../lib/sse';
 import { browserSessionStore } from '../stores/browserSessionStore';
 import { UI_NAVIGATOR_AGENT_ID } from '../constants/agents';
+import { useLiveSessionContext } from '../contexts/LiveSessionContext';
 
 type StatusFilter = 'all' | 'in_progress' | 'completed' | 'pending' | 'failed' | 'cancelled';
 
@@ -131,19 +132,16 @@ function matchesTaskSearch(task: Task, searchQuery: string): boolean {
 }
 
 function isTaskNotFoundError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return error.message.includes('task_not_found')
-    || error.message.includes('404')
-    || error.message.includes('not found');
+  if (error instanceof ApiError) return error.status === 404;
+  if (!(error instanceof Error)) return false;
+  return error.message.includes('task_not_found') || error.message.includes('not found');
 }
 
 export function Tasks(): React.JSX.Element {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { updateLiveTaskCue } = useLiveSessionContext();
   const { data: tasks, isLoading, error } = useWorkspaceCollection(workspaceService.getTasks);
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [agentTasksError, setAgentTasksError] = useState<string | null>(null);
@@ -182,25 +180,21 @@ export function Tasks(): React.JSX.Element {
     sseRef.current = null;
   }, []);
 
-  const subscribeToTask = useCallback((taskId: string) => {
+  const subscribeToTask = useCallback((taskId: string, intent?: string) => {
     closeTaskStream();
     sseRef.current = connectAuthenticatedSseStream(`/api/agents/tasks/${taskId}/events`, {
       onEvent: (_event, dataRaw) => {
         const payload = JSON.parse(dataRaw) as AgentTaskStreamPayload;
 
         setAgentTasks((prev) =>
-          prev.map((task) => {
-            if (task.id !== taskId) {
-              return task;
-            }
-
-            return updateAgentTaskFromPayload(task, payload);
-          }),
+          prev.map((task) => (task.id === taskId ? updateAgentTaskFromPayload(task, payload) : task)),
         );
 
         if (payload.type === 'completed' || payload.type === 'failed' || payload.type === 'cancelled') {
           closeTaskStream();
-          // Auto-refresh the full task list so status badges update without manual reload
+          const cueStatus = payload.type === 'completed' ? 'completed' : 'failed';
+          const cueTitle = intent ? intent.slice(0, 80) : (payload.type === 'completed' ? 'Task completed' : 'Task failed');
+          updateLiveTaskCue({ title: cueTitle, status: cueStatus, summary: null });
           setTimeout(() => void loadAgentTasks(), 600);
         }
       },
@@ -209,7 +203,19 @@ export function Tasks(): React.JSX.Element {
         closeTaskStream();
       },
     });
-  }, [closeTaskStream]);
+  }, [closeTaskStream, loadAgentTasks, updateLiveTaskCue]);
+
+  // Auto-subscribe to the most recent running task on page load so the
+  // dashboard badge stays live without the user needing to open the drawer.
+  const hasAutoSubscribedRef = useRef(false);
+  useEffect(() => {
+    if (hasAutoSubscribedRef.current || agentTasks.length === 0 || sseRef.current) return;
+    const running = agentTasks.find((t) => t.status === 'running' || t.status === 'queued');
+    if (running) {
+      hasAutoSubscribedRef.current = true;
+      subscribeToTask(running.id, running.intent);
+    }
+  }, [agentTasks, subscribeToTask]);
 
   useEffect(() => {
     const requestedTaskId = searchParams.get('task');
@@ -302,7 +308,7 @@ export function Tasks(): React.JSX.Element {
     setSelectedAgentTask(task);
     setIsDrawerOpen(true);
     if (task.status === 'running' || task.status === 'queued') {
-      subscribeToTask(task.id);
+      subscribeToTask(task.id, task.intent);
       // Activate PiP for UI Navigator tasks
       if (task.agentId === UI_NAVIGATOR_AGENT_ID) {
         browserSessionStore.set({

@@ -94,11 +94,10 @@ export function LiveSessionCard({
     setDraft('');
     try {
       await onSendMessage(next);
-    } finally {
-      if (workingResetTimerRef.current) {
-        window.clearTimeout(workingResetTimerRef.current);
-      }
+      if (workingResetTimerRef.current) window.clearTimeout(workingResetTimerRef.current);
       workingResetTimerRef.current = window.setTimeout(() => setIsWorking(false), 3000);
+    } catch {
+      setIsWorking(false);
     }
   };
 

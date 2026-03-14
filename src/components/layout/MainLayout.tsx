@@ -10,12 +10,14 @@ import { Header } from './Header';
 import { BrowserSessionPiP } from '../ui/BrowserSessionPiP';
 import { ScreenSharePiP } from '../ui/ScreenSharePiP';
 import { MiniSessionBar } from '../ui/MiniSessionBar';
+import { GoogleWorkspaceOnboardingModal } from '../onboarding/GoogleWorkspaceOnboardingModal';
 import { useLiveSessionContext } from '../../contexts/LiveSessionContext';
 import { useBrowserSessionActivation } from '../../hooks/useBrowserSessionActivation';
 
 export function MainLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => getInitialTheme() === 'dark');
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
@@ -30,6 +32,10 @@ export function MainLayout() {
     setIsOverlayOpen,
   } = useLiveSessionContext();
   const showScreenSharePiP = !isOverlayOpen;
+  const searchParams = new URLSearchParams(location.search);
+  const hasOnboardingQuery = searchParams.get('onboarding') === 'google-workspace';
+  const oauthError = searchParams.get('error_description');
+  const wasJustConnected = searchParams.get('connected') === 'true';
 
   useBrowserSessionActivation();
 
@@ -46,10 +52,12 @@ export function MainLayout() {
 
     if (!onboardingFlowService.shouldRequireIntegrationOnboarding()) {
       onboardingFlowService.markComplete();
+      setIsOnboardingModalOpen(false);
       return;
     }
 
-    if (onboardingFlowService.isComplete() || location.pathname === '/onboarding') {
+    if (onboardingFlowService.isComplete() && !hasOnboardingQuery) {
+      setIsOnboardingModalOpen(false);
       return;
     }
 
@@ -62,23 +70,24 @@ export function MainLayout() {
         }
 
         const googleWorkspace = integrations.find((integration) => integration.id === 'google-workspace');
-        if (googleWorkspace?.status === 'connected') {
+        if (googleWorkspace?.status === 'connected' && !hasOnboardingQuery) {
           onboardingFlowService.markComplete();
+          setIsOnboardingModalOpen(false);
           return;
         }
 
-        navigate('/onboarding');
+        setIsOnboardingModalOpen(true);
       })
       .catch(() => {
         if (!isCancelled) {
-          navigate('/onboarding');
+          setIsOnboardingModalOpen(true);
         }
       });
 
     return () => {
       isCancelled = true;
     };
-  }, [isLoading, location.pathname, navigate, user]);
+  }, [hasOnboardingQuery, isLoading, user]);
 
   useEffect(() => {
     function handleAuthExpired(): void {
@@ -98,6 +107,24 @@ export function MainLayout() {
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
+
+  function clearOnboardingQuery(): void {
+    if (!hasOnboardingQuery && !oauthError && !wasJustConnected) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(location.search);
+    nextSearchParams.delete('onboarding');
+    nextSearchParams.delete('connected');
+    nextSearchParams.delete('error');
+    nextSearchParams.delete('error_description');
+    const nextSearch = nextSearchParams.toString();
+
+    navigate({
+      pathname: location.pathname,
+      search: nextSearch ? `?${nextSearch}` : '',
+    }, { replace: true });
+  }
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden selection:bg-blue-500/30">
@@ -140,6 +167,14 @@ export function MainLayout() {
       )}
       <BrowserSessionPiP />
       <MiniSessionBar />
+      <GoogleWorkspaceOnboardingModal
+        isOpen={isOnboardingModalOpen}
+        hasOnboardingQuery={hasOnboardingQuery}
+        oauthError={oauthError}
+        wasJustConnected={wasJustConnected}
+        onClose={() => setIsOnboardingModalOpen(false)}
+        onClearOnboardingQuery={clearOnboardingQuery}
+      />
     </div>
   );
 }

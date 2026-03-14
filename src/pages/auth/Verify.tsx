@@ -55,7 +55,7 @@ export function Verify() {
         const token = await firebaseUser.getIdToken();
         authStorage.saveSession(token, firebaseUser.email ?? emailLinkAddress.trim());
         onboardingFlowService.reset();
-        navigate('/onboarding');
+        navigate('/dashboard');
       } catch (verifyError) {
         setError(verifyError instanceof Error ? verifyError.message : 'Unable to complete sign-in');
       } finally {

@@ -42,6 +42,11 @@ function getResultErrorMessage(result: unknown): string {
     return 'Task reported an unsuccessful result.';
   }
 
+  const error = typeof record.error === 'string' ? record.error.trim() : '';
+  if (error) {
+    return error;
+  }
+
   const summary = typeof record.summary === 'string' ? record.summary.trim() : '';
   if (summary) {
     return summary;
