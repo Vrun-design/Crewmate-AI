@@ -9,12 +9,112 @@ import { getUserPreferences, saveUserPreferences } from '../services/preferences
 import { getFeatureFlags } from '../services/featureFlagService';
 import { createClickUpTask, isClickUpConfigured } from '../services/clickupService';
 import { createNotionPage, isNotionConfigured } from '../services/notionService';
+import { createCalendarEvent } from '../services/calendarService';
+import { createGoogleDocument } from '../services/docsService';
+import { createDriveFolder } from '../services/driveService';
+import { createGmailDraft } from '../services/gmailService';
+import { createGoogleSpreadsheet } from '../services/sheetsService';
+import { createGooglePresentation } from '../services/slidesService';
 import { ingestArtifactLink } from '../services/memoryIngestor';
 import { cancelTask } from '../services/orchestrator';
 import { delegateSkillExecution, orchestrate } from '../services/orchestrator';
 import { createErrorResponse, logServerError } from '../services/runtimeLogger';
 import type { UserPreferencesRecord } from '../types';
 import type { RequireAuth } from './types';
+
+function buildGoogleRows(description: string): string[][] {
+  const lines = description
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.map((line) =>
+    line.includes(',')
+      ? line.split(',').map((cell) => cell.trim())
+      : [line],
+  );
+}
+
+function buildGoogleSlides(description: string, title: string): Array<{ title: string; body?: string }> {
+  const sections = description
+    .split(/\n\s*\n/g)
+    .map((section) => section.trim())
+    .filter(Boolean);
+
+  if (sections.length === 0) {
+    return [{ title }];
+  }
+
+  return sections.map((section, index) => {
+    const [firstLine, ...rest] = section.split('\n');
+    const slideTitle = firstLine?.trim() || `${title} ${index + 1}`;
+    const body = rest.join('\n').trim();
+    return {
+      title: slideTitle,
+      ...(body ? { body } : {}),
+    };
+  });
+}
+
+function extractLabeledField(description: string, label: string): string {
+  const pattern = new RegExp(`^${label}:\\s*(.+)$`, 'im');
+  const match = description.match(pattern);
+  return match?.[1]?.trim() ?? '';
+}
+
+function stripLabeledFields(description: string, labels: string[]): string {
+  return description
+    .split('\n')
+    .filter((line) => !labels.some((label) => new RegExp(`^${label}:\\s*`, 'i').test(line.trim())))
+    .join('\n')
+    .trim();
+}
+
+function buildGmailDraftInput(title: string, description: string): { to: string; subject: string; bodyText: string } {
+  const to = extractLabeledField(description, 'to');
+  const bodyText = stripLabeledFields(description, ['to']);
+
+  if (!to) {
+    throw new Error('For Gmail Draft, add a line like "To: person@example.com" in the description.');
+  }
+
+  return {
+    to,
+    subject: title,
+    bodyText: bodyText || title,
+  };
+}
+
+function parseEventDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Invalid date/time: "${value}". Use a clear date like 2026-03-15 10:00.`);
+  }
+
+  return parsed.toISOString();
+}
+
+function buildCalendarEventInput(title: string, description: string): {
+  summary: string;
+  description?: string;
+  start: string;
+  end: string;
+} {
+  const startRaw = extractLabeledField(description, 'start');
+  const endRaw = extractLabeledField(description, 'end');
+  const details = stripLabeledFields(description, ['start', 'end']);
+
+  if (!startRaw || !endRaw) {
+    throw new Error('For Google Calendar, add "Start: ..." and "End: ..." lines in the description.');
+  }
+
+  return {
+    summary: title,
+    ...(details ? { description: details } : {}),
+    start: parseEventDate(startRaw),
+    end: parseEventDate(endRaw),
+  };
+}
 
 async function executeIntegrationTask(tool: string, workspaceId: string, title: string, description: string): Promise<string | undefined> {
   switch (tool) {
@@ -26,6 +126,36 @@ async function executeIntegrationTask(tool: string, workspaceId: string, title: 
       if (!isClickUpConfigured(workspaceId)) throw new Error('ClickUp integration is not configured.');
       const clickupResult = await createClickUpTask(workspaceId, { name: title, description });
       return clickupResult.url;
+    case 'Google Docs': {
+      const result = await createGoogleDocument(workspaceId, { title, content: description });
+      return result.url;
+    }
+    case 'Google Sheets': {
+      const result = await createGoogleSpreadsheet(workspaceId, {
+        title,
+        rows: description.trim() ? buildGoogleRows(description) : undefined,
+      });
+      return result.url;
+    }
+    case 'Google Slides': {
+      const result = await createGooglePresentation(workspaceId, {
+        title,
+        slides: buildGoogleSlides(description, title),
+      });
+      return result.url;
+    }
+    case 'Google Drive': {
+      const result = await createDriveFolder(workspaceId, { name: title });
+      return result.url;
+    }
+    case 'Google Calendar': {
+      const result = await createCalendarEvent(workspaceId, buildCalendarEventInput(title, description));
+      return result.htmlLink;
+    }
+    case 'Gmail Draft': {
+      const result = await createGmailDraft(workspaceId, buildGmailDraftInput(title, description));
+      return `https://mail.google.com/mail/u/0/#drafts?compose=${encodeURIComponent(result.id)}`;
+    }
     case 'Crewmate':
       // Local workspace task only, no external sync needed
       return undefined;

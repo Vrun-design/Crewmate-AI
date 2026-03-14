@@ -4,6 +4,7 @@ import type { AuthUserRecord } from '../types';
 import { serverConfig } from '../config';
 import { isFirebaseAuthEnabled, verifyFirebaseIdToken } from './firebaseAdmin';
 import { auditLog } from './auditLogger';
+import { logServerError } from './runtimeLogger';
 
 const SESSION_DURATION_MS = 1000 * 60 * 60 * 24 * 7;
 const CODE_DURATION_MS = 1000 * 60 * 10;
@@ -197,7 +198,12 @@ export async function resolveAuthUserFromToken(token: string): Promise<AuthUserR
       });
 
       return user;
-    } catch {
+    } catch (error) {
+      logServerError('auth:firebase-verify-id-token', error, {
+        firebaseProjectId: serverConfig.firebaseProjectId,
+        tokenPrefix: token.slice(0, 12),
+        tokenLength: token.length,
+      });
       return null;
     }
   }

@@ -70,8 +70,8 @@ export function Onboarding(): React.JSX.Element {
   return (
     <div className="space-y-8 pb-10">
       <PageHeader
-        title="Connect your tools"
-        description="Connect Google Workspace once so Crewmate can start creating docs, sheets, slides, drafts, and calendar holds right away."
+        title="One last step"
+        description="Connect Google Workspace now, or skip and come back to it later from Integrations."
       />
 
       {error ? (
@@ -102,9 +102,9 @@ export function Onboarding(): React.JSX.Element {
               <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground">
                 Google Workspace
               </div>
-              <h2 className="text-2xl font-semibold text-foreground">One connection, six helpful actions</h2>
+              <h2 className="text-2xl font-semibold text-foreground">Connect once, then start working</h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                Sign in with Google, approve access once, and your live agents can immediately help with Workspace tasks.
+                Approve access once and Crewmate can help with docs, sheets, decks, drafts, calendar blocks, and Drive setup.
               </p>
             </div>
             {isConnected ? (
@@ -126,10 +126,6 @@ export function Onboarding(): React.JSX.Element {
             ))}
           </div>
 
-          <div className="mt-6 rounded-2xl border border-border bg-secondary/40 p-4 text-sm text-muted-foreground">
-            Crewmate will prefer draft and create flows first. Gmail send and calendar invites still require explicit confirmation before they run.
-          </div>
-
           <div className="mt-6 flex flex-wrap gap-3">
             {isConnected ? (
               <Button variant="primary" onClick={handleContinue}>
@@ -141,9 +137,7 @@ export function Onboarding(): React.JSX.Element {
                 {isConnecting ? 'Opening Google...' : 'Connect Google Workspace'}
               </Button>
             )}
-            <Button variant="secondary" onClick={handleSkip}>
-              Skip for now
-            </Button>
+            {!isConnected ? <Button variant="secondary" onClick={handleSkip}>Skip for now</Button> : null}
             <Link to="/integrations" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
               Open Integrations
             </Link>
@@ -151,11 +145,11 @@ export function Onboarding(): React.JSX.Element {
         </section>
 
         <aside className="space-y-4 rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-foreground">What happens next</h3>
+          <h3 className="text-lg font-semibold text-foreground">What you unlock</h3>
           <div className="space-y-3 text-sm text-muted-foreground">
-            <p>1. Connect Google Workspace once.</p>
-            <p>2. Start a live session or type a request.</p>
-            <p>3. Ask for docs, sheets, decks, drafts, or calendar help in plain English.</p>
+            <p>1. Connect once when you are ready.</p>
+            <p>2. Create Docs, Sheets, Slides, and Drive folders from prompts.</p>
+            <p>3. Draft Gmail messages and prepare calendar holds faster.</p>
           </div>
 
           {wasJustConnected || isConnected ? (
@@ -164,7 +158,7 @@ export function Onboarding(): React.JSX.Element {
             </div>
           ) : (
             <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4 text-sm text-muted-foreground">
-              Normal users only click connect and approve access. No API keys, no Google Cloud Console, no manual setup.
+              This is optional for now. You can skip it, explore the product, and connect later from Integrations.
             </div>
           )}
         </aside>

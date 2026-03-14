@@ -5,8 +5,6 @@ import { Button } from '../../components/ui/Button';
 import { authService, authStorage } from '../../services/authService';
 import { firebaseAuthService } from '../../services/firebaseAuth';
 import { onboardingFlowService } from '../../services/onboardingFlowService';
-import { integrationsService } from '../../services/integrationsService';
-
 function getSubmitLabel(isFirebaseMode: boolean, isLoading: boolean): string {
   if (isLoading) {
     return 'Sending link...';
@@ -24,29 +22,15 @@ export function Login(): React.JSX.Element {
 
   useEffect(() => {
     authStorage.clearSession();
+    if (!isFirebaseMode) {
+      return;
+    }
+
     void firebaseAuthService.signOut().catch(() => undefined);
-  }, []);
+  }, [isFirebaseMode, navigate]);
 
   function clearFeedback(): void {
     setError(null);
-  }
-
-  async function maybeRedirectToWorkspaceConnect(): Promise<boolean> {
-    try {
-      const integrations = await integrationsService.getIntegrations();
-      const googleWorkspace = integrations.find((integration) => integration.id === 'google-workspace');
-      const isConnected = googleWorkspace?.status === 'connected';
-
-      if (!isConnected && googleWorkspace) {
-        const { redirectUrl } = await integrationsService.startOAuthConnection(googleWorkspace.id, '/dashboard');
-        window.location.assign(redirectUrl);
-        return true;
-      }
-    } catch {
-      // Fall back to the dashboard if integration discovery fails.
-    }
-
-    return false;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -80,14 +64,8 @@ export function Login(): React.JSX.Element {
       const firebaseUser = await firebaseAuthService.signInWithGoogle();
       const token = await firebaseUser.getIdToken();
       authStorage.saveSession(token, firebaseUser.email ?? '');
-      onboardingFlowService.markComplete();
 
-      const redirectedToWorkspaceConnect = await maybeRedirectToWorkspaceConnect();
-      if (redirectedToWorkspaceConnect) {
-        return;
-      }
-
-      navigate('/dashboard');
+      navigate('/onboarding');
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : 'Unable to sign in with Google');
     } finally {

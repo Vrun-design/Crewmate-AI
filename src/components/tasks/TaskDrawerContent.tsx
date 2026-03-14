@@ -7,6 +7,12 @@ import { getTaskStatusBadge } from './tasksUtils';
 import type { Task, TaskDetail } from '../../types';
 
 const TOOL_OPTIONS = [
+  { value: 'Google Docs', label: 'Google Docs' },
+  { value: 'Google Sheets', label: 'Google Sheets' },
+  { value: 'Google Slides', label: 'Google Slides' },
+  { value: 'Google Drive', label: 'Google Drive Folder' },
+  { value: 'Google Calendar', label: 'Google Calendar Event' },
+  { value: 'Gmail Draft', label: 'Gmail Draft' },
   { value: 'ClickUp', label: 'ClickUp' },
   { value: 'Notion', label: 'Notion' },
   { value: 'Crewmate', label: 'Crewmate' },
@@ -35,6 +41,30 @@ const TASK_METADATA_ITEMS = [
 ] as const;
 
 function getOpenLabel(task: Task): string {
+  if (task.url?.includes('docs.google.com/document')) {
+    return 'Open in Google Docs';
+  }
+
+  if (task.url?.includes('docs.google.com/spreadsheets')) {
+    return 'Open in Google Sheets';
+  }
+
+  if (task.url?.includes('docs.google.com/presentation')) {
+    return 'Open in Google Slides';
+  }
+
+  if (task.url?.includes('drive.google.com')) {
+    return 'Open in Google Drive';
+  }
+
+  if (task.url?.includes('calendar.google.com')) {
+    return 'Open in Google Calendar';
+  }
+
+  if (task.url?.includes('mail.google.com')) {
+    return 'Open in Gmail';
+  }
+
   if (task.url?.includes('notion.so')) {
     return 'Open in Notion';
   }
@@ -44,6 +74,29 @@ function getOpenLabel(task: Task): string {
   }
 
   return `Open in ${task.tool}`;
+}
+
+function getDescriptionHint(tool: string, mode: CreateMode): string {
+  if (mode === 'delegated') {
+    return 'Describe what Crewmate should do, include any context, formatting, or deliverable details.';
+  }
+
+  switch (tool) {
+    case 'Google Docs':
+      return 'Optional starting content for the new document.';
+    case 'Google Sheets':
+      return 'Optional rows. Use one row per line, comma-separated for columns.';
+    case 'Google Slides':
+      return 'Optional slide outline. Use blank lines to separate slides; first line becomes the slide title.';
+    case 'Google Drive':
+      return 'Optional notes for yourself. A folder will be created using the title.';
+    case 'Google Calendar':
+      return 'Include lines like "Start: 2026-03-15 10:00" and "End: 2026-03-15 11:00", then any extra notes below.';
+    case 'Gmail Draft':
+      return 'Include a line like "To: person@example.com", then the draft body below.';
+    default:
+      return 'Add more details...';
+  }
 }
 
 function getTaskMetadataValue(task: Task, key: typeof TASK_METADATA_ITEMS[number]['key']): string {
@@ -197,7 +250,7 @@ export function TaskDrawerContent({ task, onClose, onCreateTask, onDelegateTask 
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder={mode === 'manual' ? 'Add more details...' : 'Describe what Crewmate should do, include any context, formatting, or deliverable details.'}
+          placeholder={getDescriptionHint(tool, mode)}
           rows={4}
           className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-ring text-foreground resize-none"
         />
@@ -222,7 +275,17 @@ export function TaskDrawerContent({ task, onClose, onCreateTask, onDelegateTask 
       </div>
       {mode === 'delegated' ? (
         <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-400">
-          Crewmate will use the selected tool when possible. `Notion` and `ClickUp` map to direct skills. `Crewmate` uses the orchestrator for broader work.
+          Crewmate will use the selected tool when possible. `Crewmate` uses the orchestrator for broader work.
+        </div>
+      ) : ['Google Calendar', 'Gmail Draft', 'Google Sheets', 'Google Slides'].includes(tool) ? (
+        <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2 text-xs text-muted-foreground">
+          {tool === 'Google Calendar'
+            ? 'Tip: include Start and End lines so the event can be scheduled correctly.'
+            : tool === 'Gmail Draft'
+              ? 'Tip: include a To line in the description so the draft can be addressed correctly.'
+              : tool === 'Google Sheets'
+                ? 'Tip: each line becomes a row. Separate columns with commas.'
+                : 'Tip: separate slides with blank lines. The first line of each section becomes the slide title.'}
         </div>
       ) : null}
       {submitError ? (

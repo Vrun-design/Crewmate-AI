@@ -28,6 +28,10 @@ vi.mock('../../services/browserEngine', () => ({
   takeScreenshot: vi.fn(),
 }));
 
+vi.mock('../../services/uiNavigator/uiNavigatorArtifactBridge', () => ({
+  createUiNavigatorStepScreenshotHandler: vi.fn(() => undefined),
+}));
+
 describe('browser UI skills', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -109,7 +113,7 @@ describe('browser UI skills', () => {
     expect(navigateWithUiPlanner).toHaveBeenCalledWith('Complete signup', {
       startUrl: 'https://example.com',
       maxSteps: 4,
-      onStepScreenshot: expect.any(Function),
+      onStepScreenshot: undefined,
     });
   });
 });

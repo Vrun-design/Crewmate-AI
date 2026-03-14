@@ -37,6 +37,7 @@ vi.mock('../services/integrationsService', () => ({
 
 describe('Onboarding', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     window.localStorage.setItem('crewmate_auth_token', 'auth_123');
     window.localStorage.removeItem('crewmate_onboarding_complete');
   });
@@ -48,7 +49,7 @@ describe('Onboarding', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('Connect your tools')).toBeInTheDocument();
+    expect(screen.getByText('One last step')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Connect Google Workspace' })).toBeInTheDocument();
     expect(screen.getByText('Draft Gmail emails')).toBeInTheDocument();
   });
@@ -67,11 +68,6 @@ describe('Onboarding', () => {
 
   test('starts Google Workspace OAuth through the authenticated integrations service', async () => {
     startOAuthConnectionMock.mockResolvedValue({ redirectUrl: 'https://accounts.google.com/o/oauth2/v2/auth?state=test' });
-    const assignMock = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { assign: assignMock },
-      writable: true,
-    });
 
     render(
       <MemoryRouter>
