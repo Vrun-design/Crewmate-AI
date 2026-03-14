@@ -30,7 +30,6 @@
     "@browserbasehq/stagehand": "^3.1.0",
     "@google/genai": "^1.44.0",
     "@playwright/browser-chromium": "^1.58.2",
-    "@tailwindcss/oxide-darwin-arm64": "^4.2.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "better-sqlite3": "^12.6.2",
@@ -41,7 +40,6 @@
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
     "helmet": "^8.1.0",
-    "lightningcss-darwin-arm64": "^1.32.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "playwright": "^1.58.2",
@@ -53,7 +51,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@rollup/rollup-darwin-arm64": "^4.59.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

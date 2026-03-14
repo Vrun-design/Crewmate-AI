@@ -96,3 +96,13 @@ export function consumeOAuthState(state: string, integrationId: string): OAuthSt
 
   return row;
 }
+
+export function getOAuthStateRedirectPath(state: string, integrationId: string): string | null {
+  const row = db.prepare(`
+    SELECT redirect_path as redirectPath
+    FROM oauth_states
+    WHERE state = ? AND integration_id = ?
+  `).get(state, integrationId) as { redirectPath: string | null } | undefined;
+
+  return row?.redirectPath ?? null;
+}

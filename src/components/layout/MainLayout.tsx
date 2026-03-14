@@ -3,12 +3,15 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { authStorage } from '../../services/authService';
 import { onboardingFlowService } from '../../services/onboardingFlowService';
+import { integrationsService } from '../../services/integrationsService';
 import { applyTheme, getInitialTheme } from '../../services/themeService';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { BrowserSessionPiP } from '../ui/BrowserSessionPiP';
 import { ScreenSharePiP } from '../ui/ScreenSharePiP';
 import { MiniSessionBar } from '../ui/MiniSessionBar';
 import { useLiveSessionContext } from '../../contexts/LiveSessionContext';
+import { useBrowserSessionActivation } from '../../hooks/useBrowserSessionActivation';
 
 export function MainLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -28,6 +31,8 @@ export function MainLayout() {
   } = useLiveSessionContext();
   const showScreenSharePiP = !isOverlayOpen;
 
+  useBrowserSessionActivation();
+
   useEffect(() => {
     if (!isLoading && !user && !authStorage.isAuthenticated()) {
       navigate('/login');
@@ -39,9 +44,35 @@ export function MainLayout() {
       return;
     }
 
-    if (!onboardingFlowService.isComplete() && location.pathname !== '/onboarding') {
-      navigate('/onboarding');
+    if (onboardingFlowService.isComplete() || location.pathname === '/onboarding') {
+      return;
     }
+
+    let isCancelled = false;
+
+    void integrationsService.getIntegrations()
+      .then((integrations) => {
+        if (isCancelled) {
+          return;
+        }
+
+        const googleWorkspace = integrations.find((integration) => integration.id === 'google-workspace');
+        if (googleWorkspace?.status === 'connected') {
+          onboardingFlowService.markComplete();
+          return;
+        }
+
+        navigate('/onboarding');
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          navigate('/onboarding');
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isLoading, location.pathname, navigate, user]);
 
   useEffect(() => {
@@ -102,6 +133,7 @@ export function MainLayout() {
           onOpenOverlay={() => setIsOverlayOpen(true)}
         />
       )}
+      <BrowserSessionPiP />
       <MiniSessionBar />
     </div>
   );

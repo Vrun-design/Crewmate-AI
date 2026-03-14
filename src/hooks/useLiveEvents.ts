@@ -11,6 +11,7 @@ interface LiveTaskUpdateEvent extends LiveTaskCue {
     sessionId: string;
     taskId: string;
     taskRunId: string;
+    agentId?: string;
 }
 
 interface JobUpdateEvent {

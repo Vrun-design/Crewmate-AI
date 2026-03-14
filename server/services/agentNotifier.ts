@@ -60,6 +60,7 @@ function broadcastLiveTaskUpdate(
         sessionId: sessionId ?? getReplyTargetSessionId(task),
         taskId: task.taskId ?? task.id,
         taskRunId: task.id,
+        agentId: task.agentId,
         title: task.intent,
         status,
         summary,

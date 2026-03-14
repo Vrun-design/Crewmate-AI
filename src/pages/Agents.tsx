@@ -109,7 +109,7 @@ export function Agents(): React.JSX.Element {
                         activeAgentIds={activeAgentIds}
                         onNodeClick={setSelectedAgent}
                         selectedAgentId={selectedAgent?.id}
-                        coreAgentName={profile?.agentName ? `${profile.agentName} (Orchestrator)` : 'Crewmate Orchestrator'}
+                        coreAgentName={profile?.agentName ? `${profile.agentName} (Crew Captain)` : 'Crew Captain'}
                         onCoreNodeClick={() => setIsSoulDrawerOpen(true)}
                     />
                 )}
@@ -133,7 +133,7 @@ export function Agents(): React.JSX.Element {
             <Drawer
                 isOpen={isSoulDrawerOpen}
                 onClose={() => setIsSoulDrawerOpen(false)}
-                title="Crewmate Identity"
+                title="Crew Captain"
             >
                 <SoulDrawerContent
                     profile={profile}

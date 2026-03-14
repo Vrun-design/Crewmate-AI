@@ -212,11 +212,19 @@ export function registerAgentRoutes(app: Express, requireAuth: RequireAuth): voi
     }
 
     // Lazy-import to avoid circular dep
-    const { listRecentScreenshotArtifacts } = await import('../services/screenshotArtifactService');
+    const {
+      countScreenshotArtifacts,
+      listRecentScreenshotArtifacts,
+    } = await import('../services/screenshotArtifactService');
+    const { getUiNavigatorArtifactUrl } = await import('../services/uiNavigator/uiNavigatorArtifactBridge');
 
-    // First: try screenshots tagged with this specific task run
-    const byRun = listRecentScreenshotArtifacts(user.id, { taskId: task.workspaceTaskId ?? taskRunId, limit: 1 });
-    const artifact = byRun[0] ?? null;
+    const runScopedArtifacts = listRecentScreenshotArtifacts(user.id, { taskRunId, limit: 1 });
+    const taskScopedArtifacts = runScopedArtifacts.length === 0
+      ? listRecentScreenshotArtifacts(user.id, { taskId: task.workspaceTaskId ?? taskRunId, limit: 1 })
+      : [];
+    const artifact = runScopedArtifacts[0] ?? taskScopedArtifacts[0] ?? null;
+    const artifactStepCount = countScreenshotArtifacts(user.id, { taskRunId })
+      || countScreenshotArtifacts(user.id, { taskId: task.workspaceTaskId ?? taskRunId });
 
     if (!artifact) {
       // No screenshot yet — return status so PiP can show a loading skeleton
@@ -226,17 +234,21 @@ export function registerAgentRoutes(app: Express, requireAuth: RequireAuth): voi
         stepCount: task.steps?.length ?? 0,
         status: task.status,
         intent: task.intent,
+        capturedAt: null,
       });
       return;
     }
 
     // Find the most recent step that has a currentUrl
     const latestUrlStep = [...(task.steps ?? [])].reverse().find((s) => s.currentUrl);
+    const taskResult = task.result && typeof task.result === 'object'
+      ? task.result as { output?: { finalUrl?: string } | null; finalUrl?: string | null }
+      : null;
 
     res.json({
       screenshotUrl: artifact.publicUrl,
-      currentUrl: latestUrlStep?.currentUrl ?? null,
-      stepCount: task.steps?.length ?? 0,
+      currentUrl: getUiNavigatorArtifactUrl(artifact.caption) ?? latestUrlStep?.currentUrl ?? taskResult?.output?.finalUrl ?? taskResult?.finalUrl ?? null,
+      stepCount: artifactStepCount || task.steps?.length || 0,
       status: task.status,
       intent: task.intent,
       capturedAt: artifact.createdAt,

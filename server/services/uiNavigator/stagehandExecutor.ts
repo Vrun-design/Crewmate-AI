@@ -26,6 +26,37 @@ interface StagehandActResult {
 }
 
 const COMPLETION_HINTS = ['done', 'completed', 'finished', 'no action'];
+const BLOCKED_HINTS = [
+  'captcha',
+  'verification code',
+  'verification required',
+  'two-factor',
+  'two factor',
+  '2fa',
+  'sign in',
+  'log in',
+  'login required',
+  'authentication required',
+  'requires authentication',
+  'human verification',
+  'permission denied',
+  'access denied',
+];
+const RETRYABLE_FAILURE_HINTS = [
+  'timeout',
+  'timed out',
+  'still loading',
+  'loading',
+  'detached',
+  'intercepted',
+  'not clickable',
+  'not visible',
+  'covered',
+  'overlay',
+  'temporarily unavailable',
+  'navigation',
+  'network',
+];
 
 function getStagehandModel(): string {
   const configuredModel = serverConfig.geminiBrowserModel.trim();
@@ -37,13 +68,58 @@ function buildSummary(intent: string, steps: UiExecutionResult[], finalUrl: stri
   return `Completed "${intent}" in ${successCount} step${successCount !== 1 ? 's' : ''}. Final URL: ${finalUrl}`;
 }
 
-function shouldStopAfterAct(result: StagehandActResult): boolean {
-  if (!result.success) {
-    return true;
+function describeActResult(result: StagehandActResult): string {
+  return [result.message, result.actionDescription].filter(Boolean).join(' | ').trim();
+}
+
+function isCompletionMessage(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  return COMPLETION_HINTS.some((hint) => normalizedMessage.includes(hint));
+}
+
+function containsHint(text: string, hints: string[]): boolean {
+  const normalizedText = text.toLowerCase();
+  return hints.some((hint) => normalizedText.includes(hint));
+}
+
+function isBlockedMessage(detail: string): boolean {
+  return containsHint(detail, BLOCKED_HINTS);
+}
+
+function isRetryableFailure(detail: string): boolean {
+  return containsHint(detail, RETRYABLE_FAILURE_HINTS);
+}
+
+function getFailureSummary(result: StagehandActResult): string {
+  const detail = result.message.trim() || result.actionDescription.trim() || 'Stagehand returned an unsuccessful action.';
+  return `Browser navigation failed: ${detail}`;
+}
+
+function getBlockedSummary(result: StagehandActResult): string {
+  const detail = describeActResult(result) || 'The site requires human input before the task can continue.';
+  return `Browser navigation is blocked: ${detail}`;
+}
+
+function getTerminalStatus(result: StagehandActResult): 'completed' | 'failed' | 'blocked' | null {
+  const detail = describeActResult(result);
+  if (isBlockedMessage(detail)) {
+    return 'blocked';
   }
 
-  const message = result.message.toLowerCase();
-  return COMPLETION_HINTS.some((hint) => message.includes(hint));
+  if (!result.success) {
+    return 'failed';
+  }
+
+  return isCompletionMessage(result.message) ? 'completed' : null;
+}
+
+function buildRecoveryInstruction(intent: string, currentUrl: string, detail: string): string {
+  return [
+    `Continue working toward: ${intent}.`,
+    `The previous attempt failed with: ${detail}.`,
+    `Current page: ${currentUrl}.`,
+    'Reassess the UI, dismiss overlays or popups, wait for loading if needed, and try a different safe approach.',
+  ].join(' ');
 }
 
 async function emitStepScreenshot(
@@ -115,6 +191,7 @@ export async function executeWithStagehand(
 
     let stepIndex = 0;
     let lastUrl = activePage.url();
+    let recoveryInstruction: string | null = null;
 
     // Stagehand's act() drives one meaningful action per call.
     // We loop up to maxSteps, asking Stagehand to progress toward the intent.
@@ -122,9 +199,10 @@ export async function executeWithStagehand(
       let actResult: StagehandActResult;
 
       try {
-        const instruction = stepIndex === 0
-          ? intent
-          : `Continue working toward: ${intent}. Current page: ${activePage.url()}`;
+        const instruction = recoveryInstruction
+          ?? (stepIndex === 0
+            ? intent
+            : `Continue working toward: ${intent}. Current page: ${activePage.url()}`);
 
         actResult = await stagehand.act(instruction);
       } catch (err) {
@@ -145,6 +223,35 @@ export async function executeWithStagehand(
       }
 
       lastUrl = activePage.url();
+      const detail = describeActResult(actResult);
+
+      if (!actResult.success && !recoveryInstruction && isRetryableFailure(detail) && !isBlockedMessage(detail)) {
+        steps.push({
+          action: {
+            type: 'fail',
+            error: detail,
+            reasoning: 'Transient browser issue detected; retrying with recovery guidance.',
+            safety: 'safe',
+          },
+          status: 'retried',
+          url: lastUrl,
+          detail: `Retrying after transient browser issue: ${detail}`,
+        });
+
+        await emitStepScreenshot(activePage, lastUrl, stepIndex + 1, onStepScreenshot);
+
+        recoveryInstruction = buildRecoveryInstruction(intent, lastUrl, detail);
+        stepIndex += 1;
+        continue;
+      }
+
+      const terminalStatus = getTerminalStatus(actResult);
+
+      const stepStatus = terminalStatus === 'blocked'
+        ? 'blocked'
+        : actResult.success
+          ? 'completed'
+          : 'failed';
 
       steps.push({
         action: {
@@ -153,7 +260,7 @@ export async function executeWithStagehand(
           reasoning: actResult.message,
           safety: 'safe',
         },
-        status: actResult.success ? 'completed' : 'failed',
+        status: stepStatus,
         url: lastUrl,
         detail: actResult.actionDescription || actResult.message,
       });
@@ -161,8 +268,26 @@ export async function executeWithStagehand(
       await emitStepScreenshot(activePage, lastUrl, stepIndex + 1, onStepScreenshot);
 
       stepIndex += 1;
+      recoveryInstruction = null;
+      if (terminalStatus === 'failed') {
+        return {
+          status: 'failed',
+          steps,
+          finalUrl: lastUrl,
+          summary: getFailureSummary(actResult),
+        };
+      }
 
-      if (shouldStopAfterAct(actResult)) {
+      if (terminalStatus === 'blocked') {
+        return {
+          status: 'blocked',
+          steps,
+          finalUrl: lastUrl,
+          summary: getBlockedSummary(actResult),
+        };
+      }
+
+      if (terminalStatus === 'completed') {
         return {
           status: 'completed',
           steps,

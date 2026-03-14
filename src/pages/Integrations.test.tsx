@@ -2,6 +2,7 @@ import React from 'react';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {vi} from 'vitest';
 import {describe, expect, test} from 'vitest';
+import {MemoryRouter} from 'react-router-dom';
 import {Integrations} from './Integrations';
 
 const {refreshMock, integrationConfigMock, startOAuthConnectionMock} = vi.hoisted(() => ({
@@ -77,13 +78,21 @@ vi.mock('../services/integrationsService', () => ({
 
 describe('Integrations', () => {
   test('adds bottom padding to the page shell', () => {
-    const {container} = render(<Integrations />);
+    const {container} = render(
+      <MemoryRouter>
+        <Integrations />
+      </MemoryRouter>,
+    );
 
     expect(container.firstChild).toHaveClass('pb-10');
   });
 
   test('opens integration drawer for configuration', () => {
-    render(<Integrations />);
+    render(
+      <MemoryRouter>
+        <Integrations />
+      </MemoryRouter>,
+    );
 
     fireEvent.click(screen.getByRole('button', {name: /configure|connect/i}));
 
@@ -100,12 +109,27 @@ describe('Integrations', () => {
       writable: true,
     });
 
-    render(<Integrations />);
+    render(
+      <MemoryRouter>
+        <Integrations />
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByRole('button', {name: /configure|connect/i}));
     fireEvent.click(screen.getByRole('button', {name: /reconnect google workspace/i}));
 
     await waitFor(() => {
       expect(startOAuthConnectionMock).toHaveBeenCalledWith('google-workspace', '/integrations');
     });
+  });
+
+  test('shows an oauth failure banner after a cancelled provider flow', () => {
+    render(
+      <MemoryRouter initialEntries={['/integrations?integration=slack&connected=false&error=access_denied&error_description=User%20cancelled']}>
+        <Integrations />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/slack connection was not completed/i)).toBeInTheDocument();
+    expect(screen.getByText(/User cancelled/i)).toBeInTheDocument();
   });
 });

@@ -23,9 +23,9 @@ import { broadcastEvent } from './eventService';
 const INITIAL_GREETING_PROMPT = [
   'Greet the user.',
   'Pick exactly one of these three options verbatim and say nothing else:',
-  '"Crewmate here. What are we building?" OR',
-  '"Hey — Crewmate online. What\'s the move?" OR',
-  '"Crewmate ready. What do you need?"',
+  '"Hey, what are we working on?" OR',
+  '"I\'m here. What do you need?" OR',
+  '"Alright, where should we start?"',
 ].join(' ');
 
 const RECONNECT_GREETING_PROMPT = [

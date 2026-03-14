@@ -12,7 +12,7 @@
 
 **Category: Live Agents 🗣️ + UI Navigator ☸️**
 
-[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-51-and-counting) · [Integrations](#-integrations) · [Deployment](#-google-cloud-deployment)
+[Quick Start](#-quick-start) · [Friend Testing](#-friend-testing-runbook) · [Architecture](#-architecture) · [Skills](#-skills-51-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment-path)
 
 </div>
 
@@ -424,10 +424,13 @@ Edit `.env` and fill in at minimum:
 GOOGLE_API_KEY=your_gemini_api_key_here
 CREWMATE_ENCRYPTION_KEY=your_32_char_secret_here  # openssl rand -hex 16
 
-# Optional integrations (enable per demo needs)
-NOTION_TOKEN=
-SLACK_BOT_TOKEN=
-CLICKUP_TOKEN=
+# Recommended for shared friend testing
+FIREBASE_PROJECT_ID=your_firebase_project_id
+VITE_FIREBASE_API_KEY=your_firebase_web_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_APP_ID=your_firebase_app_id
+GOOGLE_WORKSPACE_CLIENT_ID=your_google_workspace_client_id
+GOOGLE_WORKSPACE_CLIENT_SECRET=your_google_workspace_client_secret
 ```
 
 ### 3. Run
@@ -442,7 +445,22 @@ This starts:
 
 On first run, the database is auto-created and migrated at `data/crewmate.db`.
 
-### 4. (Optional) Seed Demo Data
+### 4. Shared Friend Testing
+
+The recommended low-cost testing setup is:
+
+- run frontend + backend locally with `npm run dev`
+- expose only `http://localhost:3000` through one HTTPS tunnel
+- leave `VITE_API_URL` blank so `/api` stays same-origin and Vite proxies to `:8787`
+- set `CORS_ORIGIN`, `PUBLIC_APP_URL`, and `PUBLIC_WEB_APP_URL` to the same tunnel origin
+- use Firebase Auth for shared login
+- use Google Workspace OAuth as the first required integration baseline
+
+Use the full runbook here:
+
+- [docs/deployment-testing-runbook.md](/Users/varun/Desktop/Dev_projects/crewmate-dashboard%20copy/docs/deployment-testing-runbook.md)
+
+### 5. (Optional) Seed Demo Data
 
 For a fresh install with sample tasks, memories, and activities pre-loaded:
 
@@ -452,48 +470,78 @@ npm run seed
 
 This inserts 3 sample tasks, 3 memory records, and 4 activity log entries — so the dashboard never looks empty during a demo.
 
-In development mode, use any email. The auth code is returned in the API response and printed to server logs.
+In development mode, use any email only when `AUTH_EXPOSE_DEV_CODE=true`. For shared friend testing, switch to Firebase Auth and disable dev-code auth.
 
 ---
 
-## ☁️ Google Cloud Deployment
+## 🤝 Friend Testing Runbook
 
-Crewmate is designed to run on **Google Cloud Run** using Docker.
+The default rollout path for this repo is:
 
-### Build & Deploy
+1. local frontend + local backend
+2. one HTTPS tunnel on the frontend port
+3. Firebase Auth for shared login
+4. Google Workspace OAuth as the baseline integration
+
+Detailed setup, env matrix, callback rules, smoke checks, and rollback steps:
+
+- [docs/deployment-testing-runbook.md](/Users/varun/Desktop/Dev_projects/crewmate-dashboard%20copy/docs/deployment-testing-runbook.md)
+
+---
+
+## ☁️ Deployment Path
+
+Crewmate is currently optimized for a **single backend instance** because it stores SQLite data on local disk, artifacts on local disk, and live runtime session state in memory.
+
+### Phase 1: Friend testing now
+
+- keep frontend + backend local
+- share one HTTPS tunnel to `http://localhost:3000`
+- leave `VITE_API_URL` blank so Vite proxies `/api` to the local backend
+- use Firebase Auth and Google Workspace OAuth
+
+### Phase 2: Hosted staging later
+
+- deploy the frontend to **Firebase Hosting**
+- keep the backend on one hosted service
+- keep `AUTH_EXPOSE_DEV_CODE=false`
+- satisfy the Firebase startup validation env requirements before `NODE_ENV=production`
+
+### Firebase Hosting frontend
+
+This repo includes a minimal `firebase.json` for SPA hosting of the built frontend:
 
 ```bash
-# Build the Docker image locally
-docker build -t crewmate .
-
-# OR use Cloud Build (no local Docker needed)
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/crewmate
-
-# Deploy to Cloud Run
-gcloud run deploy crewmate \
-  --image gcr.io/YOUR_PROJECT_ID/crewmate \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --memory 1Gi \
-  --timeout 300 \
-  --set-env-vars "GOOGLE_API_KEY=...,CREWMATE_ENCRYPTION_KEY=..."
-
-# Or use the included deploy script:
-bash scripts/deploy-cloud-run.sh
+npm run build
+firebase deploy --only hosting
 ```
 
-> The included `Dockerfile` uses a multi-stage build (Alpine Node.js) and includes a `HEALTHCHECK` pointing to `/api/health/live`.
+If the frontend is hosted separately, set:
 
-### Google Cloud Services Used
+- `VITE_API_URL` to the backend origin
+
+If you later choose a single-domain setup, extend Firebase Hosting rewrites to proxy `/api` to your backend.
+
+### Google Cloud services used
 
 | Service | Usage |
 |---|---|
-| **Google Cloud Run** | Container hosting for the Express backend |
-| **Firebase Authentication** | Production user identity and JWT verification |
+| **Firebase Hosting** | Frontend hosting for hosted staging later |
+| **Firebase Authentication** | Shared-test and production user identity / JWT verification |
 | **Google Gemini API** | Live audio/vision model, text models, embeddings |
 | **Google GenAI SDK** | `@google/genai` v1.44.0 — all Gemini API calls |
 | **Google Workspace APIs** | Gmail, Calendar, Docs, Sheets, Slides, Drive via OAuth |
+
+### Pre-deploy checklist
+
+- run `npm run lint`
+- run `npm test`
+- run `npm run build`
+- run `npm run test:smoke`
+- confirm Firebase Auth is configured
+- confirm the current public origin matches all callback URLs
+- confirm `AUTH_EXPOSE_DEV_CODE=false` before any production deploy
+- smoke-test login, dashboard, SSE, live session, delegated tasks, and Google Workspace OAuth
 
 ---
 
@@ -503,18 +551,25 @@ bash scripts/deploy-cloud-run.sh
 |---|---|---|
 | `GOOGLE_API_KEY` | ✅ | Gemini API key |
 | `CREWMATE_ENCRYPTION_KEY` | ✅ | 32-char secret for credential encryption |
-| `PORT` | ⬜ | Server port (default: 8787) |
-| `CORS_ORIGIN` | ⬜ | Frontend origin (default: localhost:3000) |
-| `FIREBASE_PROJECT_ID` | ⬜ | Firebase project for production auth |
-| `FIREBASE_CLIENT_EMAIL` | ⬜ | Firebase service account email |
-| `FIREBASE_PRIVATE_KEY` | ⬜ | Firebase service account private key |
-| `SLACK_BOT_TOKEN` | ⬜ | Slack OAuth bot token |
-| `NOTION_TOKEN` | ⬜ | Notion integration token |
-| `CLICKUP_TOKEN` | ⬜ | ClickUp API token |
-| `GOOGLE_WORKSPACE_CLIENT_ID` | ⬜ | OAuth client for Workspace |
+| `PORT` | ⬜ | Server port (default: `8787`) |
+| `CORS_ORIGIN` | ⬜ | Frontend origin or shared tunnel origin |
+| `PUBLIC_APP_URL` | ⬜ | Public app origin used for backend-generated URLs |
+| `PUBLIC_WEB_APP_URL` | ⬜ | Public frontend origin used for OAuth callback returns |
+| `AUTH_EXPOSE_DEV_CODE` | ⬜ | Dev email-code auth toggle; keep `false` for shared/public testing |
+| `FIREBASE_PROJECT_ID` | ⬜ | Firebase project for token verification |
+| `FIREBASE_CLIENT_EMAIL` | ⬜ | Firebase service account email if not using ADC |
+| `FIREBASE_PRIVATE_KEY` | ⬜ | Firebase service account private key if not using ADC |
+| `VITE_FIREBASE_API_KEY` | ⬜ | Firebase web API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | ⬜ | Firebase web auth domain |
+| `VITE_FIREBASE_APP_ID` | ⬜ | Firebase web app ID |
+| `GOOGLE_WORKSPACE_CLIENT_ID` | ⬜ | OAuth client for Google Workspace |
+| `GOOGLE_WORKSPACE_CLIENT_SECRET` | ⬜ | OAuth secret for Google Workspace |
+| `GOOGLE_WORKSPACE_REDIRECT_URI` | ⬜ | Google Workspace callback URL |
 | `TAVILY_API_KEY` | ⬜ | AI-optimized web search (falls back to DuckDuckGo) |
 
-See `.env.example` for the complete list.
+See [.env.example](/Users/varun/Desktop/Dev_projects/crewmate-dashboard%20copy/.env.example) for the complete list and [docs/deployment-testing-runbook.md](/Users/varun/Desktop/Dev_projects/crewmate-dashboard%20copy/docs/deployment-testing-runbook.md) for mode-by-mode guidance.
+
+For a full hosted deployment walkthrough, including Firebase Auth setup, backend/frontend deploy order, callback URLs, and cost-safety guardrails, see [docs/production-deployment-runbook.md](/Users/varun/Desktop/Dev_projects/crewmate-dashboard%20copy/docs/production-deployment-runbook.md).
 
 ---
 

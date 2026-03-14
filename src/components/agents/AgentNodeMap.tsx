@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { Network } from 'lucide-react';
 import { getAgentIcon } from './agentUi';
 import type { AgentManifest } from './types';
 import { Tooltip } from '../ui/Tooltip';
@@ -13,7 +12,7 @@ interface AgentNodeMapProps {
     onCoreNodeClick?: () => void;
 }
 
-export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgentId, coreAgentName = 'Core Orchestrator', onCoreNodeClick }: AgentNodeMapProps): React.JSX.Element {
+export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgentId, coreAgentName = 'Crew Captain', onCoreNodeClick }: AgentNodeMapProps): React.JSX.Element {
 
     // Mathematics to distribute agents in a ring around the center Core
     const radius = 140;
@@ -163,7 +162,11 @@ export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgen
                         className="w-16 h-16 rounded-2xl bg-primary shadow-[0_0_30px_rgba(233,84,32,0.5)] border border-white/20 flex items-center justify-center relative select-none cursor-pointer hover:scale-105 transition-transform"
                     >
                         <div className="absolute inset-0 rounded-2xl border-2 border-white/30 animate-pulse opacity-40 shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]" />
-                        <Network size={26} className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                        <img
+                            src="/Crewmate_logo.svg"
+                            alt={coreAgentName}
+                            className="h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                        />
                     </div>
                 </Tooltip>
             </div>

@@ -8,6 +8,7 @@ process.env.CREWMATE_ARTIFACTS_PATH = 'data/test-artifacts';
 const { db } = await import('../db');
 const { requestLoginCode, verifyLoginCode } = await import('./authService');
 const {
+  countScreenshotArtifacts,
   saveScreenshotArtifact,
   getScreenshotArtifactBytesForUser,
   getPublicScreenshotArtifactFilePath,
@@ -110,5 +111,34 @@ describe('screenshotArtifactService', () => {
     const artifacts = listRecentScreenshotArtifacts(user.id, { sessionId: 'SES-1', limit: 2 });
     expect(artifacts[0]?.id).toBe(second.id);
     expect(artifacts).toHaveLength(2);
+  });
+
+  test('filters screenshot artifacts by task run id', () => {
+    const user = createUser('screens-4@example.com');
+    saveScreenshotArtifact({
+      userId: user.id,
+      workspaceId: user.workspaceId,
+      taskId: 'TSK-1',
+      taskRunId: 'RUN-1',
+      mimeType: 'image/jpeg',
+      data: Buffer.from('first-run').toString('base64'),
+      title: 'Run 1',
+      internalOnly: true,
+    });
+    const second = saveScreenshotArtifact({
+      userId: user.id,
+      workspaceId: user.workspaceId,
+      taskId: 'TSK-1',
+      taskRunId: 'RUN-2',
+      mimeType: 'image/jpeg',
+      data: Buffer.from('second-run').toString('base64'),
+      title: 'Run 2',
+      internalOnly: true,
+    });
+
+    const runArtifacts = listRecentScreenshotArtifacts(user.id, { taskRunId: 'RUN-2', limit: 5 });
+    expect(runArtifacts).toHaveLength(1);
+    expect(runArtifacts[0]?.id).toBe(second.id);
+    expect(countScreenshotArtifacts(user.id, { taskRunId: 'RUN-2' })).toBe(1);
   });
 });

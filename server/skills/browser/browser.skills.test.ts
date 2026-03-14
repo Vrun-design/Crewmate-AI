@@ -101,7 +101,7 @@ describe('browser UI skills', () => {
 
     const { browserUiNavigateSkill } = await import('./browser.skills');
     const result = await browserUiNavigateSkill.handler(
-      { userId: 'user-1', workspaceId: 'workspace-1' },
+      { userId: 'user-1', workspaceId: 'workspace-1', taskId: 'TSK-1', taskRunId: 'RUN-1' },
       { intent: 'Complete signup', startUrl: 'https://example.com', maxSteps: 4 },
     );
 
@@ -109,6 +109,7 @@ describe('browser UI skills', () => {
     expect(navigateWithUiPlanner).toHaveBeenCalledWith('Complete signup', {
       startUrl: 'https://example.com',
       maxSteps: 4,
+      onStepScreenshot: expect.any(Function),
     });
   });
 });

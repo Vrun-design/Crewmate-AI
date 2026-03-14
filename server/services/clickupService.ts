@@ -137,7 +137,10 @@ export async function finalizeClickUpOAuthCallback(input: { code: string; state:
       'Content-Type': 'application/json',
     },
   });
-  const teamPayload = await teamResponse.json() as { teams?: Array<{ id: string; name: string }> };
+  const teamPayload = await teamResponse.json() as { teams?: Array<{ id: string; name: string }>; err?: string; error?: string };
+  if (!teamResponse.ok) {
+    throw new Error(`ClickUp workspace lookup failed: ${teamPayload.err ?? teamPayload.error ?? teamResponse.statusText}`);
+  }
   const firstTeam = teamPayload.teams?.[0];
   const current = getStoredIntegrationConfig(state.workspaceId, 'clickup');
   saveStoredIntegrationConfig(state.workspaceId, 'clickup', {

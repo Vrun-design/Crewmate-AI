@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '../../components/ui/Button';
 import { authService, authStorage } from '../../services/authService';
@@ -20,7 +19,6 @@ export function Login(): React.JSX.Element {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const navigate = useNavigate();
   const isFirebaseMode = firebaseAuthService.isConfigured();
 
@@ -31,7 +29,6 @@ export function Login(): React.JSX.Element {
 
   function clearFeedback(): void {
     setError(null);
-    setMessage(null);
   }
 
   async function maybeRedirectToWorkspaceConnect(): Promise<boolean> {
@@ -63,9 +60,6 @@ export function Login(): React.JSX.Element {
 
     try {
       if (isFirebaseMode) {
-        await firebaseAuthService.sendEmailLink(email);
-        setMessage('Magic sign-in link sent. Open it on this device to continue.');
-        navigate('/verify', { state: { email } });
         return;
       }
 
@@ -113,60 +107,58 @@ export function Login(): React.JSX.Element {
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-[380px] relative z-10"
       >
-        <div className="flex flex-col items-center text-center space-y-5 mb-8">
-          <img src="/Crewmate.svg" alt="Crewmate" className="h-14 w-14 object-contain shadow-[0_8px_20px_rgba(0,0,0,0.08)]" />
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Log in to Crewmate</h1>
-            <p className="text-sm text-muted-foreground">
-              {isFirebaseMode
-                ? 'Use Google or a magic email link to access the beta workspace.'
-                : 'Enter your email to continue into the local workspace preview.'}
-            </p>
-          </div>
-        </div>
-
         <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-2xl p-6 shadow-2xl shadow-black/5">
-          <div className="mb-4 flex items-start gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm text-muted-foreground">
-            <ShieldCheck size={16} className="mt-0.5 shrink-0 text-foreground" />
-            <div>
-              {isFirebaseMode
-                ? 'Production-ready Firebase Auth is enabled for this build. Your backend session is derived from the verified Firebase identity token.'
-                : 'This build uses local email-code auth for development. Hosted auth providers are not enabled here yet.'}
+          <div className="flex flex-col items-center text-center space-y-5 mb-6">
+            <img src="/Crewmate.svg" alt="Crewmate" className="h-14 w-14 object-contain shadow-[0_8px_20px_rgba(0,0,0,0.08)]" />
+            <div className="space-y-2">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in to Crewmate</h1>
+              <p className="text-sm text-muted-foreground">
+                {isFirebaseMode
+                  ? 'Sign in with your Google account to enter your workspace.'
+                  : 'Enter your email to continue into the local workspace preview.'}
+              </p>
             </div>
           </div>
+
           {isFirebaseMode ? (
-            <Button variant="primary" className="w-full justify-center py-5 text-sm font-medium mb-4" disabled={isLoading} onClick={() => void handleGoogleSignIn()}>
+            <Button
+              variant="primary"
+              className="mb-2 w-full justify-center py-5 text-sm font-semibold shadow-[0_14px_34px_rgba(233,84,32,0.28)]"
+              disabled={isLoading}
+              onClick={() => void handleGoogleSignIn()}
+            >
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow-sm">
+                <img src="/Google.svg" alt="" className="h-4.5 w-4.5" aria-hidden="true" />
+              </span>
               Continue with Google
             </Button>
           ) : null}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-xs font-medium text-foreground/80 uppercase tracking-wider">Email Address</label>
-              <input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-background/50 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground transition-all text-foreground placeholder:text-muted-foreground/50"
-                required
-              />
-            </div>
-            <Button variant="primary" className="w-full justify-center py-5 text-sm font-medium shadow-[0_1px_2px_rgba(0,0,0,0.1)]" disabled={isLoading}>
-              {getSubmitLabel(isFirebaseMode, isLoading)}
-            </Button>
-            {error ? <div className="text-sm text-red-500">{error}</div> : null}
-            {message ? (
-              <div className="flex items-center gap-2 text-sm text-emerald-600">
-                <Mail size={14} />
-                {message}
+          {!isFirebaseMode ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-xs font-medium text-foreground/80 uppercase tracking-wider">Email Address</label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-background/50 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground transition-all text-foreground placeholder:text-muted-foreground/50"
+                  required
+                />
               </div>
-            ) : null}
-          </form>
+              <Button variant="primary" className="w-full justify-center py-5 text-sm font-medium shadow-[0_1px_2px_rgba(0,0,0,0.1)]" disabled={isLoading}>
+                {getSubmitLabel(isFirebaseMode, isLoading)}
+              </Button>
+            </form>
+          ) : null}
+          {error ? <div className="mt-3 text-sm text-red-500">{error}</div> : null}
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-8">
-          Local preview mode stores auth state in your browser and the workspace database.
+          {isFirebaseMode
+            ? 'Google is the only sign-in method enabled for this deployment.'
+            : 'Local preview mode stores auth state in your browser and the workspace database.'}
         </p>
       </motion.div>
     </div>

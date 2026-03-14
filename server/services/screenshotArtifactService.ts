@@ -124,6 +124,7 @@ export function saveScreenshotArtifact(input: {
   caption?: string;
   width?: number;
   height?: number;
+  internalOnly?: boolean;
 }): ScreenshotArtifactRecord {
   ensureStorageRoot();
 
@@ -168,29 +169,31 @@ export function saveScreenshotArtifact(input: {
     now,
   );
 
-  ingestArtifactMemory({
-    userId: input.userId,
-    workspaceId: input.workspaceId,
-    title,
-    url: buildAuthenticatedUrl(id),
-    sourceType: 'integration',
-    summary: input.caption ?? 'Screenshot captured from a live session.',
-    metadata: {
-      provider: 'Screenshot',
-      artifactId: id,
-      source: 'live_screen_capture',
-      sessionId: input.sessionId ?? null,
-      taskId: input.taskId ?? null,
-      taskRunId: input.taskRunId ?? null,
-      mimeType: input.mimeType,
-      sharedPublicUrl: publicUrl,
-      shareExpiresAt: accessExpiresAt,
-      width: input.width ?? null,
-      height: input.height ?? null,
-    },
-  });
+  if (!input.internalOnly) {
+    ingestArtifactMemory({
+      userId: input.userId,
+      workspaceId: input.workspaceId,
+      title,
+      url: buildAuthenticatedUrl(id),
+      sourceType: 'integration',
+      summary: input.caption ?? 'Screenshot captured from a live session.',
+      metadata: {
+        provider: 'Screenshot',
+        artifactId: id,
+        source: 'live_screen_capture',
+        sessionId: input.sessionId ?? null,
+        taskId: input.taskId ?? null,
+        taskRunId: input.taskRunId ?? null,
+        mimeType: input.mimeType,
+        sharedPublicUrl: publicUrl,
+        shareExpiresAt: accessExpiresAt,
+        width: input.width ?? null,
+        height: input.height ?? null,
+      },
+    });
+  }
 
-  if (input.taskId) {
+  if (input.taskId && !input.internalOnly) {
     updateWorkspaceTask(input.taskId, input.userId, { artifactCount: countArtifactsForTask(input.taskId) });
   }
 
@@ -284,7 +287,7 @@ export function getScreenshotArtifactBytesForUser(artifactId: string, userId: st
 
 export function listRecentScreenshotArtifacts(
   userId: string,
-  options: { sessionId?: string | null; taskId?: string | null; limit?: number } = {},
+  options: { sessionId?: string | null; taskId?: string | null; taskRunId?: string | null; limit?: number } = {},
 ): ScreenshotArtifactRecord[] {
   const clauses = ['user_id = ?'];
   const params: unknown[] = [userId];
@@ -297,6 +300,11 @@ export function listRecentScreenshotArtifacts(
   if (options.taskId) {
     clauses.push('task_id = ?');
     params.push(options.taskId);
+  }
+
+  if (options.taskRunId) {
+    clauses.push('task_run_id = ?');
+    params.push(options.taskRunId);
   }
 
   params.push(options.limit ?? 10);
@@ -326,9 +334,40 @@ export function listRecentScreenshotArtifacts(
   return rows.map(mapRow);
 }
 
+export function countScreenshotArtifacts(
+  userId: string,
+  options: { sessionId?: string | null; taskId?: string | null; taskRunId?: string | null } = {},
+): number {
+  const clauses = ['user_id = ?'];
+  const params: unknown[] = [userId];
+
+  if (options.sessionId) {
+    clauses.push('session_id = ?');
+    params.push(options.sessionId);
+  }
+
+  if (options.taskId) {
+    clauses.push('task_id = ?');
+    params.push(options.taskId);
+  }
+
+  if (options.taskRunId) {
+    clauses.push('task_run_id = ?');
+    params.push(options.taskRunId);
+  }
+
+  const row = db.prepare(`
+    SELECT COUNT(*) as count
+    FROM screenshot_artifacts
+    WHERE ${clauses.join(' AND ')}
+  `).get(...params) as { count: number };
+
+  return row.count;
+}
+
 export function resolveRecentScreenshotArtifact(
   userId: string,
-  options: { artifactId?: string; sessionId?: string | null; taskId?: string | null },
+  options: { artifactId?: string; sessionId?: string | null; taskId?: string | null; taskRunId?: string | null },
 ): ScreenshotArtifactRecord | null {
   if (options.artifactId) {
     return getScreenshotArtifactForUser(options.artifactId, userId);
@@ -339,6 +378,13 @@ export function resolveRecentScreenshotArtifact(
     : null;
   if (sessionScoped) {
     return sessionScoped;
+  }
+
+  const taskRunScoped = options.taskRunId
+    ? listRecentScreenshotArtifacts(userId, { taskRunId: options.taskRunId, limit: 1 })[0]
+    : null;
+  if (taskRunScoped) {
+    return taskRunScoped;
   }
 
   const taskScoped = options.taskId

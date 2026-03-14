@@ -17,8 +17,7 @@ import type { AgentTask, AgentStepEvent } from '../components/agents/types';
 import { api } from '../lib/api';
 import { connectAuthenticatedSseStream } from '../lib/sse';
 import { browserSessionStore } from '../stores/browserSessionStore';
-
-const UI_NAVIGATOR_AGENT_ID = 'crewmate-ui-navigator-agent';
+import { UI_NAVIGATOR_AGENT_ID } from '../constants/agents';
 
 type StatusFilter = 'all' | 'in_progress' | 'completed' | 'pending' | 'failed' | 'cancelled';
 

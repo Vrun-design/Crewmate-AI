@@ -85,4 +85,15 @@ describe('Onboarding', () => {
       expect(startOAuthConnectionMock).toHaveBeenCalledWith('google-workspace', '/onboarding');
     });
   });
+
+  test('shows a friendly oauth failure banner when Google Workspace connect is cancelled', () => {
+    render(
+      <MemoryRouter initialEntries={['/onboarding?error=access_denied&error_description=Consent%20cancelled']}>
+        <Onboarding />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/Google Workspace connection was not completed/i)).toBeInTheDocument();
+    expect(screen.getByText(/Consent cancelled/i)).toBeInTheDocument();
+  });
 });

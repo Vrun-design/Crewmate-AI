@@ -1,4 +1,5 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
+import {useLocation} from 'react-router-dom';
 import {IntegrationCardGrid} from '../components/integrations/IntegrationCardGrid';
 import {IntegrationDrawerContent} from '../components/integrations/IntegrationDrawerContent';
 import {Drawer} from '../components/ui/Drawer';
@@ -11,6 +12,24 @@ export function Integrations(): React.JSX.Element {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const {integrations, isLoading, error, refresh} = useIntegrations();
+  const location = useLocation();
+  const callbackState = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const integration = params.get('integration');
+    const connected = params.get('connected');
+    const errorCode = params.get('error');
+    const errorDescription = params.get('error_description');
+    if (!integration) {
+      return null;
+    }
+
+    return {
+      integration,
+      connected,
+      errorCode,
+      errorDescription,
+    };
+  }, [location.search]);
 
   function handleOpenIntegration(integration: Integration): void {
     setSelectedIntegration(integration);
@@ -32,6 +51,20 @@ export function Integrations(): React.JSX.Element {
           </div>
         </div>
       )}
+
+      {callbackState?.connected === 'false' ? (
+        <div className="glass-panel rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
+          {callbackState.errorDescription
+            ? `${callbackState.integration} connection was not completed: ${callbackState.errorDescription}`
+            : `${callbackState.integration} connection was not completed.`}
+        </div>
+      ) : null}
+
+      {callbackState?.connected === 'true' ? (
+        <div className="glass-panel rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700">
+          {callbackState.integration} connected successfully.
+        </div>
+      ) : null}
 
       <IntegrationCardGrid integrations={integrations} onOpen={handleOpenIntegration} />
 

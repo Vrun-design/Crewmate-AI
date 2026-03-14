@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from 'express';
+import { serverConfig } from '../config';
 import {
     deleteIntegrationConfig,
     getIntegrationConfigState,
@@ -33,6 +34,7 @@ import {
     getClickUpConfigState,
     saveClickUpDefaults,
 } from '../services/clickupService';
+import { getOAuthStateRedirectPath } from '../services/integrationOAuthService';
 import type { RequireAuth } from './types';
 
 function isOAuthConfigIntegration(integrationId: string): boolean {
@@ -53,6 +55,33 @@ function respondWithRedirect(req: Request, res: Response, redirectUrl: string): 
     }
 
     res.redirect(302, redirectUrl);
+}
+
+function getCallbackError(req: Request): { code: string; description: string } | null {
+    const error = typeof req.query.error === 'string' ? req.query.error : '';
+    if (!error) {
+        return null;
+    }
+
+    const description = typeof req.query.error_description === 'string' ? req.query.error_description : error;
+    return { code: error, description };
+}
+
+function buildFrontendOAuthErrorRedirect(integrationId: string, req: Request, fallbackPath = '/integrations'): string {
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    const redirectPath = state ? getOAuthStateRedirectPath(state, integrationId) : null;
+    const target = new URL(redirectPath || fallbackPath, serverConfig.publicWebAppUrl || serverConfig.publicAppUrl || 'http://localhost:3000');
+    const callbackError = getCallbackError(req);
+
+    target.searchParams.set('integration', integrationId);
+    target.searchParams.set('connected', 'false');
+
+    if (callbackError) {
+        target.searchParams.set('error', callbackError.code);
+        target.searchParams.set('error_description', callbackError.description);
+    }
+
+    return target.toString();
 }
 
 export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth): void {
@@ -153,10 +182,16 @@ export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth
     });
 
     app.get('/api/integrations/google-workspace/callback', async (req: Request, res: Response) => {
+        const callbackError = getCallbackError(req);
+        if (callbackError) {
+            res.redirect(302, buildFrontendOAuthErrorRedirect('google-workspace', req, '/onboarding'));
+            return;
+        }
+
         const code = typeof req.query.code === 'string' ? req.query.code : '';
         const state = typeof req.query.state === 'string' ? req.query.state : '';
         if (!code || !state) {
-            res.status(400).json({ message: 'Missing Google OAuth callback parameters.' });
+            res.redirect(302, buildFrontendOAuthErrorRedirect('google-workspace', req, '/onboarding'));
             return;
         }
 
@@ -213,10 +248,16 @@ export function registerIntegrationRoutes(app: Express, requireAuth: RequireAuth
             return;
         }
 
+        const callbackError = getCallbackError(req);
+        if (callbackError) {
+            res.redirect(302, buildFrontendOAuthErrorRedirect(integrationId, req));
+            return;
+        }
+
         const code = typeof req.query.code === 'string' ? req.query.code : '';
         const state = typeof req.query.state === 'string' ? req.query.state : '';
         if (!code || !state) {
-            res.status(400).json({ message: 'Missing OAuth callback parameters.' });
+            res.redirect(302, buildFrontendOAuthErrorRedirect(integrationId, req));
             return;
         }
 

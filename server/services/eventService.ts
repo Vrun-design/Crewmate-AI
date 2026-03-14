@@ -22,6 +22,7 @@ type LiveTaskUpdateEvent = {
   sessionId: string;
   taskId: string;
   taskRunId: string;
+  agentId?: string;
   title: string;
   status: 'running' | 'completed' | 'failed';
   summary?: string | null;

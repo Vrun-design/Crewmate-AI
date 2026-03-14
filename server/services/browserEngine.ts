@@ -43,6 +43,16 @@ export interface FillFormOptions {
     submitSelector?: string;          // CSS selector for submit button
 }
 
+export interface UiPlannerStepScreenshotHandler {
+  (base64: string, mimeType: string, currentUrl: string, stepIndex: number): void;
+}
+
+export interface NavigateWithUiPlannerOptions {
+  startUrl?: string;
+  maxSteps?: number;
+  onStepScreenshot?: UiPlannerStepScreenshotHandler;
+}
+
 export async function fillForm(options: FillFormOptions): Promise<{ success: boolean; resultUrl: string; message: string }> {
     return withBrowserPage(async (page) => {
         await page.goto(options.url, { waitUntil: 'domcontentloaded' });
@@ -163,7 +173,7 @@ export async function inspectVisibleUi(url: string): Promise<UiObservation> {
 
 export async function navigateWithUiPlanner(
     intent: string,
-    options: { startUrl?: string; maxSteps?: number } = {},
+    options: NavigateWithUiPlannerOptions = {},
 ): Promise<UiNavigatorRunResult> {
     const executor = createUiNavigatorExecutor();
     return executor.execute(intent, options);

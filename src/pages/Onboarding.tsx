@@ -30,6 +30,7 @@ export function Onboarding(): React.JSX.Element {
 
   const isConnected = googleWorkspace?.status === 'connected';
   const wasJustConnected = new URLSearchParams(location.search).get('connected') === 'true';
+  const oauthError = new URLSearchParams(location.search).get('error_description');
 
   useEffect(() => {
     if (isConnected) {
@@ -85,6 +86,12 @@ export function Onboarding(): React.JSX.Element {
       {connectError ? (
         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
           {connectError}
+        </div>
+      ) : null}
+
+      {oauthError ? (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-muted-foreground">
+          Google Workspace connection was not completed: {oauthError}
         </div>
       ) : null}
 

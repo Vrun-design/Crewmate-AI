@@ -13,6 +13,7 @@ import { parseStringMapArgument } from '../framework';
 import {
     clickElement,
     openUrl,
+    type NavigateWithUiPlannerOptions,
     extractContent,
     extractTextFromPage,
     fillForm,
@@ -25,6 +26,7 @@ import {
     typeIntoElement,
 } from '../../services/browserEngine';
 import { isFeatureEnabled } from '../../services/featureFlagService';
+import { createUiNavigatorStepScreenshotHandler } from '../../services/uiNavigator/uiNavigatorArtifactBridge';
 
 function ensureUiNavigatorEnabled() {
     if (!isFeatureEnabled('uiNavigator')) {
@@ -417,10 +419,15 @@ export const browserUiNavigateSkill: Skill = {
         },
         required: ['intent'],
     },
-    async handler(_ctx, args) {
+    async handler(ctx, args) {
         ensureUiNavigatorEnabled();
         const { intent, startUrl, maxSteps } = args as { intent: string; startUrl?: string; maxSteps?: number };
-        const result = await navigateWithUiPlanner(intent, { startUrl, maxSteps });
+        const options: NavigateWithUiPlannerOptions = {
+          startUrl,
+          maxSteps,
+          onStepScreenshot: createUiNavigatorStepScreenshotHandler(ctx),
+        };
+        const result = await navigateWithUiPlanner(intent, options);
         return {
             success: result.status === 'completed',
             output: result,
