@@ -13,6 +13,7 @@ import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import express from 'express';
 
 export const DATA_AGENT_MANIFEST = {
@@ -59,8 +60,8 @@ export async function runDataAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { type?: 'sql' | 'analysis' | 'report' | 'metrics' | 'story' | 'dashboard' | 'ab_test' | 'funnel'; data?: string; schema?: string } = {},
-): Promise<{ output: string; queries?: string[] }> {
+    options: { type?: 'sql' | 'analysis' | 'report' | 'metrics' | 'story' | 'dashboard' | 'ab_test' | 'funnel'; data?: string; schema?: string; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ output: string; queries?: string[]; workspaceUrl?: string }> {
     const ai = createGeminiClient();
     const { type = 'analysis', data, schema } = options;
 
@@ -514,8 +515,11 @@ Write a COMPLETE, PRODUCTION-READY output. For SQL: write actual runnable querie
         }
     }
 
-    emitStep('done', `Data ${type} complete${queries.length > 0 ? ` — ${queries.length} queries ready` : ''}`, { success: true });
-    return { output, queries };
+    // Optional: save to Google Workspace (Sheets, Slides, or Docs)
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(output, intent, options.outputTarget, ctx, emitStep);
+
+    emitStep('done', `Data ${type} complete${queries.length > 0 ? ` — ${queries.length} queries ready` : ''}${workspaceUrl ? ' — Google Workspace file created' : ''}`, { success: true });
+    return { output, queries, workspaceUrl };
 }
 
 export const dataAgentApp = express();

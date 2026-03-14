@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Clock3 } from 'lucide-react';
 import { ActiveDelegatedTasksCard } from '../components/dashboard/ActiveDelegatedTasksCard';
 import { IntegrationsCard } from '../components/dashboard/IntegrationsCard';
@@ -7,6 +8,7 @@ import { RecentActivityCard } from '../components/dashboard/RecentActivityCard';
 import { RecentTasksCard } from '../components/dashboard/RecentTasksCard';
 import { Button } from '../components/ui/Button';
 import { Drawer } from '../components/ui/Drawer';
+import { LiveTaskCueBadge } from '../components/ui/LiveTaskCueBadge';
 import { LiveSessionOverlay } from '../components/ui/LiveSessionOverlay';
 import { PageHeader } from '../components/ui/PageHeader';
 import { useDashboard } from '../hooks/useDashboard';
@@ -38,6 +40,7 @@ export function Dashboard() {
     stopMicrophone,
     isOverlayOpen,
     setIsOverlayOpen,
+    liveTaskCue,
   } = useLiveSessionContext();
 
   useEffect(() => {
@@ -91,6 +94,20 @@ export function Dashboard() {
         </div>
       )}
 
+      <AnimatePresence>
+        {liveTaskCue && (
+          <motion.div
+            key={liveTaskCue.status}
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+          >
+            <LiveTaskCueBadge cue={liveTaskCue} className="w-full rounded-2xl px-4 py-2.5" variant="dashboard" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="min-h-0 flex-1">
         <LiveSessionCard
           session={session}
@@ -140,6 +157,7 @@ export function Dashboard() {
         microphoneStatus={microphoneStatus}
         isMicrophoneSupported={isMicrophoneSupported}
         onToggleMicrophone={toggleMicrophone}
+        liveTaskCue={liveTaskCue}
       />
     </div>
   );

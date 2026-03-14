@@ -39,4 +39,5 @@ export interface RuntimeSession {
   lastUserActivityTime: number;
   lastProactiveTime: number | null;
   proactiveInterval: NodeJS.Timeout | null;
+  pendingAnnouncements: string[];
 }

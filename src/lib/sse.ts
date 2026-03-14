@@ -3,6 +3,7 @@ import { buildApiUrl, getAuthToken } from './api';
 interface SseHandlers {
   onEvent?: (event: string, dataRaw: string) => void;
   onError?: (error: unknown) => void;
+  onClose?: () => void;
 }
 
 export function connectAuthenticatedSseStream(
@@ -34,6 +35,7 @@ export function connectAuthenticatedSseStream(
       while (true) {
         const { value, done } = await reader.read();
         if (done) {
+          handlers.onClose?.();
           break;
         }
 

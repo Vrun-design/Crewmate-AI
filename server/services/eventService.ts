@@ -23,7 +23,7 @@ type LiveTaskUpdateEvent = {
   taskId: string;
   taskRunId: string;
   title: string;
-  status: 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed';
   summary?: string | null;
 };
 

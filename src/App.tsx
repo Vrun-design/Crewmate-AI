@@ -3,11 +3,14 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { MainLayout } from './components/layout/MainLayout';
 import { AppErrorBoundary } from './components/shared/AppErrorBoundary';
 import { RouteLoader } from './components/shared/RouteLoader';
+import { TaskToastListener } from './components/tasks/TaskToastListener';
 import { LiveSessionProvider } from './contexts/LiveSessionContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 function AuthenticatedShell() {
   return (
     <LiveSessionProvider>
+      <TaskToastListener />
       <MainLayout />
     </LiveSessionProvider>
   );
@@ -71,27 +74,29 @@ export default function App() {
 
   return (
     <AppErrorBoundary>
-      <BrowserRouter>
-        <Suspense fallback={<RouteLoader />}>
-          <Routes>
-            <Route path="/login" element={<loginRoute.Component />} />
-            <Route path="/verify" element={<verifyRoute.Component />} />
-            <Route element={<AuthenticatedShell />}>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<dashboardRoute.Component />} />
-              <Route path="/memory" element={<memoryBaseRoute.Component />} />
-              <Route path="/sessions" element={<sessionsRoute.Component />} />
-              <Route path="/tasks" element={<tasksRoute.Component />} />
-              <Route path="/integrations" element={<integrationsRoute.Component />} />
-              <Route path="/account" element={<accountRoute.Component />} />
-              <Route path="/notifications" element={<notificationsRoute.Component />} />
-              <Route path="/skills" element={<skillsRoute.Component />} />
-              <Route path="/agents" element={<agentsRoute.Component />} />
-              <Route path="/onboarding" element={<onboardingRoute.Component />} />
-            </Route>
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <Suspense fallback={<RouteLoader />}>
+            <Routes>
+              <Route path="/login" element={<loginRoute.Component />} />
+              <Route path="/verify" element={<verifyRoute.Component />} />
+              <Route element={<AuthenticatedShell />}>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<dashboardRoute.Component />} />
+                <Route path="/memory" element={<memoryBaseRoute.Component />} />
+                <Route path="/sessions" element={<sessionsRoute.Component />} />
+                <Route path="/tasks" element={<tasksRoute.Component />} />
+                <Route path="/integrations" element={<integrationsRoute.Component />} />
+                <Route path="/account" element={<accountRoute.Component />} />
+                <Route path="/notifications" element={<notificationsRoute.Component />} />
+                <Route path="/skills" element={<skillsRoute.Component />} />
+                <Route path="/agents" element={<agentsRoute.Component />} />
+                <Route path="/onboarding" element={<onboardingRoute.Component />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </ToastProvider>
     </AppErrorBoundary>
   );
 }

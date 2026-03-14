@@ -49,6 +49,39 @@ function parseSlides(value: unknown): Array<{ title: string; body?: string }> {
   });
 }
 
+type GoogleWorkspaceFileKind = 'document' | 'presentation' | 'spreadsheet';
+
+function getGoogleWorkspaceFileUrl(
+  result: { id?: unknown; url?: unknown },
+  kind: GoogleWorkspaceFileKind,
+): string | undefined {
+  if (typeof result.url === 'string') {
+    return result.url;
+  }
+
+  if (typeof result.id !== 'string') {
+    return undefined;
+  }
+
+  if (kind === 'document') {
+    return `https://docs.google.com/document/d/${result.id}/edit`;
+  }
+
+  if (kind === 'spreadsheet') {
+    return `https://docs.google.com/spreadsheets/d/${result.id}/edit`;
+  }
+
+  return `https://docs.google.com/presentation/d/${result.id}/edit`;
+}
+
+function buildEmptyCreateNote(itemCount: number, itemLabel: string, followUpSkillId: string): string {
+  if (itemCount > 0) {
+    return '';
+  }
+
+  return ` Note: no ${itemLabel} data was provided - the file was created empty. Use ${followUpSkillId} to populate it.`;
+}
+
 const googleBaseFields = {
   approved: { type: 'boolean' as const, description: 'Set to true only after the user explicitly confirms this side effect.' },
 };
@@ -194,16 +227,17 @@ export const googleDocsCreateDocumentSkill: Skill = {
     required: ['title'],
   },
   handler: async (ctx, args) => {
+    const title = String(args.title ?? '');
     const result = await createGoogleDocument(ctx.workspaceId, {
-      title: String(args.title ?? ''),
+      title,
       content: typeof args.content === 'string' ? args.content : undefined,
       folderId: typeof args.folderId === 'string' ? args.folderId : undefined,
     });
-    const docUrl = typeof result.url === 'string' ? result.url : (typeof result.id === 'string' ? `https://docs.google.com/document/d/${result.id}/edit` : undefined);
+    const docUrl = getGoogleWorkspaceFileUrl(result, 'document');
     return {
       success: true,
       output: result,
-      message: `✅ Google Doc "${String(args.title ?? '')}" created successfully!${docUrl ? ` Open it here: ${docUrl}` : ''}`,
+      message: `✅ Google Doc "${title}" created successfully!${docUrl ? ` Open it here: ${docUrl}` : ''}`,
     };
   },
 };
@@ -298,16 +332,19 @@ export const googleSheetsCreateSpreadsheetSkill: Skill = {
     required: ['title'],
   },
   handler: async (ctx, args) => {
+    const rows = parseRows(args.rows);
+    const title = String(args.title ?? '');
+    const emptyNote = buildEmptyCreateNote(rows.length, 'row', 'google.sheets-append-rows');
     const result = await createGoogleSpreadsheet(ctx.workspaceId, {
-      title: String(args.title ?? ''),
-      rows: parseRows(args.rows),
+      title,
+      rows,
       folderId: typeof args.folderId === 'string' ? args.folderId : undefined,
     });
-    const sheetUrl = typeof result.url === 'string' ? result.url : (typeof result.id === 'string' ? `https://docs.google.com/spreadsheets/d/${result.id}/edit` : undefined);
+    const sheetUrl = getGoogleWorkspaceFileUrl(result, 'spreadsheet');
     return {
       success: true,
       output: result,
-      message: `✅ Google Sheet "${String(args.title ?? '')}" created!${sheetUrl ? ` Open it here: ${sheetUrl}` : ''}`,
+      message: `✅ Google Sheet "${title}" created!${sheetUrl ? ` Open it here: ${sheetUrl}` : ''}${emptyNote}`,
     };
   },
 };
@@ -416,16 +453,19 @@ export const googleSlidesCreatePresentationSkill: Skill = {
     required: ['title'],
   },
   handler: async (ctx, args) => {
+    const slides = parseSlides(args.slides);
+    const title = String(args.title ?? '');
+    const emptyNote = buildEmptyCreateNote(slides.length, 'slide', 'google.slides-add-slides');
     const result = await createGooglePresentation(ctx.workspaceId, {
-      title: String(args.title ?? ''),
-      slides: parseSlides(args.slides),
+      title,
+      slides,
       folderId: typeof args.folderId === 'string' ? args.folderId : undefined,
     });
-    const slideUrl = typeof result.url === 'string' ? result.url : (typeof result.id === 'string' ? `https://docs.google.com/presentation/d/${result.id}/edit` : undefined);
+    const slideUrl = getGoogleWorkspaceFileUrl(result, 'presentation');
     return {
       success: true,
       output: result,
-      message: `✅ Google Slides presentation "${String(args.title ?? '')}" created with ${parseSlides(args.slides).length || 0} slides!${slideUrl ? ` Open it here: ${slideUrl}` : ''}`,
+      message: `✅ Google Slides presentation "${title}" created with ${slides.length} slide(s)!${slideUrl ? ` Open it here: ${slideUrl}` : ''}${emptyNote}`,
     };
   },
 };

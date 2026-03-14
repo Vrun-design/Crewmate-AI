@@ -53,6 +53,7 @@ export interface RoutingDecision {
   | 'sales' | 'marketing' | 'product' | 'hr' | 'support' | 'social'
   | 'finance' | 'legal' | 'data' | 'ui_navigator' | 'skill';
   skillId?: string;
+  skillArgs?: Record<string, unknown> | null;
   confidence: number;
   reasoning: string;
 }
@@ -419,8 +420,13 @@ export async function routeIntent(intent: string, userId: string): Promise<Routi
     model: serverConfig.geminiOrchestrationModel,
     contents: `You are an intent router for a 14-agent AI workforce. Route the user's intent to the most appropriate agent or direct skill.
 
+CRITICAL ROUTING RULES:
+1. A direct skill route is ONLY appropriate for ATOMIC tasks where all required data is already present in the intent (e.g. "Create a folder called Marketing", "List my calendar events").
+2. If the task requires research, analysis, or data gathering BEFORE a creation step, ALWAYS route to an AGENT — never a direct skill. The agent will gather the data and call the creation skill itself.
+3. If the intent combines any of (research/analyse/analyze/find/compare/look up) WITH any of (create/sheet/spreadsheet/slides/presentation/deck/doc/document), it is a COMPOUND intent — route to an agent, never a direct skill.
+
 Agents:
-- research: Deep research, market analysis, technical deep-dives, competitive intelligence
+- research: Deep research, market analysis, technical deep-dives, competitive intelligence. Also handles: research + create sheet/slides/doc compound requests.
 - content: Blog posts, articles, documentation, any long-form writing
 - devops: Code review, terminal commands, CI/CD, technical architecture
 - communications: Message drafting, Slack messages, outreach sequences, follow-ups
@@ -430,18 +436,20 @@ Agents:
 - hr: Job descriptions, interviews, offer letters, onboarding, people ops
 - support: Customer responses, ticket triage, FAQ, escalations, playbooks
 - social: Tweet threads, LinkedIn posts, Instagram, social calendars
-- finance: Invoices, expense reports, budgets, financial templates
+- finance: Invoices, expense reports, budgets, financial templates, stock/market analysis. Also handles: finance + create sheet/slides compound requests.
 - legal: Contract analysis, NDA review, compliance, policy drafts
-- data: SQL queries, data analysis, metrics, KPI reports, data stories
+- data: SQL queries, data analysis, metrics, KPI reports, data stories. Also handles: data + create sheet/slides compound requests.
 - ui_navigator: Visual browser interaction, clicking, typing, scrolling, and navigating website UIs
 
-Direct skills (for simple single atomic tasks):
+Direct skills (only for simple single atomic tasks where no prior research or generation is needed):
 ${skills}
 
 User intent: "${intent}"
 
 Respond ONLY with valid JSON (no markdown, no explanation):
-{"agent":"<agent_name or 'skill'>","skillId":"<skill id if skill route, else null>","confidence":0.9,"reasoning":"<1 sentence>"}`,
+{"agent":"<agent_name or 'skill'>","skillId":"<skill id if skill route, else null>","skillArgs":<for skill routes: object with args extracted from intent such as {"title":"..."} — for agent routes: null>,"confidence":0.9,"reasoning":"<1 sentence>"}
+
+For skillArgs: extract the most obvious args from the intent. For google.sheets-create-spreadsheet extract {"title":"<title>"}. For google.docs-create-document extract {"title":"<title>"}. For google.calendar-create-event extract date/time/title details. For other skills use {}.`,
   });
 
   try {

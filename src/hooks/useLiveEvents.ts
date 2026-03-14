@@ -1,18 +1,16 @@
 import { useEffect, useRef } from 'react';
 import type { Notification } from '../types';
-import { connectAuthenticatedSseStream } from '../lib/sse';
+import { subscribeToLiveEvents } from '../lib/liveEventsStream';
+import type { LiveTaskCue } from '../types/liveTaskCue';
 
 interface SessionUpdateEvent {
     sessionId: string;
 }
 
-interface LiveTaskUpdateEvent {
+interface LiveTaskUpdateEvent extends LiveTaskCue {
     sessionId: string;
     taskId: string;
     taskRunId: string;
-    title: string;
-    status: 'completed' | 'failed';
-    summary?: string | null;
 }
 
 interface JobUpdateEvent {
@@ -56,7 +54,7 @@ export function useLiveEvents(callbacks: UseLiveEventsCallbacks): void {
             return;
         }
 
-        const controller = connectAuthenticatedSseStream('/api/events', {
+        return subscribeToLiveEvents({
             onEvent: (event, dataRaw) => {
                 if (dataRaw === '"connected"' || !isLiveEvent(event)) {
                     return;
@@ -83,12 +81,9 @@ export function useLiveEvents(callbacks: UseLiveEventsCallbacks): void {
                     callbacksRef.current.onError?.('Live updates hit an unreadable event. Try refreshing this page if updates look stale.');
                 }
             },
-            onError: (error) => {
-                console.error('SSE Connection Error:', error);
-                callbacksRef.current.onError?.('Live updates disconnected. Refresh or reopen the page to reconnect.');
+            onError: (message) => {
+                callbacksRef.current.onError?.(message);
             },
         });
-
-        return () => controller?.abort();
     }, [callbacks.enabled]);
 }

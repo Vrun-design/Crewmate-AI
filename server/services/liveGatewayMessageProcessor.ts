@@ -2,6 +2,7 @@ import type { LiveServerMessage } from '@google/genai';
 import { updateTranscriptMessage } from '../repositories/sessionRepository';
 import { getAssistantTranscriptText, mergeStreamingText } from './liveGatewayTranscript';
 import { clearPendingTurn, resolvePendingTurn } from './liveGatewayPendingTurn';
+import { flushPendingAnnouncements } from './liveGatewayAnnouncements';
 import {
   collectAudioChunks,
   handleInputTranscription,
@@ -48,5 +49,6 @@ export function handleServerMessage(runtime: RuntimeSession, message: LiveServer
     maybePersistTurnMemory(runtime);
     resetAssistantTurn(runtime);
     resolvePendingTurn(runtime);
+    flushPendingAnnouncements(runtime);
   }
 }

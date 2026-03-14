@@ -3,6 +3,15 @@ import type { ModelPreference } from '../skills/types';
 
 type TaskType = 'live' | 'research' | 'creative' | 'general' | 'orchestration';
 type Complexity = 'low' | 'high';
+const HIGH_COMPLEXITY_KEYWORDS = [
+    'compare', 'analyze', 'analyse', 'strategy', 'deep dive', 'comprehensive',
+    'tradeoffs', 'architecture', 'design',
+    // Finance and market research
+    'stocks', 'portfolio', 'market', 'nse', 'nifty', 'bse', 'equity', 'fund',
+    'investment', 'financial', 'revenue', 'budget', 'forecast', 'valuation',
+    // Research triggers
+    'research', 'intelligence', 'landscape', 'competitors', 'report', 'analysis',
+];
 
 export function selectModel(taskType: TaskType, complexity: Complexity = 'low', textLength = 0): string {
     // Live sessions need the real-time audio model
@@ -48,10 +57,9 @@ export function selectModelForSkill(preferredModel?: ModelPreference): string {
 }
 
 export function determineComplexity(prompt: string): Complexity {
-    const deepKeywords = ['compare', 'analyze', 'strategy', 'deep dive', 'comprehensive', 'tradeoffs', 'architecture', 'design'];
     const lowerPrompt = prompt.toLowerCase();
 
-    if (deepKeywords.some(kw => lowerPrompt.includes(kw))) {
+    if (HIGH_COMPLEXITY_KEYWORDS.some((keyword) => lowerPrompt.includes(keyword))) {
         return 'high';
     }
 

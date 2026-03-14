@@ -11,6 +11,28 @@ import { connectGeminiSession } from './liveGatewayLifecycle';
 import type { AudioChunkRecord, SessionRecord } from '../types';
 import type { RuntimeSession } from './liveGatewayTypes';
 
+function getLiveSessionSnapshot(sessionId: string, runtime: RuntimeSession): SessionRecord {
+  return getLiveSessionState(sessionId) ?? getSession(sessionId) ?? {
+    id: sessionId,
+    status: 'live',
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    transcript: [],
+    provider: 'gemini-live',
+    audioChunks: [],
+    playbackRevision: runtime.playbackRevision,
+  };
+}
+
+function interruptPendingTurn(runtime: RuntimeSession): void {
+  runtime.pendingTurn?.reject(new Error('Interrupted by a newer user request.'));
+  clearPendingTurn(runtime);
+  runtime.playbackRevision += 1;
+  runtime.audioChunks = [];
+  runtime.nextAudioChunkId = 1;
+  runtime.lastAudioChunkSignature = null;
+}
+
 export async function createRuntimeSession(sessionId: string, userId: string): Promise<RuntimeSession> {
   const preferences = getUserPreferences(userId);
   const systemInstruction = await buildUserSystemInstruction(userId, { liveFast: true });
@@ -42,6 +64,7 @@ export async function createRuntimeSession(sessionId: string, userId: string): P
     lastUserActivityTime: Date.now(),
     lastProactiveTime: null,
     proactiveInterval: null,
+    pendingAnnouncements: [],
   };
 
   runtime.proactiveInterval = setInterval(() => {
@@ -75,19 +98,14 @@ export async function createRuntimeSession(sessionId: string, userId: string): P
   return runtime;
 }
 
-export function sendLiveMessage(sessionId: string, text: string): Promise<SessionRecord> {
+export function sendLiveMessage(sessionId: string, text: string): SessionRecord {
   const runtime = getRuntimeSession(sessionId);
   if (!runtime) {
     throw new Error('Live runtime not found. Start a Gemini session first.');
   }
 
   if (runtime.pendingTurn) {
-    runtime.pendingTurn.reject(new Error('Interrupted by a newer user request.'));
-    clearPendingTurn(runtime);
-    runtime.playbackRevision += 1;
-    runtime.audioChunks = [];
-    runtime.nextAudioChunkId = 1;
-    runtime.lastAudioChunkSignature = null;
+    interruptPendingTurn(runtime);
   }
 
   runtime.lastUserTurnText = text;
@@ -106,12 +124,22 @@ export function sendLiveMessage(sessionId: string, text: string): Promise<Sessio
   }
 
   const responsePromise = createPendingTurn(runtime, 45000, 'Gemini Live response timed out.');
-  runtime.session.sendClientContent({
-    turns: createUserContent(text),
-    turnComplete: true,
+  void responsePromise.catch(() => {
+    // Live turns stream back over SSE/audio; the request itself should not stay blocked on failures.
   });
 
-  return responsePromise;
+  try {
+    runtime.session.sendClientContent({
+      turns: createUserContent(text),
+      turnComplete: true,
+    });
+  } catch (error) {
+    runtime.pendingTurn?.reject(error instanceof Error ? error : new Error(String(error)));
+    clearPendingTurn(runtime);
+    throw error;
+  }
+
+  return getLiveSessionSnapshot(sessionId, runtime);
 }
 
 export function sendLiveVideoFrame(sessionId: string, input: { mimeType: string; data: string }): void {

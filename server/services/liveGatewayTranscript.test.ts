@@ -29,6 +29,7 @@ function createRuntimeSession(overrides: Partial<RuntimeSession> = {}): RuntimeS
     lastUserActivityTime: 0,
     lastProactiveTime: null,
     proactiveInterval: null,
+    pendingAnnouncements: [],
     ...overrides,
   };
 }

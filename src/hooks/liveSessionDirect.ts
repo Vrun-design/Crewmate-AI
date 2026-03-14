@@ -22,6 +22,7 @@ interface HandleDirectMessageOptions {
   queueAudioChunk: (chunk: { id: number; data: string; mimeType: string }) => void;
   setError: (message: string) => void;
   incrementPlaybackRevision: () => void;
+  onTurnComplete?: () => void;
 }
 
 function mapFunctionCalls(functionCalls: DirectMessageRecord[]): LiveToolCall[] {
@@ -46,6 +47,7 @@ export async function handleDirectLiveMessage({
   queueAudioChunk,
   setError,
   incrementPlaybackRevision,
+  onTurnComplete,
 }: HandleDirectMessageOptions): Promise<void> {
   const inputTranscription = message.serverContent?.inputTranscription?.text;
   if (typeof inputTranscription === 'string' && inputTranscription.trim()) {
@@ -115,5 +117,6 @@ export async function handleDirectLiveMessage({
     directAssistantTextRef.current = '';
     directUserTextRef.current = '';
     directAudioChunkIdRef.current = 0;
+    onTurnComplete?.();
   }
 }

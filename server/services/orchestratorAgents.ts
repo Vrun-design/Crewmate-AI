@@ -22,6 +22,7 @@ import { runSalesAgent, SALES_AGENT_MANIFEST } from './agents/salesAgent';
 import { runSocialAgent, SOCIAL_AGENT_MANIFEST } from './agents/socialAgent';
 import { runSupportAgent, SUPPORT_AGENT_MANIFEST } from './agents/supportAgent';
 import { runUiNavigatorAgent, UI_NAVIGATOR_AGENT_MANIFEST } from './agents/uiNavigatorAgent';
+import type { WorkspaceOutputTarget } from './agents/agentWorkspaceOutput';
 import type { SkillRunContext } from '../skills/types';
 import type { EmitStep } from '../types/agentEvents';
 import type { RoutingDecision } from './orchestratorShared';
@@ -48,6 +49,33 @@ export const AGENT_MANIFESTS = [
 function hasAny(intent: string, ...keywords: string[]): boolean {
   const lower = intent.toLowerCase();
   return keywords.some((kw) => lower.includes(kw));
+}
+
+function getWorkspaceSaveOptions(intent: string): {
+  outputTarget?: WorkspaceOutputTarget;
+  saveToNotion: boolean;
+} {
+  return {
+    outputTarget: detectWorkspaceOutputTarget(intent),
+    saveToNotion: shouldSave(),
+  };
+}
+
+/**
+ * Detect if the intent requests output into a specific Google Workspace format.
+ * Used to wire compound intents (research + create sheet/slides/doc) through agents.
+ */
+function detectWorkspaceOutputTarget(intent: string): WorkspaceOutputTarget | undefined {
+  if (hasAny(intent, 'google sheet', 'spreadsheet', ' sheet', 'csv', 'excel')) {
+    return 'google.sheets-create-spreadsheet';
+  }
+  if (hasAny(intent, 'slides', 'presentation', 'deck', 'pitch deck', 'powerpoint')) {
+    return 'google.slides-create-presentation';
+  }
+  if (hasAny(intent, 'google doc', 'create a doc', 'write a doc', 'into a doc')) {
+    return 'google.docs-create-document';
+  }
+  return undefined;
 }
 
 /**
@@ -175,7 +203,7 @@ function runFinance(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
 
   return runFinanceAgent(intent, ctx, emitStep, {
     type,
-    saveToNotion: shouldSave(),
+    ...getWorkspaceSaveOptions(intent),
   });
 }
 
@@ -223,6 +251,7 @@ function runData(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
 
   return runDataAgent(intent, ctx, emitStep, {
     type,
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -248,7 +277,9 @@ export async function runAgentForRoutingDecision(
 ): Promise<unknown> {
   switch (routing.agent) {
     case 'research':
-      return runResearchAgent(intent, ctx, emitStep);
+      return runResearchAgent(intent, ctx, emitStep, {
+        ...getWorkspaceSaveOptions(intent),
+      });
     case 'content':
       return runContent(intent, ctx, emitStep);
     case 'devops':
@@ -276,6 +307,8 @@ export async function runAgentForRoutingDecision(
     case 'ui_navigator':
       return runUiNavigatorAgent(intent, ctx, emitStep);
     default:
-      return runResearchAgent(intent, ctx, emitStep);
+      return runResearchAgent(intent, ctx, emitStep, {
+        ...getWorkspaceSaveOptions(intent),
+      });
   }
 }

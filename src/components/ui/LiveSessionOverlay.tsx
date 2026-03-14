@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, ScreenShare, ScreenShareOff, Square, Minimize2, AlignLeft, User, BrainCircuit } from 'lucide-react';
 import { Drawer } from './Drawer';
+import { LiveTaskCueBadge } from './LiveTaskCueBadge';
 import type { MicrophoneStatus, ScreenShareStatus, TranscriptMessage } from '../../types/live';
+import type { LiveTaskCue } from '../../types/liveTaskCue';
 import { getDisplayNameFromEmail } from '../../utils/userName';
 
 interface LiveSessionOverlayProps {
@@ -22,6 +24,7 @@ interface LiveSessionOverlayProps {
   microphoneStatus?: MicrophoneStatus;
   isMicrophoneSupported?: boolean;
   onToggleMicrophone?: () => Promise<void> | void;
+  liveTaskCue?: LiveTaskCue | null;
 }
 
 function getComposerPlaceholder(provider: 'local' | 'gemini-live'): string {
@@ -92,6 +95,7 @@ export function LiveSessionOverlay({
   microphoneStatus = 'idle',
   isMicrophoneSupported = false,
   onToggleMicrophone,
+  liveTaskCue,
 }: LiveSessionOverlayProps) {
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -149,6 +153,7 @@ export function LiveSessionOverlay({
   const composerPlaceholder = getComposerPlaceholder(provider);
   const isMuted = microphoneStatus === 'muted' || microphoneStatus === 'idle';
   const isScreenSharing = screenShareStatus === 'sharing';
+  const lastAgentMessage = [...transcript].reverse().find((m) => m.role === 'agent')?.text ?? null;
 
   return createPortal(
     <AnimatePresence>
@@ -190,7 +195,7 @@ export function LiveSessionOverlay({
                 </div>
               </div>
             ) : (
-              <div className="relative flex items-center justify-center w-full h-full">
+              <div className="relative flex flex-col items-center justify-center w-full h-full gap-6">
                 {/* Outer Glow */}
                 {!isMuted && (
                   <motion.div
@@ -211,9 +216,40 @@ export function LiveSessionOverlay({
                     ))}
                   </div>
                 </div>
+
+                {/* Last agent message */}
+                <AnimatePresence mode="wait">
+                  {lastAgentMessage && (
+                    <motion.p
+                      key={lastAgentMessage.slice(0, 40)}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.3 }}
+                      className="relative z-10 max-w-md text-center text-sm text-muted-foreground px-4"
+                    >
+                      {lastAgentMessage.length > 160 ? `${lastAgentMessage.slice(0, 160)}…` : lastAgentMessage}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </div>
+
+          {/* Task Cue Banner */}
+          <AnimatePresence>
+            {liveTaskCue && (
+              <motion.div
+                key={liveTaskCue.status + liveTaskCue.title.slice(0, 20)}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <LiveTaskCueBadge cue={liveTaskCue} className="shrink-0 mb-3 max-w-full" titleMaxLength={60} />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Bottom Dock (Controls & Input) */}
           <div className="shrink-0 w-full max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-4">

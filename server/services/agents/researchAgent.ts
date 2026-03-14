@@ -20,6 +20,7 @@ import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import { selectModel, determineComplexity } from '../modelRouter';
 import { isFeatureEnabled } from '../featureFlagService';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import express from 'express';
 
 export const RESEARCH_AGENT_MANIFEST = {
@@ -179,8 +180,8 @@ export async function runResearchAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { outputType?: 'brief' | 'deep' | 'bullets' | 'report'; saveToNotion?: boolean } = {},
-): Promise<{ plan: string; findings: string; brief: string; sources: ResearchSource[]; grounded: boolean }> {
+    options: { outputType?: 'brief' | 'deep' | 'bullets' | 'report'; saveToNotion?: boolean; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ plan: string; findings: string; brief: string; sources: ResearchSource[]; grounded: boolean; workspaceUrl?: string }> {
     const ai = createGeminiClient();
     const { outputType = 'brief', saveToNotion = false } = options;
     const complexity = determineComplexity(intent);
@@ -446,6 +447,9 @@ ${totalSources > 0 ? `Sources:\n${formatSources(allSources.slice(0, 10))}` : 'No
         }
     }
 
+    // Optional: save to Google Workspace (Sheets, Slides, or Docs)
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(brief, intent, options.outputTarget, ctx, emitStep);
+
     const wordCount = brief.split(/\s+/).length;
     emitStep('done', `Research complete — ${wordCount} word ${outputType} | ${totalSources} sources | ${searchQueries.length} angles`, {
         success: true,
@@ -457,6 +461,7 @@ ${totalSources > 0 ? `Sources:\n${formatSources(allSources.slice(0, 10))}` : 'No
         brief,
         sources: allSources,
         grounded: groundedResearchEnabled && totalSources > 0,
+        workspaceUrl,
     };
 }
 

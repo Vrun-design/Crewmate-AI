@@ -16,8 +16,10 @@ import { broadcastEvent } from './eventService';
 import { parseReplyTarget } from './channelTasking';
 import { serverConfig } from '../config';
 import { logServerError } from './runtimeLogger';
+import { announceLiveTaskUpdate } from './liveGatewayAnnouncements';
 
 const SLACK_WEBHOOK_TIMEOUT_MS = 8_000;
+type LiveTaskUpdateStatus = 'running' | 'completed' | 'failed';
 
 function getWorkspaceIdForUser(userId: string): string | null {
     const row = db.prepare('SELECT workspace_id as workspaceId FROM workspace_members WHERE user_id = ? LIMIT 1').get(userId) as { workspaceId: string } | undefined;
@@ -40,6 +42,28 @@ function buildChannelCompletionMessage(task: AgentTask): string {
         `Open: ${buildPublicTaskUrl(task.taskId ?? task.id)}`,
     ];
     return lines.join('\n');
+}
+
+function getReplyTargetSessionId(task: AgentTask): string {
+    const replyTarget = parseReplyTarget(task.originRef);
+    return replyTarget?.channel === 'live_session' ? replyTarget.sessionId : '';
+}
+
+function broadcastLiveTaskUpdate(
+    userId: string,
+    task: AgentTask,
+    status: LiveTaskUpdateStatus,
+    summary: string | null,
+    sessionId?: string,
+): void {
+    broadcastEvent(userId, 'live_task_update', {
+        sessionId: sessionId ?? getReplyTargetSessionId(task),
+        taskId: task.taskId ?? task.id,
+        taskRunId: task.id,
+        title: task.intent,
+        status,
+        summary,
+    });
 }
 
 // ── In-app notification ───────────────────────────────────────────────────────
@@ -113,6 +137,18 @@ async function sendSlackWebhook(webhookUrl: string, task: AgentTask): Promise<vo
 
 // ── Main dispatcher ───────────────────────────────────────────────────────────
 
+/**
+ * Broadcast a live_task_update with status 'running' immediately when a task starts.
+ * This gives the frontend an immediate "agent is working" signal regardless of origin.
+ */
+export function notifyTaskStarted(userId: string, task: AgentTask): void {
+    try {
+        broadcastLiveTaskUpdate(userId, task, 'running', null);
+    } catch (err) {
+        logServerError('agentNotifier:task-started', err, { userId, taskId: task.taskId ?? task.id });
+    }
+}
+
 export async function notifyTaskComplete(userId: string, task: AgentTask): Promise<void> {
     // 1. Load user notification preferences
     let prefs;
@@ -162,16 +198,18 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
         return;
     }
 
+    // Always broadcast completion via SSE so the Dashboard can show the notification,
+    // regardless of whether the task originated from a live session or the app UI.
+    const payload = buildTaskNotification(task);
+    broadcastLiveTaskUpdate(
+        userId,
+        task,
+        task.status === 'failed' ? 'failed' : 'completed',
+        payload.message,
+        replyTarget?.channel === 'live_session' ? replyTarget.sessionId : undefined,
+    );
     if (replyTarget?.channel === 'live_session') {
-        const payload = buildTaskNotification(task);
-        broadcastEvent(userId, 'live_task_update', {
-            sessionId: replyTarget.sessionId,
-            taskId: task.taskId ?? task.id,
-            taskRunId: task.id,
-            title: task.intent,
-            status: task.status === 'failed' ? 'failed' : 'completed',
-            summary: payload.message,
-        });
+        announceLiveTaskUpdate(replyTarget.sessionId, task, payload.message);
         return;
     }
 
@@ -182,5 +220,4 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
             logServerError('agentNotifier:slack-webhook', err, { userId, taskId: task.taskId ?? task.id });
         }
     }
-
 }

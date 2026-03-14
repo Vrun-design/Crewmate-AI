@@ -1,5 +1,6 @@
 import {dashboardService} from '../services/dashboardService';
 import {useAsyncResource} from './useAsyncResource';
+import {useLiveEvents} from './useLiveEvents';
 import type {DashboardData} from '../types/live';
 
 interface UseDashboardResult {
@@ -14,6 +15,12 @@ export function useDashboard(): UseDashboardResult {
     initialData: null,
     load: dashboardService.getDashboard,
     loadErrorMessage: 'Unable to load dashboard',
+  });
+
+  useLiveEvents({
+    onLiveTaskUpdate: () => {
+      void refresh();
+    },
   });
 
   return {

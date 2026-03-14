@@ -1,4 +1,4 @@
-import { notifyTaskComplete } from './agentNotifier';
+import { notifyTaskComplete, notifyTaskStarted } from './agentNotifier';
 import { runAgentForRoutingDecision, AGENT_MANIFESTS } from './orchestratorAgents';
 import {
   AgentTask,
@@ -105,6 +105,7 @@ async function runDelegatedSkillTask(
 
   const { emitStep, getSteps } = createStepEmitter(task);
   emitRunningStatus(task, task.agentId);
+  notifyTaskStarted(ctx.userId, { ...task, status: 'running' });
   emitStep('routing', `Delegating skill ${skillId}`, { detail: task.intent, skillId });
 
   try {
@@ -206,20 +207,32 @@ export async function orchestrate(
   intent: string,
   ctx: SkillRunContext,
 ): Promise<{ taskId: string; result?: unknown; routeType: RuntimeRouteType }> {
-  const routing = await routeIntent(intent, ctx.userId);
-  const agentId = routing.agent === 'skill' ? 'skill-registry' : `crewmate-${routing.agent}-agent`;
+  const initialRouting = await routeIntent(intent, ctx.userId);
+  const agentId = initialRouting.agent === 'skill' ? 'skill-registry' : `crewmate-${initialRouting.agent}-agent`;
   const task = createTask(agentId, intent, ctx, {
-    routeType: routing.routeType ?? (routing.agent === 'skill' ? 'delegated_skill' : 'delegated_agent'),
+    routeType: initialRouting.routeType ?? (initialRouting.agent === 'skill' ? 'delegated_skill' : 'delegated_agent'),
   });
   const { emitStep, getSteps } = createStepEmitter(task);
 
   async function runOrchestratedTask(): Promise<void> {
+    // Allow confidence threshold override — use let so we can reassign
+    let routing = initialRouting;
+
     updateTask(task.id, { userId: task.userId, status: 'running' });
+    notifyTaskStarted(ctx.userId, { ...task, status: 'running' });
     emitRunningStatus(task, agentId, {
       agent: routing.agent,
       confidence: routing.confidence,
       reasoning: routing.reasoning,
     });
+    // Low-confidence routing falls back to research agent (safest default)
+    if (routing.confidence < 0.55 && routing.agent !== 'research') {
+      emitStep('thinking', `Low confidence routing (${routing.confidence}) — defaulting to research agent`, {
+        detail: routing.reasoning,
+      });
+      routing = { ...routing, agent: 'research', routeType: 'delegated_agent' };
+    }
+
     emitStep('routing', `Routing to ${routing.agent === 'skill' ? `skill: ${routing.skillId}` : `${routing.agent} agent`}`, {
       detail: routing.reasoning,
     });
@@ -239,7 +252,7 @@ export async function orchestrate(
           taskId: getTaskIdentifier(task),
           originType: task.originType,
           originRef: task.originRef,
-        }, {});
+        }, routing.skillArgs ?? {});
         result = runRecord.result;
         emitStep('skill_result', `${routing.skillId} complete`, {
           skillId: routing.skillId,

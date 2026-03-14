@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { api } from '../lib/api';
 import { connectAuthenticatedSseStream } from '../lib/sse';
+import { useToast } from '../contexts/ToastContext';
 import { workspaceService } from '../services/workspaceService';
 import { Tasks } from './Tasks';
 import type { Task } from '../types';
@@ -23,6 +24,10 @@ vi.mock('../lib/sse', () => ({
 
 vi.mock('../hooks/useWorkspaceCollection', () => ({
   useWorkspaceCollection: () => useWorkspaceCollectionMock(),
+}));
+
+vi.mock('../contexts/ToastContext', () => ({
+  useToast: vi.fn(),
 }));
 
 vi.mock('../services/workspaceService', async () => {
@@ -52,10 +57,12 @@ const mockConnectAuthenticatedSseStream = vi.mocked(connectAuthenticatedSseStrea
 const mockWorkspaceCreateTask = vi.mocked(workspaceService.createTask);
 const mockWorkspaceGetTask = vi.mocked(workspaceService.getTask);
 const mockWorkspaceCancelTask = vi.mocked(workspaceService.cancelTask);
+const mockUseToast = vi.mocked(useToast);
+const showToastMock = vi.fn();
 
-function renderTasks(): void {
+function renderTasks(initialEntries: string[] = ['/tasks']): void {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <Tasks />
     </MemoryRouter>,
   );
@@ -70,6 +77,8 @@ describe('Tasks', () => {
     mockWorkspaceCreateTask.mockReset();
     mockWorkspaceGetTask.mockReset();
     mockWorkspaceCancelTask.mockReset();
+    showToastMock.mockReset();
+    mockUseToast.mockReturnValue({ showToast: showToastMock });
     useWorkspaceCollectionMock.mockReset();
     useWorkspaceCollectionMock.mockReturnValue({
       data: [
@@ -248,6 +257,30 @@ describe('Tasks', () => {
         onEvent: expect.any(Function),
       }),
     );
+  });
+
+  test('opens a task from the task query parameter even if it is not in the current list', async () => {
+    mockWorkspaceGetTask.mockResolvedValue({
+      id: 'TSK-REMOTE',
+      title: 'Imported async task',
+      description: 'Created from a toast deep link',
+      status: 'completed',
+      time: 'Today',
+      tool: 'Crewmate',
+      priority: 'Medium',
+      sourceKind: 'delegated',
+      runs: [],
+      latestRun: null,
+      currentRunId: null,
+    });
+
+    renderTasks(['/tasks?task=TSK-REMOTE']);
+
+    await waitFor(() => {
+      expect(mockWorkspaceGetTask).toHaveBeenCalledWith('TSK-REMOTE');
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Imported async task' })).toBeInTheDocument();
   });
 
   test('cancels a running agent task from the drawer', async () => {

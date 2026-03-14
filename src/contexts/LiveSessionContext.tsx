@@ -6,6 +6,7 @@ import { useCurrentSession } from '../hooks/useCurrentSession';
 import { usePreferences } from '../hooks/usePreferences';
 import { useLiveEvents } from '../hooks/useLiveEvents';
 import type { LiveSession, MicrophoneStatus, ScreenShareStatus } from '../types/live';
+import type { LiveTaskCue } from '../types/liveTaskCue';
 import { liveSessionService } from '../services/liveSessionService';
 
 interface LiveSessionContextValue {
@@ -25,7 +26,7 @@ interface LiveSessionContextValue {
   isScreenShareSupported: boolean;
   previewStream: MediaStream | null;
   captureScreenshotArtifact: (options?: { title?: string; caption?: string }) => Promise<{ id: string; publicUrl: string } | null>;
-  liveTaskCue: { title: string; status: 'completed' | 'failed'; summary?: string | null } | null;
+  liveTaskCue: LiveTaskCue | null;
   
   isOverlayOpen: boolean;
   setIsOverlayOpen: (open: boolean) => void;
@@ -48,7 +49,7 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   const { session: currentSession, refresh } = useCurrentSession(true);
   const { preferences } = usePreferences(true);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
-  const [liveTaskCue, setLiveTaskCue] = useState<{ title: string; status: 'completed' | 'failed'; summary?: string | null } | null>(null);
+  const [liveTaskCue, setLiveTaskCue] = useState<LiveTaskCue | null>(null);
   const captureCurrentFrameRef = React.useRef<(() => Promise<{ mimeType: string; data: string } | null>) | null>(null);
 
   const prepareToolCalls = React.useCallback(async (calls: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>) => {
@@ -145,9 +146,12 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   useLiveEvents({
     enabled: true,
     onLiveTaskUpdate: (event) => {
-      if (!session?.id || event.sessionId !== session.id) {
-        return;
-      }
+      // Show cue for:
+      // - Events from the current live session (sessionId matches)
+      // - Events from app/background tasks (empty sessionId — not session-bound)
+      const isCurrentSession = session?.id && event.sessionId === session.id;
+      const isAppTask = !event.sessionId;
+      if (!isCurrentSession && !isAppTask) return;
 
       setLiveTaskCue({
         title: event.title,
@@ -158,7 +162,8 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   });
 
   React.useEffect(() => {
-    if (!liveTaskCue) {
+    // Keep 'running' cues visible indefinitely — they will be replaced by completed/failed
+    if (!liveTaskCue || liveTaskCue.status === 'running') {
       return;
     }
 

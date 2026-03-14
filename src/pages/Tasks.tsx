@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Drawer } from '../components/ui/Drawer';
 import { Card } from '../components/ui/Card';
 import { TaskList } from '../components/tasks/TaskList';
 import { TaskDrawerContent } from '../components/tasks/TaskDrawerContent';
+import { useToast } from '../contexts/ToastContext';
 import { AgentTaskDrawerContent } from '../components/agents/AgentTaskDrawerContent';
 import { EmptyStateCard } from '../components/shared/EmptyStateCard';
 import { useWorkspaceCollection } from '../hooks/useWorkspaceCollection';
@@ -141,6 +142,8 @@ function isTaskNotFoundError(error: unknown): boolean {
 }
 
 export function Tasks(): React.JSX.Element {
+  const { showToast } = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: tasks, isLoading, error } = useWorkspaceCollection(workspaceService.getTasks);
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
@@ -211,20 +214,53 @@ export function Tasks(): React.JSX.Element {
 
   useEffect(() => {
     const requestedTaskId = searchParams.get('task');
-    if (!requestedTaskId || tasks.length === 0) {
+    if (!requestedTaskId || isLoading) {
       return;
     }
 
-    const matchingTask = tasks.find((task) => task.id === requestedTaskId);
-    if (!matchingTask) {
-      return;
-    }
-    void handleOpenTask(matchingTask);
+    let isCancelled = false;
 
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('task');
-    setSearchParams(nextParams, { replace: true });
-  }, [tasks, searchParams, setSearchParams]);
+    async function openRequestedTask(): Promise<void> {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('task');
+
+      const matchingTask = tasks.find((task) => task.id === requestedTaskId);
+      if (matchingTask) {
+        await handleOpenTask(matchingTask);
+        if (!isCancelled) {
+          setSearchParams(nextParams, { replace: true });
+        }
+        return;
+      }
+
+      try {
+        const requestedTask = await workspaceService.getTask(requestedTaskId);
+        if (isCancelled) {
+          return;
+        }
+
+        setCreatedTasks((previousTasks) => [
+          requestedTask,
+          ...previousTasks.filter((task) => task.id !== requestedTask.id),
+        ]);
+        await handleOpenTask(requestedTask);
+      } catch (loadError) {
+        if (!isCancelled) {
+          setAgentTasksError(loadError instanceof Error ? loadError.message : 'Unable to load task details');
+        }
+      } finally {
+        if (!isCancelled) {
+          setSearchParams(nextParams, { replace: true });
+        }
+      }
+    }
+
+    void openRequestedTask();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isLoading, searchParams, setSearchParams, tasks]);
 
   async function handleOpenTask(task: Task) {
     let detail: TaskDetail | null = null;
@@ -288,6 +324,14 @@ export function Tasks(): React.JSX.Element {
   async function handleCreateStandardTask(input: TaskFormInput): Promise<Task> {
     const createdTask = await workspaceService.createTask({ ...input, mode: 'manual' }) as Task;
     setCreatedTasks((previousTasks) => [createdTask, ...previousTasks.filter((task) => task.id !== createdTask.id)]);
+    showToast({
+      title: 'Task created',
+      description: createdTask.title,
+      variant: 'success',
+      durationMs: 3500,
+      actionLabel: 'Open task',
+      onAction: () => navigate(`/tasks?task=${encodeURIComponent(createdTask.id)}`),
+    });
     return createdTask;
   }
 
@@ -297,6 +341,14 @@ export function Tasks(): React.JSX.Element {
     setSelectedTask(createdTask);
     setSelectedTaskDetail(createdTask);
     setIsDrawerOpen(true);
+    showToast({
+      title: 'Background task created',
+      description: createdTask.title,
+      variant: 'info',
+      durationMs: 3500,
+      actionLabel: 'Open task',
+      onAction: () => navigate(`/tasks?task=${encodeURIComponent(createdTask.id)}`),
+    });
 
     const runId = createdTask.latestRun?.id ?? createdTask.currentRunId ?? null;
     if (runId) {

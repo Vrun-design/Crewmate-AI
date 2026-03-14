@@ -11,6 +11,7 @@ import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import express from 'express';
 
 export const FINANCE_AGENT_MANIFEST = {
@@ -20,7 +21,7 @@ export const FINANCE_AGENT_MANIFEST = {
     description: 'CFO-level financial strategist — financial models, budget templates, runway analysis, unit economics, investor reports, expense frameworks, and cost optimization (informational only — not financial advice).',
     capabilities: ['financial_models', 'budget_templates', 'runway_analysis', 'unit_economics', 'investor_reports', 'expense_frameworks', 'cost_optimization'],
     skills: ['notion.create-page', 'web.search'],
-    model: serverConfig.geminiTextModel,
+    model: serverConfig.geminiResearchModel,
     emoji: '💰',
 };
 
@@ -50,8 +51,8 @@ export async function runFinanceAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { type?: 'invoice' | 'expense' | 'budget' | 'report' | 'analysis' | 'model' | 'investor'; saveToNotion?: boolean } = {},
-): Promise<{ output: string; savedToNotion: boolean }> {
+    options: { type?: 'invoice' | 'expense' | 'budget' | 'report' | 'analysis' | 'model' | 'investor'; saveToNotion?: boolean; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ output: string; savedToNotion: boolean; workspaceUrl?: string }> {
     const ai = createGeminiClient();
     const { type = 'report', saveToNotion = true } = options;
 
@@ -401,7 +402,7 @@ Routing/Sort: [XXXXXX]
 
     emitStep('generating', `Writing ${type} document...`);
     const response = await ai.models.generateContent({
-        model: serverConfig.geminiTextModel,
+        model: serverConfig.geminiResearchModel,
         contents: `${FINANCE_EXPERT_SYSTEM_PROMPT}
 
 ${benchmarkContext ? `\nIndustry benchmarks context:\n${benchmarkContext.slice(0, 600)}` : ''}
@@ -431,8 +432,11 @@ Write the COMPLETE document. For financial tables, fill in plausible illustrativ
         }
     }
 
-    emitStep('done', `Finance ${type} complete${savedToNotion ? ' — saved to Notion' : ''}`, { success: true });
-    return { output, savedToNotion };
+    // Optional: save to Google Workspace (Sheets, Slides, or Docs)
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(output, intent, options.outputTarget, ctx, emitStep);
+
+    emitStep('done', `Finance ${type} complete${savedToNotion ? ' — saved to Notion' : ''}${workspaceUrl ? ' — Google Workspace file created' : ''}`, { success: true });
+    return { output, savedToNotion, workspaceUrl };
 }
 
 export const financeAgentApp = express();

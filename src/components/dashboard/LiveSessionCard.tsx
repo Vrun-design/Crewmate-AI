@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Mic, MicOff, ScreenShare, ScreenShareOff, Maximize2, Play, Square } from 'lucide-react';
 import type { LiveSession, MicrophoneStatus, ScreenShareStatus } from '../../types/live';
@@ -73,13 +73,33 @@ export function LiveSessionCard({
   onSendMessage,
 }: LiveSessionCardProps) {
   const [draft, setDraft] = useState('');
+  const [isWorking, setIsWorking] = useState(false);
+  const [lastIntent, setLastIntent] = useState('');
+  const workingResetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (workingResetTimerRef.current) {
+        window.clearTimeout(workingResetTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const next = draft.trim();
     if (!next || !onSendMessage) return;
-    await onSendMessage(next);
+    setLastIntent(next);
+    setIsWorking(true);
     setDraft('');
+    try {
+      await onSendMessage(next);
+    } finally {
+      if (workingResetTimerRef.current) {
+        window.clearTimeout(workingResetTimerRef.current);
+      }
+      workingResetTimerRef.current = window.setTimeout(() => setIsWorking(false), 3000);
+    }
   };
 
   const isMuted = microphoneStatus === 'muted' || microphoneStatus === 'idle';
@@ -198,6 +218,11 @@ export function LiveSessionCard({
                 {isBusy ? 'Wait...' : 'Send'}
               </button>
             </form>
+            {isWorking && (
+              <p className="text-xs text-muted-foreground animate-pulse text-center mt-2">
+                Working on it - &ldquo;{lastIntent.length > 60 ? `${lastIntent.slice(0, 60)}...` : lastIntent}&rdquo;
+              </p>
+            )}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center">

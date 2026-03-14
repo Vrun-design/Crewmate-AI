@@ -44,6 +44,46 @@ interface UseLiveSessionResult {
 
 type TransportMode = 'relay' | 'direct' | null;
 
+function buildAnnouncementPrompt(
+  intro: string,
+  taskTitle: string,
+  detailLabel: 'Reason' | 'Result',
+  detail: string,
+): string {
+  return [
+    intro,
+    'Reply in exactly one short spoken sentence.',
+    `Task: "${taskTitle}"`,
+    detail ? `${detailLabel}: "${detail}"` : '',
+    'Do not ask a follow-up question.',
+  ].filter(Boolean).join('\n');
+}
+
+function buildLiveTaskAnnouncementPrompt(
+  title: string,
+  status: 'completed' | 'failed',
+  summary?: string | null,
+): string {
+  const taskTitle = title.slice(0, 140);
+  const detail = (summary ?? '').slice(0, 220);
+
+  if (status === 'failed') {
+    return buildAnnouncementPrompt(
+      'A background task you started for the user has failed. Say that it failed, mention the task briefly, and include the reason if it is useful.',
+      taskTitle,
+      'Reason',
+      detail,
+    );
+  }
+
+  return buildAnnouncementPrompt(
+    'A background task you started for the user has completed. Say that it is done, mention the task briefly, and include the key result if it is useful.',
+    taskTitle,
+    'Result',
+    detail,
+  );
+}
+
 export function useLiveSession({ initialSession, onSessionChange, eventsEnabled = true, prepareToolCalls }: UseLiveSessionOptions): UseLiveSessionResult {
   const [session, setSession] = useState<LiveSession | null>(initialSession);
   const [isBusy, setIsBusy] = useState(false);
@@ -64,6 +104,8 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
   const directAudioChunkIdRef = useRef(0);
   const directAssistantTextRef = useRef('');
   const directUserTextRef = useRef('');
+  const directAnnouncementQueueRef = useRef<string[]>([]);
+  const isDirectTurnActiveRef = useRef(false);
   const sessionIdRef = useRef<string | null>(initialSession?.id ?? null);
 
   const ensureAudioContext = useCallback(async () => {
@@ -133,6 +175,40 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
     });
   }, [ensureAudioContext]);
 
+  const sendDirectPrompt = useCallback((prompt: string) => {
+    if (!directSessionRef.current) {
+      return;
+    }
+
+    isDirectTurnActiveRef.current = true;
+    directSessionRef.current.sendClientContent({
+      turns: createUserContent(prompt),
+      turnComplete: true,
+    });
+  }, []);
+
+  const flushDirectAnnouncementQueue = useCallback(() => {
+    if (isDirectTurnActiveRef.current || !directSessionRef.current || directAnnouncementQueueRef.current.length === 0) {
+      return;
+    }
+
+    const nextPrompt = directAnnouncementQueueRef.current.shift();
+    if (!nextPrompt) {
+      return;
+    }
+
+    sendDirectPrompt(nextPrompt);
+  }, [sendDirectPrompt]);
+
+  const enqueueDirectAnnouncement = useCallback((prompt: string) => {
+    if (isDirectTurnActiveRef.current) {
+      directAnnouncementQueueRef.current.push(prompt);
+      return;
+    }
+
+    sendDirectPrompt(prompt);
+  }, [sendDirectPrompt]);
+
   const persistCompletedTurn = useCallback(async (userText: string, assistantText: string) => {
     const currentSessionId = sessionIdRef.current;
     if (!currentSessionId || (!userText && !assistantText)) {
@@ -187,8 +263,12 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
           playbackRevision: (currentSession.playbackRevision ?? 0) + 1,
         } : currentSession);
       },
+      onTurnComplete: () => {
+        isDirectTurnActiveRef.current = false;
+        flushDirectAnnouncementQueue();
+      },
     });
-  }, [applyDirectTranscript, interruptPlayback, persistCompletedTurn, prepareToolCalls, queueAudioChunk]);
+  }, [applyDirectTranscript, flushDirectAnnouncementQueue, interruptPlayback, persistCompletedTurn, prepareToolCalls, queueAudioChunk]);
 
   useEffect(() => {
     setSession((currentSession) => mergeSessionState(initialSession, currentSession));
@@ -247,7 +327,20 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
       if (data.sessionId === session?.id) {
         refreshSession();
       }
-    }
+    },
+    onLiveTaskUpdate: (data) => {
+      if (data.sessionId !== session?.id) {
+        return;
+      }
+
+      if (transportModeRef.current === 'direct' && directSessionRef.current && data.status !== 'running') {
+        enqueueDirectAnnouncement(buildLiveTaskAnnouncementPrompt(data.title, data.status, data.summary));
+      }
+
+      if (transportModeRef.current === 'relay') {
+        refreshSession();
+      }
+    },
   });
 
   const sessionId = session?.id;
@@ -316,6 +409,8 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
       }
       directSessionRef.current?.close();
       directSessionRef.current = null;
+      directAnnouncementQueueRef.current = [];
+      isDirectTurnActiveRef.current = false;
     };
   }, []);
 
@@ -350,6 +445,8 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
         directAssistantTextRef.current = '';
         directUserTextRef.current = '';
         directAudioChunkIdRef.current = 0;
+        directAnnouncementQueueRef.current = [];
+        isDirectTurnActiveRef.current = false;
         setSession(direct.session);
         stopPollingRef.current = true;
         lastAudioChunkIdRef.current = 0;
@@ -390,6 +487,8 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
       if (transportModeRef.current === 'direct') {
         directSessionRef.current?.close();
         directSessionRef.current = null;
+        directAnnouncementQueueRef.current = [];
+        isDirectTurnActiveRef.current = false;
       }
       const next = await liveSessionService.end(session.id);
       setSession(next);
@@ -416,10 +515,7 @@ export function useLiveSession({ initialSession, onSessionChange, eventsEnabled 
       if (transportModeRef.current === 'direct' && directSessionRef.current) {
         directUserTextRef.current = text.trim();
         applyDirectTranscript('user', directUserTextRef.current, 'complete');
-        directSessionRef.current.sendClientContent({
-          turns: createUserContent(text),
-          turnComplete: true,
-        });
+        sendDirectPrompt(text);
         return;
       }
 

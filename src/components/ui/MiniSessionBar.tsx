@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mic, MicOff, Square, Maximize2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { LiveTaskCueBadge } from './LiveTaskCueBadge';
 import { useLiveSessionContext } from '../../contexts/LiveSessionContext';
 
 function isDashboardPath(pathname: string): boolean {
@@ -48,13 +49,15 @@ export function MiniSessionBar() {
         >
           <div className="flex flex-col gap-2">
             {liveTaskCue ? (
-              <div className={`mx-auto rounded-full border px-3 py-1 text-xs ${
-                liveTaskCue.status === 'completed'
-                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                  : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-              }`}>
-                {liveTaskCue.status === 'completed' ? 'Task finished' : 'Task failed'}: {liveTaskCue.title}
-              </div>
+              <LiveTaskCueBadge
+                cue={liveTaskCue}
+                className="mx-auto px-3 py-1 text-xs"
+                completedLabel="Task finished"
+                failedLabel="Task failed"
+                separator=":"
+                showIcon={false}
+                titleMaxLength={50}
+              />
             ) : null}
             <div className="flex items-center gap-4 py-2 px-4 rounded-full bg-secondary/90 backdrop-blur-xl border border-border shadow-2xl ring-1 ring-white/5">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
