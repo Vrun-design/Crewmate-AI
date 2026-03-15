@@ -177,6 +177,7 @@ export function Agents(): React.JSX.Element {
                 title="Crew Captain"
             >
                 <SoulDrawerContent
+                    key={profile ? 'loaded' : 'loading'}
                     profile={profile}
                     onSaved={(newProfile) => setProfile(newProfile)}
                 />

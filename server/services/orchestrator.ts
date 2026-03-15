@@ -75,6 +75,23 @@ function logTaskFailure(taskId: string, errorMessage: string, error: unknown): v
   console.error(`[orchestrator] Task ${taskId} failed: ${errorMessage}`, error);
 }
 
+function notifyCompletion(
+  userId: string,
+  task: AgentTask,
+  status: 'completed' | 'failed',
+  data: { result?: unknown; error?: string; steps: AgentTask['steps']; completedAt: string },
+  label: string,
+): void {
+  void notifyTaskComplete(userId, {
+    ...task,
+    status,
+    steps: data.steps,
+    completedAt: data.completedAt,
+    ...(data.result !== undefined && { result: data.result }),
+    ...(data.error && { error: data.error }),
+  }).catch((err) => console.error(`[agentNotifier] ${label} notification failed:`, err));
+}
+
 function emitRunningStatus(task: AgentTask, agentId: string, routing?: { agent: string; confidence: number; reasoning: string }): void {
   emitTaskEvent(task.id, {
     type: 'status',
@@ -164,24 +181,28 @@ async function runDelegatedSkillTask(
 
     if (!success) {
       const errorMessage = getResultErrorMessage(result);
+      const completedAt = new Date().toISOString();
       updateTask(task.id, {
         userId: task.userId,
         status: 'failed',
         result,
         error: errorMessage,
-        completedAt: new Date().toISOString(),
+        completedAt,
       }, steps);
       emitTerminalTaskEvent(task, 'failed', { result, error: errorMessage, steps });
+      notifyCompletion(ctx.userId, task, 'failed', { result, error: errorMessage, steps, completedAt }, 'skill failure');
       return;
     }
 
+    const completedAt = new Date().toISOString();
     updateTask(task.id, {
       userId: task.userId,
       status: 'completed',
       result,
-      completedAt: new Date().toISOString(),
+      completedAt,
     }, steps);
     emitTerminalTaskEvent(task, 'completed', { result, steps });
+    notifyCompletion(ctx.userId, task, 'completed', { result, steps, completedAt }, 'skill completion');
   } catch (error) {
     if (isCancellationRequested(task.id)) {
       completeCancelledTask(task, getSteps(), 'Cancelled by user');
@@ -189,15 +210,17 @@ async function runDelegatedSkillTask(
     }
 
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const completedAt = new Date().toISOString();
     const steps = getSteps();
     emitStep('error', `Failed: ${errorMessage}`, { success: false, skillId });
     updateTask(task.id, {
       userId: task.userId,
       status: 'failed',
       error: errorMessage,
-      completedAt: new Date().toISOString(),
+      completedAt,
     }, steps);
     emitTerminalTaskEvent(task, 'failed', { error: errorMessage, steps });
+    notifyCompletion(ctx.userId, task, 'failed', { error: errorMessage, steps, completedAt }, 'skill error');
   }
 }
 
@@ -292,7 +315,6 @@ export async function orchestrate(
       }
 
       const completedAt = new Date().toISOString();
-      const doneTask = getTask(task.id, ctx.userId);
       const steps = getSteps();
       const success = getResultSuccess(result);
 
@@ -306,17 +328,7 @@ export async function orchestrate(
           completedAt,
         }, steps);
         emitTerminalTaskEvent(task, 'failed', { result, error: errorMessage, steps });
-
-        if (doneTask) {
-          void notifyTaskComplete(ctx.userId, {
-            ...doneTask,
-            status: 'failed',
-            result,
-            error: errorMessage,
-            steps,
-            completedAt,
-          }).catch((error) => console.error('[agentNotifier] failure notification failed:', error));
-        }
+        notifyCompletion(ctx.userId, task, 'failed', { result, error: errorMessage, steps, completedAt }, 'failure');
         return;
       }
 
@@ -337,16 +349,7 @@ export async function orchestrate(
         originRef: task.originRef,
       });
       emitTerminalTaskEvent(task, 'completed', { result, steps });
-
-      if (doneTask) {
-        void notifyTaskComplete(ctx.userId, {
-          ...doneTask,
-          status: 'completed',
-          result,
-          steps,
-          completedAt,
-        }).catch((error) => console.error('[agentNotifier] success notification failed:', error));
-      }
+      notifyCompletion(ctx.userId, task, 'completed', { result, steps, completedAt }, 'success');
     } catch (error) {
       if (isCancellationRequested(task.id)) {
         completeCancelledTask(task, getSteps(), 'Cancelled by user');
@@ -365,13 +368,7 @@ export async function orchestrate(
         completedAt,
       }, steps);
       emitTerminalTaskEvent(task, 'failed', { error: errorMessage, steps });
-      void notifyTaskComplete(ctx.userId, {
-        ...task,
-        status: 'failed',
-        error: errorMessage,
-        steps,
-        completedAt,
-      }).catch((notifyError) => console.error('[agentNotifier] failure notification failed:', notifyError));
+      notifyCompletion(ctx.userId, task, 'failed', { error: errorMessage, steps, completedAt }, 'failure');
     }
   }
 

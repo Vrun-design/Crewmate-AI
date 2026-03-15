@@ -149,6 +149,7 @@ export function Tasks(): React.JSX.Element {
   const [agentTasksError, setAgentTasksError] = useState<string | null>(null);
   const [createdTasks, setCreatedTasks] = useState<Task[]>([]);
   const sseRef = useRef<AbortController | null>(null);
+  const sseTaskIdRef = useRef<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedTaskDetail, setSelectedTaskDetail] = useState<TaskDetail | null>(null);
@@ -180,10 +181,13 @@ export function Tasks(): React.JSX.Element {
   const closeTaskStream = useCallback(() => {
     sseRef.current?.abort();
     sseRef.current = null;
+    sseTaskIdRef.current = null;
   }, []);
 
   const subscribeToTask = useCallback((taskId: string, intent?: string) => {
+    if (sseTaskIdRef.current === taskId && sseRef.current) return;
     closeTaskStream();
+    sseTaskIdRef.current = taskId;
     sseRef.current = connectAuthenticatedSseStream(`/api/agents/tasks/${taskId}/events`, {
       onEvent: (_event, dataRaw) => {
         const payload = JSON.parse(dataRaw) as AgentTaskStreamPayload;

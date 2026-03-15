@@ -1,0 +1,323 @@
+<mxGraphModel dx="1422" dy="762" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1200" math="0" shadow="1">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <!-- Title -->
+    <mxCell id="title" value="&lt;font style=&quot;font-size:24px;&quot;&gt;&lt;b&gt;Crewmate — Multimodal AI Remote Employee&lt;/b&gt;&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#64748B&quot; style=&quot;font-size:13px;&quot;&gt;System Architecture · Gemini Live Agent Challenge 2026&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="450" y="18" width="800" height="52" as="geometry"/>
+    </mxCell>
+
+    <!-- USER -->
+    <mxCell id="user" value="&lt;b&gt;👤 USER&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px;&quot;&gt;Voice · Screen · Text&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FF6D00;strokeColor=#BF360C;fontColor=#FFFFFF;fontSize=13;fontStyle=1;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="725" y="88" width="250" height="65" as="geometry"/>
+    </mxCell>
+
+    <!-- FRONTEND swimlane -->
+    <mxCell id="fe" value="&lt;b&gt;⚡ FRONTEND&lt;/b&gt;  ·  React + Vite  ·  Firebase Hosting (Global CDN)" style="swimlane;fillColor=#EEF2FF;strokeColor=#4338CA;fontColor=#4338CA;fontSize=12;fontStyle=1;startSize=32;rounded=1;arcSize=3;shadow=1;html=1;" vertex="1" parent="1">
+      <mxGeometry x="277" y="208" width="1146" height="108" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe1" value="🎙️ Live Session&lt;br&gt;Dashboard" style="rounded=1;fillColor=#C7D2FE;strokeColor=#6366F1;fontColor=#3730A3;fontSize=10;html=1;" vertex="1" parent="fe">
+      <mxGeometry x="12" y="38" width="155" height="56" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe2" value="📋 Tasks UI&lt;br&gt;SSE Streaming" style="rounded=1;fillColor=#C7D2FE;strokeColor=#6366F1;fontColor=#3730A3;fontSize=10;html=1;" vertex="1" parent="fe">
+      <mxGeometry x="177" y="38" width="155" height="56" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe3" value="🎤 Mic + Screen&lt;br&gt;Capture Hooks" style="rounded=1;fillColor=#C7D2FE;strokeColor=#6366F1;fontColor=#3730A3;fontSize=10;html=1;" vertex="1" parent="fe">
+      <mxGeometry x="342" y="38" width="155" height="56" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe4" value="🔄 LiveSession&lt;br&gt;Context" style="rounded=1;fillColor=#C7D2FE;strokeColor=#6366F1;fontColor=#3730A3;fontSize=10;html=1;" vertex="1" parent="fe">
+      <mxGeometry x="507" y="38" width="155" height="56" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe5" value="🧠 Memory&lt;br&gt;Knowledge Base" style="rounded=1;fillColor=#C7D2FE;strokeColor=#6366F1;fontColor=#3730A3;fontSize=10;html=1;" vertex="1" parent="fe">
+      <mxGeometry x="672" y="38" width="155" height="56" as="geometry"/>
+    </mxCell>
+    <mxCell id="fe6" value="🔌 Integrations&lt;br&gt;OAuth Manager" style="rounded=1;fillColor=#C7D2FE;strokeColor=#6366F1;fontColor=#3730A3;fontSize=10;html=1;" vertex="1" parent="fe">
+      <mxGeometry x="975" y="38" width="155" height="56" as="geometry"/>
+    </mxCell>
+
+    <!-- BACKEND swimlane -->
+    <mxCell id="be" value="&lt;b&gt;🖥️ BACKEND — Google Cloud Run&lt;/b&gt;  ·  Node.js + Express  ·  Auto-scaling  ·  HTTPS  ·  Secret Manager" style="swimlane;fillColor=#F0FDF4;strokeColor=#15803D;fontColor=#15803D;fontSize=12;fontStyle=1;startSize=35;rounded=1;arcSize=2;shadow=1;html=1;" vertex="1" parent="1">
+      <mxGeometry x="50" y="385" width="1600" height="548" as="geometry"/>
+    </mxCell>
+
+    <!-- API bar -->
+    <mxCell id="api" value="🌐  REST API  ·  8 Route Modules  ·  Firebase Auth Middleware  ·  CORS  ·  SSE EventService  ·  Error Boundaries" style="rounded=1;fillColor=#DCFCE7;strokeColor=#22C55E;fontColor=#166534;fontSize=11;fontStyle=1;html=1;" vertex="1" parent="be">
+      <mxGeometry x="15" y="43" width="1565" height="33" as="geometry"/>
+    </mxCell>
+
+    <!-- LIVE LAYER -->
+    <mxCell id="ll" value="&lt;b&gt;🎙️ LIVE LAYER&lt;/b&gt;" style="swimlane;fillColor=#E0F2FE;strokeColor=#0284C7;fontColor=#0369A1;fontSize=11;fontStyle=1;startSize=28;rounded=1;arcSize=4;html=1;" vertex="1" parent="be">
+      <mxGeometry x="15" y="90" width="400" height="442" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll1" value="&lt;b&gt;liveGateway&lt;/b&gt;&lt;br&gt;WebSocket lifecycle&lt;br&gt;Session resumption&lt;br&gt;goAway / reconnect" style="rounded=1;fillColor=#BAE6FD;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=10;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="10" y="36" width="183" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll2" value="&lt;b&gt;promptBuilder&lt;/b&gt;&lt;br&gt;Memory injection&lt;br&gt;System instruction&lt;br&gt;Tool declarations" style="rounded=1;fillColor=#BAE6FD;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=10;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="203" y="36" width="183" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll3" value="&lt;b&gt;messageProcessor&lt;/b&gt;&lt;br&gt;Tool call dispatch&lt;br&gt;Audio + transcript&lt;br&gt;Stream handling" style="rounded=1;fillColor=#BAE6FD;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=10;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="10" y="122" width="183" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll4" value="&lt;b&gt;toolRunner&lt;/b&gt;&lt;br&gt;Execution policy&lt;br&gt;Inline vs delegate&lt;br&gt;Pipeline dispatch" style="rounded=1;fillColor=#BAE6FD;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=10;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="203" y="122" width="183" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll5" value="⚙️  Execution Policy:  inline · delegated · either  ·  quick · slow · side-effect" style="rounded=1;fillColor=#7DD3FA;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=10;fontStyle=1;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="10" y="208" width="376" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll6" value="📸 Screenshot per turn&lt;br&gt;sent as multimodal context" style="rounded=1;fillColor=#E0F2FE;strokeColor=#7DD3FA;fontColor=#0369A1;fontSize=10;fontStyle=2;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="10" y="248" width="183" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll7" value="🎙️ PCM 16kHz audio&lt;br&gt;80ms flush interval" style="rounded=1;fillColor=#E0F2FE;strokeColor=#7DD3FA;fontColor=#0369A1;fontSize=10;fontStyle=2;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="203" y="248" width="183" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll8" value="🔄  Auto-reconnect on goAway / transport_error / socket_closed  ·  Resumption token preserved" style="rounded=1;fillColor=#BAE6FD;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=9;fontStyle=2;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="10" y="310" width="376" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll9" value="📡  SSE on every turn:  session_update · live_task_update · session_error" style="rounded=1;fillColor=#BAE6FD;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=9;fontStyle=2;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="10" y="358" width="376" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="ll10" value="🧠  Memory injected into system prompt before every session start" style="rounded=1;fillColor=#7DD3FA;strokeColor=#0284C7;fontColor=#0C4A6E;fontSize=9;fontStyle=1;html=1;" vertex="1" parent="ll">
+      <mxGeometry x="10" y="404" width="376" height="28" as="geometry"/>
+    </mxCell>
+
+    <!-- EXECUTION LAYER -->
+    <mxCell id="el" value="&lt;b&gt;⚙️ EXECUTION LAYER&lt;/b&gt;" style="swimlane;fillColor=#ECFDF5;strokeColor=#059669;fontColor=#065F46;fontSize=11;fontStyle=1;startSize=28;rounded=1;arcSize=4;html=1;" vertex="1" parent="be">
+      <mxGeometry x="428" y="90" width="748" height="442" as="geometry"/>
+    </mxCell>
+    <mxCell id="el1" value="&lt;b&gt;🧭 Orchestrator&lt;/b&gt;&lt;br&gt;LLM intent routing&lt;br&gt;Task creation + SSE&lt;br&gt;A2A /.well-known/agent.json" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="36" width="230" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="el2" value="&lt;b&gt;🔗 Pipeline Orchestrator&lt;/b&gt;&lt;br&gt;Sequential agent chaining&lt;br&gt;Context passed forward&lt;br&gt;step 1 → 2 → N" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="254" y="36" width="230" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="el3" value="&lt;b&gt;📦 Skill Registry&lt;/b&gt;&lt;br&gt;62 registered skills&lt;br&gt;run · validate · emit&lt;br&gt;step events via SSE" style="rounded=1;fillColor=#BBF7D0;strokeColor=#16A34A;fontColor=#14532D;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="498" y="36" width="230" height="76" as="geometry"/>
+    </mxCell>
+
+    <!-- Agents header -->
+    <mxCell id="el4" value="🤖  14 SPECIALIST AGENTS  ·  Memory injected before every run  ·  Self-critique built in  ·  Pipeline-chainable" style="rounded=1;fillColor=#15803D;strokeColor=#14532D;fontColor=#FFFFFF;fontSize=10;fontStyle=1;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="124" width="722" height="28" as="geometry"/>
+    </mxCell>
+
+    <!-- Agents row 1 -->
+    <mxCell id="a1" value="🔬 Research" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="160" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a2" value="✍️ Content" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="118" y="160" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a3" value="📣 Marketing" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="226" y="160" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a4" value="📱 Social" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="334" y="160" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a5" value="👥 HR" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="442" y="160" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a6" value="🗂️ Product" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="550" y="160" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a7" value="🎧 Support" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="632" y="160" width="100" height="34" as="geometry"/>
+    </mxCell>
+
+    <!-- Agents row 2 -->
+    <mxCell id="a8" value="💼 Sales" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="202" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a9" value="💰 Finance" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="118" y="202" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a10" value="⚖️ Legal" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="226" y="202" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a11" value="📧 Comms" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="334" y="202" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a12" value="⚙️ DevOps" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="442" y="202" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a13" value="📊 Data" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="550" y="202" width="100" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="a14" value="🌐 UI Navigator" style="rounded=1;fillColor=#D1FAE5;strokeColor=#34D399;fontColor=#065F46;fontSize=10;html=1;" vertex="1" parent="el">
+      <mxGeometry x="632" y="202" width="100" height="34" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="el5" value="Research → Strategy → Generate → Self-Critique → Save to Notion / ClickUp / Slack" style="text;html=1;fontSize=9;fontColor=#64748B;fontStyle=2;align=center;" vertex="1" parent="el">
+      <mxGeometry x="10" y="242" width="722" height="18" as="geometry"/>
+    </mxCell>
+
+    <!-- Skills -->
+    <mxCell id="el6" value="&lt;b&gt;62 Skills across 8 categories:&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#065F46;fontStyle=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="266" width="220" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="s1" value="🔍 Research (2)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="288" width="118" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="s2" value="💬 Slack (5)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="136" y="288" width="118" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="s3" value="📝 Notion (9)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="262" y="288" width="118" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="s4" value="📋 ClickUp (4)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="388" y="288" width="118" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="s5" value="📁 G. Workspace (14)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="514" y="288" width="118" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="s6" value="🌐 Browser (13)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="640" y="288" width="92" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="s7" value="⚡ Live (3)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="322" width="118" height="26" as="geometry"/>
+    </mxCell>
+    <mxCell id="s8" value="💻 Code / Terminal (1)" style="rounded=1;fillColor=#A7F3D0;strokeColor=#10B981;fontColor=#065F46;fontSize=9;html=1;" vertex="1" parent="el">
+      <mxGeometry x="136" y="322" width="150" height="26" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="el7" value="live.delegate-to-agent → Orchestrator → Specialist Agent    ·    live.run-pipeline → Pipeline → Sequential Agents" style="rounded=1;fillColor=#BBF7D0;strokeColor=#22C55E;fontColor=#14532D;fontSize=9;fontStyle=2;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="360" width="722" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="el8" value="📡  All agents stream real-time step events to Tasks UI via SSE  ·  A2A discoverable at /.well-known/agent.json" style="rounded=1;fillColor=#15803D;strokeColor=#14532D;fontColor=#FFFFFF;fontSize=9;fontStyle=1;html=1;" vertex="1" parent="el">
+      <mxGeometry x="10" y="406" width="722" height="26" as="geometry"/>
+    </mxCell>
+
+    <!-- MEMORY + DATA LAYER -->
+    <mxCell id="ml" value="&lt;b&gt;🧠 MEMORY + DATA&lt;/b&gt;" style="swimlane;fillColor=#FAF5FF;strokeColor=#9333EA;fontColor=#7C3AED;fontSize=11;fontStyle=1;startSize=28;rounded=1;arcSize=4;html=1;" vertex="1" parent="be">
+      <mxGeometry x="1190" y="90" width="395" height="442" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml1" value="&lt;b&gt;memoryService&lt;/b&gt;&lt;br&gt;ingest + retrieve&lt;br&gt;topK=5 recall&lt;br&gt;lexical fallback" style="rounded=1;fillColor=#E9D5FF;strokeColor=#9333EA;fontColor=#4C1D95;fontSize=10;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="36" width="183" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml2" value="&lt;b&gt;embeddingService&lt;/b&gt;&lt;br&gt;Gemini text-embedding&lt;br&gt;cosine similarity&lt;br&gt;async fire-and-forget" style="rounded=1;fillColor=#E9D5FF;strokeColor=#9333EA;fontColor=#4C1D95;fontSize=10;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="203" y="36" width="183" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml3" value="&lt;b&gt;🗄️ SQLite&lt;/b&gt;&lt;br&gt;19 tables · WAL mode&lt;br&gt;AES encrypted creds&lt;br&gt;busy_timeout = 5s" style="rounded=1;fillColor=#E9D5FF;strokeColor=#9333EA;fontColor=#4C1D95;fontSize=10;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="122" width="183" height="76" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml4" value="&lt;b&gt;📡 SSE EventService&lt;/b&gt;&lt;br&gt;Real-time broadcasts&lt;br&gt;task · session · notif&lt;br&gt;heartbeat keepalive" style="rounded=1;fillColor=#E9D5FF;strokeColor=#9333EA;fontColor=#4C1D95;fontSize=10;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="203" y="122" width="183" height="76" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="ml5" value="&lt;b&gt;Memory Write Paths:&lt;/b&gt;" style="text;html=1;fontSize=10;fontColor=#7C3AED;fontStyle=1;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="210" width="180" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml6" value="🎙️ Live Turn →&lt;br&gt;ingestLiveTurnMemory" style="rounded=1;fillColor=#F3E8FF;strokeColor=#C084FC;fontColor=#4C1D95;fontSize=9;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="232" width="183" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml7" value="🤖 Agent Result →&lt;br&gt;ingestAgentResult" style="rounded=1;fillColor=#F3E8FF;strokeColor=#C084FC;fontColor=#4C1D95;fontSize=9;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="203" y="232" width="183" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml8" value="⚙️ Skill Result →&lt;br&gt;ingestSkillResult" style="rounded=1;fillColor=#F3E8FF;strokeColor=#C084FC;fontColor=#4C1D95;fontSize=9;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="278" width="183" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml9" value="📸 Screenshot →&lt;br&gt;ingestArtifactMemory" style="rounded=1;fillColor=#F3E8FF;strokeColor=#C084FC;fontColor=#4C1D95;fontSize=9;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="203" y="278" width="183" height="40" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml10" value="💉  Injected into Live sessions AND every Agent run before execution" style="rounded=1;fillColor=#9333EA;strokeColor=#7C3AED;fontColor=#FFFFFF;fontSize=10;fontStyle=1;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="330" width="375" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml11" value="vector similarity → lexical fallback → topK=5 injected into system prompt" style="text;html=1;fontSize=9;fontColor=#64748B;fontStyle=2;align=center;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="366" width="375" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="ml12" value="Activity Log · Notifications · Screenshot Artifacts · OAuth States · Auth Sessions" style="rounded=1;fillColor=#F3E8FF;strokeColor=#C084FC;fontColor=#4C1D95;fontSize=9;html=1;" vertex="1" parent="ml">
+      <mxGeometry x="10" y="392" width="375" height="26" as="geometry"/>
+    </mxCell>
+
+    <!-- GOOGLE CLOUD -->
+    <mxCell id="gc" value="&lt;b&gt;☁️ GOOGLE CLOUD&lt;/b&gt;" style="swimlane;fillColor=#E8F0FE;strokeColor=#1A73E8;fontColor=#1A73E8;fontSize=12;fontStyle=1;startSize=32;rounded=1;arcSize=3;shadow=1;html=1;" vertex="1" parent="1">
+      <mxGeometry x="50" y="1002" width="1060" height="128" as="geometry"/>
+    </mxCell>
+    <mxCell id="gc1" value="&lt;b&gt;🎙️ Gemini Live API&lt;/b&gt;&lt;br&gt;gemini-2.5-flash-native-audio&lt;br&gt;Real-time audio + vision&lt;br&gt;Bidirectional WebSocket" style="rounded=1;fillColor=#C5D9FB;strokeColor=#4285F4;fontColor=#0D47A1;fontSize=10;html=1;" vertex="1" parent="gc">
+      <mxGeometry x="12" y="40" width="235" height="72" as="geometry"/>
+    </mxCell>
+    <mxCell id="gc2" value="&lt;b&gt;🧠 Gemini Pro&lt;/b&gt;&lt;br&gt;Agents + Orchestration&lt;br&gt;gemini-2.5-pro-preview&lt;br&gt;Research + routing + embed" style="rounded=1;fillColor=#C5D9FB;strokeColor=#4285F4;fontColor=#0D47A1;fontSize=10;html=1;" vertex="1" parent="gc">
+      <mxGeometry x="260" y="40" width="235" height="72" as="geometry"/>
+    </mxCell>
+    <mxCell id="gc3" value="&lt;b&gt;🔥 Firebase Auth&lt;/b&gt;&lt;br&gt;JWT verification&lt;br&gt;Every API request&lt;br&gt;Firebase Hosting (CDN)" style="rounded=1;fillColor=#C5D9FB;strokeColor=#4285F4;fontColor=#0D47A1;fontSize=10;html=1;" vertex="1" parent="gc">
+      <mxGeometry x="508" y="40" width="235" height="72" as="geometry"/>
+    </mxCell>
+    <mxCell id="gc4" value="&lt;b&gt;☁️ Cloud Run + Secret Manager&lt;/b&gt;&lt;br&gt;Container hosting · Auto-scale&lt;br&gt;HTTPS · gcloud deploy&lt;br&gt;Secrets: API keys, enc. key" style="rounded=1;fillColor=#C5D9FB;strokeColor=#4285F4;fontColor=#0D47A1;fontSize=10;html=1;" vertex="1" parent="gc">
+      <mxGeometry x="756" y="40" width="290" height="72" as="geometry"/>
+    </mxCell>
+
+    <!-- INTEGRATIONS -->
+    <mxCell id="int" value="&lt;b&gt;🔌 EXTERNAL INTEGRATIONS — OAuth 2.0 · AES-256 Encrypted Credentials at Rest&lt;/b&gt;" style="swimlane;fillColor=#FFF7ED;strokeColor=#D97706;fontColor=#B45309;fontSize=12;fontStyle=1;startSize=32;rounded=1;arcSize=3;shadow=1;html=1;" vertex="1" parent="1">
+      <mxGeometry x="1150" y="1002" width="550" height="128" as="geometry"/>
+    </mxCell>
+    <mxCell id="i1" value="&lt;b&gt;Notion&lt;/b&gt;&lt;br&gt;Pages · DBs&lt;br&gt;Blocks · Screenshots" style="rounded=1;fillColor=#FDE68A;strokeColor=#F59E0B;fontColor=#78350F;fontSize=10;html=1;" vertex="1" parent="int">
+      <mxGeometry x="12" y="40" width="118" height="72" as="geometry"/>
+    </mxCell>
+    <mxCell id="i2" value="&lt;b&gt;Slack&lt;/b&gt;&lt;br&gt;Post · DMs&lt;br&gt;Channels · Read" style="rounded=1;fillColor=#FDE68A;strokeColor=#F59E0B;fontColor=#78350F;fontSize=10;html=1;" vertex="1" parent="int">
+      <mxGeometry x="140" y="40" width="118" height="72" as="geometry"/>
+    </mxCell>
+    <mxCell id="i3" value="&lt;b&gt;ClickUp&lt;/b&gt;&lt;br&gt;Tasks · Projects&lt;br&gt;Screenshots" style="rounded=1;fillColor=#FDE68A;strokeColor=#F59E0B;fontColor=#78350F;fontSize=10;html=1;" vertex="1" parent="int">
+      <mxGeometry x="268" y="40" width="118" height="72" as="geometry"/>
+    </mxCell>
+    <mxCell id="i4" value="&lt;b&gt;Google Workspace&lt;/b&gt;&lt;br&gt;Gmail · Docs · Sheets&lt;br&gt;Slides · Drive · Calendar" style="rounded=1;fillColor=#FDE68A;strokeColor=#F59E0B;fontColor=#78350F;fontSize=10;html=1;" vertex="1" parent="int">
+      <mxGeometry x="396" y="40" width="142" height="72" as="geometry"/>
+    </mxCell>
+
+    <!-- ═══ EDGES ═══ -->
+
+    <!-- User ↔ Frontend (bidirectional) -->
+    <mxCell id="e1" value="Voice + Screen" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#FF6D00;strokeWidth=2.5;fontColor=#BF360C;fontSize=10;fontStyle=1;endArrow=block;startArrow=block;startFill=1;endFill=1;" edge="1" source="user" target="fe" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Frontend ↔ Backend (bidirectional) -->
+    <mxCell id="e2" value="REST API + SSE Events" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4338CA;strokeWidth=2;fontColor=#4338CA;fontSize=10;fontStyle=1;endArrow=block;startArrow=block;startFill=1;endFill=1;" edge="1" source="fe" target="be" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- liveGateway ↔ Gemini Live API (WebSocket) -->
+    <mxCell id="e3" value="WebSocket (bidirectional)&lt;br&gt;Audio · Vision · Tool calls" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4285F4;strokeWidth=3;fontColor=#1A73E8;fontSize=10;fontStyle=1;endArrow=block;startArrow=block;startFill=1;endFill=1;" edge="1" source="ll1" target="gc1" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Orchestrator → Gemini Pro (routing) -->
+    <mxCell id="e4" value="LLM routing + agents" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#1A73E8;strokeWidth=1.5;fontColor=#1A73E8;fontSize=9;fontStyle=2;dashed=1;endArrow=block;endFill=1;" edge="1" source="el1" target="gc2" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- embeddingService → Gemini Pro -->
+    <mxCell id="e5" value="Text embeddings" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9333EA;strokeWidth=1.5;fontColor=#7C3AED;fontSize=9;fontStyle=2;dashed=1;endArrow=block;endFill=1;" edge="1" source="ml2" target="gc2" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- API auth → Firebase -->
+    <mxCell id="e6" value="JWT verify" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#1A73E8;strokeWidth=1.5;fontColor=#1A73E8;fontSize=9;fontStyle=2;dashed=1;endArrow=block;endFill=1;" edge="1" source="api" target="gc3" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Skill Registry → Integrations (OAuth calls) -->
+    <mxCell id="e7" value="OAuth 2.0 API calls" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#D97706;strokeWidth=2;fontColor=#D97706;fontSize=10;fontStyle=1;endArrow=block;endFill=1;" edge="1" source="el3" target="int" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- SSE EventService → Frontend Tasks (right-side wrap) -->
+    <mxCell id="e8" value="📡 Real-time SSE" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9333EA;strokeWidth=2;fontColor=#7C3AED;fontSize=10;fontStyle=1;endArrow=block;endFill=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="ml4" target="fe2" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1680" y="660"/>
+          <mxPoint x="1680" y="265"/>
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Memory → promptBuilder (injection) -->
+    <mxCell id="e9" value="inject context" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9333EA;strokeWidth=1.5;fontColor=#7C3AED;fontSize=9;fontStyle=2;dashed=1;endArrow=block;endFill=1;" edge="1" source="ml10" target="ll2" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <!-- Memory → Agents (inject before run) -->
+    <mxCell id="e10" value="inject before run" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9333EA;strokeWidth=1.5;fontColor=#7C3AED;fontSize=9;fontStyle=2;dashed=1;endArrow=block;endFill=1;" edge="1" source="ml10" target="el4" parent="1">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+  </root>
+</mxGraphModel>

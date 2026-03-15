@@ -179,7 +179,10 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
         status: event.status,
         summary: event.summary ?? null,
       });
-
+    },
+    onSessionError: (event) => {
+      if (session?.id && event.sessionId !== session.id) return;
+      void endSession();
     },
   });
 

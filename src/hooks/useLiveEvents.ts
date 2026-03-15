@@ -23,11 +23,19 @@ type NotificationEvent = Omit<Notification, 'time'> & {
     time?: string;
 };
 
+interface SessionErrorEvent {
+    sessionId: string;
+    reason: 'session_expired' | 'reconnect_failed';
+    message: string;
+    technicalDetail?: string;
+}
+
 type LiveEventMap = {
     job_update: JobUpdateEvent;
     notification: NotificationEvent;
     session_update: SessionUpdateEvent;
     live_task_update: LiveTaskUpdateEvent;
+    session_error: SessionErrorEvent;
 };
 
 interface UseLiveEventsCallbacks {
@@ -35,12 +43,13 @@ interface UseLiveEventsCallbacks {
     onJobUpdate?: (data: JobUpdateEvent) => void;
     onNotification?: (data: NotificationEvent) => void;
     onLiveTaskUpdate?: (data: LiveTaskUpdateEvent) => void;
+    onSessionError?: (data: SessionErrorEvent) => void;
     onError?: (message: string) => void;
     enabled?: boolean;
 }
 
 function isLiveEvent(event: string): event is keyof LiveEventMap {
-    return event === 'session_update' || event === 'job_update' || event === 'notification' || event === 'live_task_update';
+    return event === 'session_update' || event === 'job_update' || event === 'notification' || event === 'live_task_update' || event === 'session_error';
 }
 
 export function useLiveEvents(callbacks: UseLiveEventsCallbacks): void {
@@ -76,6 +85,10 @@ export function useLiveEvents(callbacks: UseLiveEventsCallbacks): void {
 
                     if (event === 'live_task_update') {
                         callbacksRef.current.onLiveTaskUpdate?.(JSON.parse(dataRaw) as LiveTaskUpdateEvent);
+                    }
+
+                    if (event === 'session_error') {
+                        callbacksRef.current.onSessionError?.(JSON.parse(dataRaw) as SessionErrorEvent);
                     }
                 } catch (error) {
                     console.error('Failed to parse SSE data', error);

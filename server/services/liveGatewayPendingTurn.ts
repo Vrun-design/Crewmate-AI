@@ -1,4 +1,4 @@
-import { getSession } from '../repositories/sessionRepository';
+import { getSessionMeta } from '../repositories/sessionRepository';
 import type { SessionRecord } from '../types';
 import type { RuntimeSession } from './liveGatewayTypes';
 
@@ -19,15 +19,18 @@ export function resolvePendingTurn(runtime: RuntimeSession): void {
 
   clearPendingTurn(runtime);
 
-  const session = getSession(runtime.id);
-  if (!session) {
+  const meta = getSessionMeta(runtime.id);
+  if (!meta) {
     pendingTurn.reject(new Error('Session state missing after model response.'));
     return;
   }
 
   pendingTurn.resolve({
-    ...session,
+    ...meta,
+    transcript: [],
     provider: 'gemini-live',
+    audioChunks: [],
+    playbackRevision: runtime.playbackRevision,
   });
 }
 

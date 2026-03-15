@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { User, Zap, PlayCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import React from 'react';
+import { User, Zap } from 'lucide-react';
 import type { AgentManifest } from './types';
 import { getAgentIcon } from './agentUi';
-import { api } from '../../lib/api';
 
 interface AgentDrawerContentProps {
   agent: AgentManifest;
@@ -19,30 +18,6 @@ export function AgentDrawerContent({
 }: AgentDrawerContentProps): React.JSX.Element {
   const AgentIcon = getAgentIcon(agent);
   const capabilityItems = getCapabilityItems(agent);
-
-  const [tryPrompt, setTryPrompt] = useState('');
-  const [tryState, setTryState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [tryError, setTryError] = useState<string | null>(null);
-
-  async function handleTryAgent(): Promise<void> {
-    if (!tryPrompt.trim() || tryState === 'sending') {
-      return;
-    }
-
-    setTryState('sending');
-    setTryError(null);
-
-    try {
-      await api.post('/api/orchestrate', { intent: tryPrompt.trim() });
-      setTryState('sent');
-      setTryPrompt('');
-      setTimeout(() => setTryState('idle'), 3000);
-    } catch (err) {
-      setTryState('error');
-      setTryError(err instanceof Error ? err.message : 'Failed to dispatch task');
-      setTimeout(() => setTryState('idle'), 4000);
-    }
-  }
 
   return (
     <div className="mt-2 space-y-8 pb-10">
@@ -100,49 +75,6 @@ export function AgentDrawerContent({
         </div>
       </div>
 
-      {/* Try This Agent */}
-      <div className="space-y-3 border-t border-border pt-6">
-        <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-          <PlayCircle size={16} className="text-muted-foreground" />
-          Try This Agent
-        </h4>
-        <p className="text-xs text-muted-foreground">
-          Dispatch a task directly to the orchestrator — it will route to {agent.name}.
-        </p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={tryPrompt}
-            onChange={(event) => setTryPrompt(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                void handleTryAgent();
-              }
-            }}
-            placeholder={`e.g. "Write a blog post about AI trends"`}
-            disabled={tryState === 'sending' || tryState === 'sent'}
-            className="flex-1 rounded-xl border border-border bg-secondary px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-          />
-          <button
-            type="button"
-            onClick={() => void handleTryAgent()}
-            disabled={!tryPrompt.trim() || tryState !== 'idle'}
-            className="shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-1.5"
-          >
-            {tryState === 'sending'
-              ? <Loader2 size={14} className="animate-spin" />
-              : tryState === 'sent'
-                ? <CheckCircle2 size={14} />
-                : 'Run'}
-          </button>
-        </div>
-        {tryState === 'sent' && (
-          <p className="text-xs text-emerald-500">Task dispatched — check the Tasks panel to track progress.</p>
-        )}
-        {tryState === 'error' && tryError && (
-          <p className="text-xs text-destructive">{tryError}</p>
-        )}
-      </div>
     </div>
   );
 }

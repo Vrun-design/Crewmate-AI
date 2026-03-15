@@ -68,7 +68,7 @@ export async function createRuntimeSession(sessionId: string, userId: string): P
   };
 
   runtime.proactiveInterval = setInterval(() => {
-    if (!runtime.hasVideoContext) {
+    if (!runtime.hasVideoContext || runtime.pendingTurn) {
       return;
     }
 

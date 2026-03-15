@@ -10,6 +10,17 @@ export function listTranscript(sessionId: string): TranscriptMessage[] {
   `).all(sessionId) as TranscriptMessage[];
 }
 
+export function getSessionMeta(sessionId: string): Omit<SessionRecord, 'transcript' | 'audioChunks' | 'playbackRevision'> | null {
+  const row = db.prepare(`
+    SELECT id, status, started_at as startedAt, ended_at as endedAt, user_id as userId, provider
+    FROM sessions
+    WHERE id = ?
+    LIMIT 1
+  `).get(sessionId) as (Omit<SessionRecord, 'transcript'> & {userId?: string | null}) | undefined;
+
+  return row ?? null;
+}
+
 export function getSession(sessionId: string): SessionRecord | null {
   const row = db.prepare(`
     SELECT id, status, started_at as startedAt, ended_at as endedAt, user_id as userId, provider

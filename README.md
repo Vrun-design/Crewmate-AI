@@ -10,7 +10,7 @@
 [![Google Cloud](https://img.shields.io/badge/Deployed%20on-Google%20Cloud-34A853?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com)
 [![Gemini Live Agent Challenge](https://img.shields.io/badge/Hackathon-Gemini%20Live%20Agent%20Challenge-FF6D00?style=for-the-badge)](https://devpost.com)
 
-**Category: Live Agents 🗣️ + UI Navigator ☸️**
+**Category: Live Agents 🗣️**
 
 [Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-62-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment) · [Full Architecture Diagrams](docs/ARCHITECTURE.md)
 
@@ -761,8 +761,31 @@ Crewmate uses a **multi-model routing strategy** to balance quality, speed, and 
 | ⚡ **Text & quick tasks** | `gemini-3.1-flash-lite-preview` | Inline skill calls, fast responses, confirmations |
 | 🎨 **Creative / images** | `gemini-3.1-flash-image-preview` | Image generation, creative content |
 | 💬 **Lite / filler** | `gemini-3.1-flash-lite-preview` | Acknowledgements, simple Q&A |
+| 🔢 **Vector embeddings** | `gemini-embedding-2` | Semantic memory encoding — every session turn, agent result, skill output, and screenshot is embedded and stored for future retrieval |
 
 All models can be overridden via environment variables (`GEMINI_LIVE_MODEL`, `GEMINI_RESEARCH_MODEL`, etc.).
+
+### Vector Memory — How It Works
+
+Crewmate uses **Gemini Embedding 2** (`gemini-embedding-2`) to build a persistent, semantically searchable memory layer across all interactions:
+
+```
+Every turn / agent result / skill output
+        ↓
+embedText(content) → gemini-embedding-2 → float[] vector
+        ↓
+Stored in SQLite memory_records table (embedding column)
+        ↓
+On next session or agent run:
+embedText(query) → cosine similarity against all stored vectors
+        ↓
+Top-5 most relevant memories injected into system prompt
+```
+
+- **Write paths**: live turns, agent results, skill outputs, screenshot artifacts
+- **Retrieval**: cosine similarity search with lexical fallback for zero-vector records
+- **Injection point**: system prompt of every Live session AND every specialist agent before it runs — so Crewmate knows your company, preferences, and past work from turn one
+- **Model fallback**: automatically falls back to `gemini-embedding-001` if the primary model is unavailable
 
 ---
 

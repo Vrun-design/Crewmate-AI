@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, User, ShieldAlert, Cpu, Sparkles } from 'lucide-react';
+import { Save, User, ShieldAlert, Cpu, SlidersHorizontal } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { PropertyRow } from '../ui/PropertyRow';
 import { onboardingService, type OnboardingProfile } from '../../services/onboardingService';
@@ -91,7 +91,7 @@ export function SoulDrawerContent({ profile, onSaved }: SoulDrawerContentProps):
 
       <div className="space-y-4">
         <div className="flex items-center gap-2 border-b border-border/40 pb-3">
-          <Sparkles size={16} className="text-violet-400" />
+          <SlidersHorizontal size={16} className="text-violet-400" />
           <h3 className="text-[13px] font-bold tracking-[0.08em] uppercase text-white/90">Personality</h3>
         </div>
 

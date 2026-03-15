@@ -202,7 +202,7 @@ export function registerLiveSessionRoutes(app: Express, requireAuth: RequireAuth
 
       const session = sessionRecord.provider === 'local'
         ? sendLocalSessionMessage(req.params.sessionId, text)
-        : await sendLiveMessage(req.params.sessionId, text);
+        : sendLiveMessage(req.params.sessionId, text);
       res.json(session);
     } catch (error) {
       res.status(500).json({

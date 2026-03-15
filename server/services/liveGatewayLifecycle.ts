@@ -130,6 +130,16 @@ export async function connectGeminiSession(
           current.pendingTurn.reject(new Error('Gemini Live session closed.'));
           clearPendingTurn(current);
         }
+
+        // Session ended without resumption — notify frontend so it can prompt a restart
+        const userId = getSessionUserId(sessionId);
+        if (userId) {
+          broadcastEvent(userId, 'session_error', {
+            sessionId,
+            reason: 'session_expired',
+            message: 'Your Crewmate session ended. Tap to start a new one.',
+          });
+        }
       },
     },
   });

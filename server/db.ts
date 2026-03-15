@@ -41,6 +41,8 @@ ensureDirectoryExists(artifactStoragePath);
 export const db = new Database(databasePath);
 
 db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
+db.pragma('synchronous = NORMAL');
 
 db.exec(DB_SCHEMA_SQL);
 runDatabaseMigrations(db);

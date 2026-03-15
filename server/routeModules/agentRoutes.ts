@@ -181,7 +181,12 @@ export function registerAgentRoutes(app: Express, requireAuth: RequireAuth): voi
     }
 
     const unsubscribe = subscribeToTask(req.params.id, (event) => {
-      res.write(event);
+      try {
+        res.write(event);
+      } catch {
+        unsubscribe();
+        res.end();
+      }
     });
 
     req.on('close', () => {

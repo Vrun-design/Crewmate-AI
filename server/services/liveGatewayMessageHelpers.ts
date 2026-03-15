@@ -55,6 +55,8 @@ export function syncAssistantTranscript(runtime: RuntimeSession): void {
   }
 }
 
+const MAX_AUDIO_CHUNKS = 500;
+
 export function collectAudioChunks(runtime: RuntimeSession, message: LiveServerMessage): void {
   const parts = message.serverContent?.modelTurn?.parts ?? [];
 
@@ -76,6 +78,10 @@ export function collectAudioChunks(runtime: RuntimeSession, message: LiveServerM
       data,
       mimeType,
     });
+
+    if (runtime.audioChunks.length > MAX_AUDIO_CHUNKS) {
+      runtime.audioChunks = runtime.audioChunks.slice(-MAX_AUDIO_CHUNKS);
+    }
   }
 }
 

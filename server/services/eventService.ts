@@ -53,7 +53,11 @@ let clients: Client[] = [];
 // Most proxies time out idle connections at 60–120 s; we ping every 25 s.
 setInterval(() => {
   clients.forEach((client) => {
-    client.res.write(': heartbeat\n\n');
+    try {
+      client.res.write(': heartbeat\n\n');
+    } catch {
+      removeSseClient(client.id);
+    }
   });
 }, 25_000);
 
@@ -77,7 +81,11 @@ export function broadcastEvent<TEvent extends keyof EventPayloadMap>(
   const targetClients = clients.filter((client) => client.userId === userId);
 
   targetClients.forEach((client) => {
-    client.res.write(`event: ${event}\n`);
-    client.res.write(`data: ${JSON.stringify(data)}\n\n`);
+    try {
+      client.res.write(`event: ${event}\n`);
+      client.res.write(`data: ${JSON.stringify(data)}\n\n`);
+    } catch {
+      removeSseClient(client.id);
+    }
   });
 }
