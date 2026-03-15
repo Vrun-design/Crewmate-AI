@@ -4,7 +4,6 @@ import { motion } from 'motion/react';
 import { Button } from '../../components/ui/Button';
 import { authService, authStorage } from '../../services/authService';
 import { firebaseAuthService } from '../../services/firebaseAuth';
-import { onboardingFlowService } from '../../services/onboardingFlowService';
 function getSubmitLabel(isFirebaseMode: boolean, isLoading: boolean): string {
   if (isLoading) {
     return 'Sending link...';
@@ -19,15 +18,6 @@ export function Login(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const isFirebaseMode = firebaseAuthService.isConfigured();
-
-  useEffect(() => {
-    authStorage.clearSession();
-    if (!isFirebaseMode) {
-      return;
-    }
-
-    void firebaseAuthService.signOut().catch(() => undefined);
-  }, [isFirebaseMode, navigate]);
 
   function clearFeedback(): void {
     setError(null);
@@ -64,7 +54,6 @@ export function Login(): React.JSX.Element {
       const firebaseUser = await firebaseAuthService.signInWithGoogle();
       const token = await firebaseUser.getIdToken();
       authStorage.saveSession(token, firebaseUser.email ?? '');
-      onboardingFlowService.reset();
       navigate('/dashboard');
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : 'Unable to sign in with Google');

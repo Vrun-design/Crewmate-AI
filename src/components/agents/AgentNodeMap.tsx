@@ -55,9 +55,9 @@ export function AgentNodeMap({ agents, activeAgentIds, onNodeClick, selectedAgen
         <div className="w-full h-[400px] relative group/map flex items-center justify-center">
 
             {/* Background Layer with Rounded Corners & Clipping */}
-            <div className="absolute inset-0 rounded-2xl bg-card border border-border shadow-soft overflow-hidden pointer-events-none z-0">
+            <div className="absolute inset-0 rounded-2xl bg-card border border-border shadow-soft pointer-events-none z-0">
                 {/* Mosaic Grid Background */}
-                <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06] text-foreground"
+                <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-[0.04] dark:opacity-[0.06] text-foreground"
                     style={{
                         backgroundImage: `linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)`,
                         backgroundSize: '32px 32px',

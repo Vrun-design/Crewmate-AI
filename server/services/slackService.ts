@@ -187,6 +187,22 @@ export async function resolveSlackChannelName(workspaceId: string, channelName: 
   return match.id;
 }
 
+async function autoDiscoverSlackChannel(workspaceId: string, token: string): Promise<string> {
+  const res = await fetch('https://slack.com/api/conversations.list?types=public_channel&limit=200&exclude_archived=true', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json() as { ok: boolean; channels?: Array<{ id: string; name: string }> };
+  const channels = data.channels ?? [];
+  // Prefer #general, otherwise take the first available channel
+  const channel = channels.find((c) => c.name === 'general') ?? channels[0];
+  if (!channel) throw new Error('Slack is connected but no channels are accessible. Make sure the Crewmate app is added to at least one channel.');
+
+  // Persist so future calls are instant
+  const existing = getStoredIntegrationConfig(workspaceId, 'slack');
+  saveStoredIntegrationConfig(workspaceId, 'slack', { ...existing, defaultChannelId: channel.id });
+  return channel.id;
+}
+
 export async function postSlackMessage(workspaceId: string, input: PostSlackMessageInput): Promise<SlackMessageResult> {
   const token = requireSlackToken(workspaceId);
   const config = getSlackConfig(workspaceId);
@@ -204,7 +220,7 @@ export async function postSlackMessage(workspaceId: string, input: PostSlackMess
   }
 
   if (!channelId) {
-    throw new Error('Slack is connected, but no channel specified. Provide channelId, channelName (e.g. "engineering"), or set a default channel in Integrations.');
+    channelId = await autoDiscoverSlackChannel(workspaceId, token);
   }
 
   const response = await fetch('https://slack.com/api/chat.postMessage', {
@@ -301,6 +317,54 @@ export async function getSlackMessages(
     userId: msg.user ?? msg.bot_id ?? 'unknown',
     text: msg.text ?? '',
   }));
+}
+
+/** List IM (DM) conversations and return recent messages from a specific user's DM channel */
+export async function getSlackDMs(
+  workspaceId: string,
+  targetUserId: string,
+  limit = 10,
+): Promise<Array<{ ts: string; userId: string; text: string }>> {
+  const token = requireSlackToken(workspaceId);
+
+  // Step 1: find the DM channel for the target user via conversations.open
+  const openResp = await fetch('https://slack.com/api/conversations.open', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ users: targetUserId, return_im: true }),
+  });
+  const openPayload = await openResp.json() as { ok: boolean; channel?: { id: string }; error?: string };
+  if (!openPayload.ok || !openPayload.channel?.id) {
+    throw getSlackApiError('Failed to open Slack DM channel', openPayload.error);
+  }
+
+  const dmChannelId = openPayload.channel.id;
+
+  // Step 2: fetch history from that DM channel
+  return getSlackMessages(workspaceId, dmChannelId, limit);
+}
+
+/** List all open IM (DM) channels for the bot */
+export async function listSlackDMChannels(workspaceId: string): Promise<Array<{ id: string; userId: string }>> {
+  const token = requireSlackToken(workspaceId);
+
+  const params = new URLSearchParams({ types: 'im', limit: '100', exclude_archived: 'true' });
+  const response = await fetch(`https://slack.com/api/conversations.list?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = await response.json() as {
+    ok: boolean;
+    channels?: Array<{ id: string; user?: string }>;
+    error?: string;
+  };
+
+  if (!payload.ok) {
+    throw getSlackApiError('Slack list DM channels failed', payload.error);
+  }
+
+  return (payload.channels ?? [])
+    .filter((ch) => Boolean(ch.user))
+    .map((ch) => ({ id: ch.id, userId: ch.user! }));
 }
 
 /** Send a direct message to a Slack user by userId or display name */

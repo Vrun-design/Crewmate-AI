@@ -9,6 +9,7 @@
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
@@ -50,10 +51,10 @@ export async function runProductAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { type?: 'user_story' | 'prd' | 'sprint' | 'spec' | 'roadmap' | 'competitive' | 'brief'; createTicket?: boolean } = {},
-): Promise<{ output: string; ticketCreated: boolean }> {
+    options: { type?: 'user_story' | 'prd' | 'sprint' | 'spec' | 'roadmap' | 'competitive' | 'brief'; createTicket?: boolean; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ output: string; ticketCreated: boolean; workspaceUrl?: string }> {
     const ai = createGeminiClient();
-    const { type = 'prd', createTicket = true } = options;
+    const { type = 'prd', createTicket = true, outputTarget } = options;
 
     emitStep('thinking', 'Analyzing product challenge...', { detail: `${type}: ${intent.slice(0, 80)}` });
 
@@ -442,8 +443,9 @@ Write the COMPLETE document. Be specific and concrete — fill in plausible spec
         }
     }
 
-    emitStep('done', `Product ${type} complete${ticketCreated ? ' — task created and saved' : ''}`, { success: true });
-    return { output, ticketCreated };
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(output, intent, outputTarget, ctx, emitStep);
+    emitStep('done', `Product ${type} complete${ticketCreated ? ' — task created and saved' : ''}${workspaceUrl ? ' — exported' : ''}`, { success: true });
+    return { output, ticketCreated, workspaceUrl };
 }
 
 export const productAgentApp = express();

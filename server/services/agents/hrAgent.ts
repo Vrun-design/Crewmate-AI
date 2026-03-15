@@ -10,6 +10,7 @@
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
@@ -46,10 +47,10 @@ export async function runHRAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { type?: 'jd' | 'interview' | 'offer' | 'onboarding' | 'review' | 'policy' | 'culture'; role?: string; saveToNotion?: boolean } = {},
-): Promise<{ output: string; savedToNotion: boolean }> {
+    options: { type?: 'jd' | 'interview' | 'offer' | 'onboarding' | 'review' | 'policy' | 'culture'; role?: string; saveToNotion?: boolean; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ output: string; savedToNotion: boolean; workspaceUrl?: string }> {
     const ai = createGeminiClient();
-    const { type = 'jd', role, saveToNotion = true } = options;
+    const { type = 'jd', role, saveToNotion = true, outputTarget } = options;
 
     emitStep('thinking', `Preparing expert ${type} for: ${role ?? intent.slice(0, 60)}...`);
 
@@ -398,8 +399,9 @@ Write the COMPLETE, READY-TO-USE document. Make it specific to the role and cont
         }
     }
 
-    emitStep('done', `HR ${type} complete${savedToNotion ? ' — saved to Notion' : ''}`, { success: true });
-    return { output, savedToNotion };
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(output, intent, outputTarget, ctx, emitStep);
+    emitStep('done', `HR ${type} complete${savedToNotion ? ' — saved to Notion' : ''}${workspaceUrl ? ' — exported' : ''}`, { success: true });
+    return { output, savedToNotion, workspaceUrl };
 }
 
 export const hrAgentApp = express();

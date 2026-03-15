@@ -26,6 +26,7 @@ import type { WorkspaceOutputTarget } from './agents/agentWorkspaceOutput';
 import type { SkillRunContext } from '../skills/types';
 import type { EmitStep } from '../types/agentEvents';
 import type { RoutingDecision } from './orchestratorShared';
+import { retrieveRelevantMemories } from './memoryService';
 
 export const AGENT_MANIFESTS = [
   RESEARCH_AGENT_MANIFEST,
@@ -120,6 +121,7 @@ function runMarketing(intent: string, ctx: SkillRunContext, emitStep: EmitStep) 
   return runMarketingAgent(intent, ctx, emitStep, {
     type,
     saveToNotion: shouldSave(),
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -135,6 +137,7 @@ function runSocial(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
       : hasAny(intent, 'professional') ? 'professional'
       : 'authentic and engaging',
     saveToNotion: shouldSave(),
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -153,6 +156,7 @@ function runHR(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
     type,
     role,
     saveToNotion: shouldSave(),
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -169,6 +173,7 @@ function runProduct(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
   return runProductAgent(intent, ctx, emitStep, {
     type,
     createTicket: createTicket || shouldSave(),
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -191,6 +196,7 @@ function runSupport(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
     type,
     customerName,
     urgency,
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -239,6 +245,7 @@ function runComms(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
     tone,
     send,
     context: '',
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -264,6 +271,7 @@ function runSales(intent: string, ctx: SkillRunContext, emitStep: EmitStep) {
     company: companyMatch?.[1],
     leadName: leadMatch?.[1],
     sendEmail: false, // Never auto-send — always draft first
+    outputTarget: detectWorkspaceOutputTarget(intent),
   });
 }
 
@@ -275,40 +283,50 @@ export async function runAgentForRoutingDecision(
   ctx: SkillRunContext,
   emitStep: EmitStep,
 ): Promise<unknown> {
+  let enrichedIntent = intent;
+  try {
+    const memories = await retrieveRelevantMemories(ctx.userId, intent, 4);
+    if (memories.length > 0) {
+      enrichedIntent = `${intent}\n\n[Relevant context from past sessions:\n${memories.map((m) => `- ${m}`).join('\n')}]`;
+    }
+  } catch {
+    // graceful fallback — proceed without memories
+  }
+
   switch (routing.agent) {
     case 'research':
-      return runResearchAgent(intent, ctx, emitStep, {
-        ...getWorkspaceSaveOptions(intent),
+      return runResearchAgent(enrichedIntent, ctx, emitStep, {
+        ...getWorkspaceSaveOptions(enrichedIntent),
       });
     case 'content':
-      return runContent(intent, ctx, emitStep);
+      return runContent(enrichedIntent, ctx, emitStep);
     case 'devops':
-      return runDevOpsAgent(intent, ctx, emitStep);
+      return runDevOpsAgent(enrichedIntent, ctx, emitStep);
     case 'communications':
-      return runComms(intent, ctx, emitStep);
+      return runComms(enrichedIntent, ctx, emitStep);
     case 'sales':
-      return runSales(intent, ctx, emitStep);
+      return runSales(enrichedIntent, ctx, emitStep);
     case 'marketing':
-      return runMarketing(intent, ctx, emitStep);
+      return runMarketing(enrichedIntent, ctx, emitStep);
     case 'product':
-      return runProduct(intent, ctx, emitStep);
+      return runProduct(enrichedIntent, ctx, emitStep);
     case 'hr':
-      return runHR(intent, ctx, emitStep);
+      return runHR(enrichedIntent, ctx, emitStep);
     case 'support':
-      return runSupport(intent, ctx, emitStep);
+      return runSupport(enrichedIntent, ctx, emitStep);
     case 'social':
-      return runSocial(intent, ctx, emitStep);
+      return runSocial(enrichedIntent, ctx, emitStep);
     case 'finance':
-      return runFinance(intent, ctx, emitStep);
+      return runFinance(enrichedIntent, ctx, emitStep);
     case 'legal':
-      return runLegal(intent, ctx, emitStep);
+      return runLegal(enrichedIntent, ctx, emitStep);
     case 'data':
-      return runData(intent, ctx, emitStep);
+      return runData(enrichedIntent, ctx, emitStep);
     case 'ui_navigator':
-      return runUiNavigatorAgent(intent, ctx, emitStep);
+      return runUiNavigatorAgent(enrichedIntent, ctx, emitStep);
     default:
-      return runResearchAgent(intent, ctx, emitStep, {
-        ...getWorkspaceSaveOptions(intent),
+      return runResearchAgent(enrichedIntent, ctx, emitStep, {
+        ...getWorkspaceSaveOptions(enrichedIntent),
       });
   }
 }

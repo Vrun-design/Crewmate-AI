@@ -9,6 +9,7 @@
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
@@ -53,10 +54,10 @@ export async function runSalesAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { leadName?: string; company?: string; sendEmail?: boolean; type?: 'outreach' | 'sequence' | 'discovery' | 'battlecard' | 'objection' | 'proposal' } = {},
-): Promise<{ research: string; email: string; sent: boolean }> {
+    options: { leadName?: string; company?: string; sendEmail?: boolean; type?: 'outreach' | 'sequence' | 'discovery' | 'battlecard' | 'objection' | 'proposal'; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ research: string; email: string; sent: boolean; workspaceUrl?: string }> {
     const ai = createGeminiClient();
-    const { leadName, company, type = 'outreach' } = options;
+    const { leadName, company, type = 'outreach', outputTarget } = options;
 
     emitStep('thinking', 'Analyzing sales context...', { detail: `${type}: ${company ?? leadName ?? intent.slice(0, 60)}` });
 
@@ -385,8 +386,9 @@ Write the COMPLETE, READY-TO-SEND output. For outreach: make it feel like it was
         }
     }
 
-    emitStep('done', `Sales ${type} complete`, { success: true });
-    return { research, email, sent: false };
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(email, intent, outputTarget, ctx, emitStep);
+    emitStep('done', `Sales ${type} complete${workspaceUrl ? ' — exported' : ''}`, { success: true });
+    return { research, email, sent: false, workspaceUrl };
 }
 
 export const salesAgentApp = express();

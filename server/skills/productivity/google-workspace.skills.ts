@@ -1,12 +1,12 @@
 import type { Skill } from '../types';
 import { parseStringMatrixArgument, requireExplicitApproval } from '../framework';
 import { createCalendarEvent, listCalendarEvents } from '../../services/calendarService';
-import { createGoogleDocument, appendToGoogleDocument } from '../../services/docsService';
+import { createGoogleDocument, appendToGoogleDocument, readGoogleDocument } from '../../services/docsService';
 import { createDriveFolder, searchDriveFiles } from '../../services/driveService';
 import { inferAutoImageQuery } from '../../services/autoVisuals';
 import { resolveGoogleResourceId } from '../../services/googleResourceResolver';
 import { createGmailDraft, searchGmailMessages, sendGmailMessage } from '../../services/gmailService';
-import { createGoogleSpreadsheet, appendSpreadsheetRows } from '../../services/sheetsService';
+import { createGoogleSpreadsheet, appendSpreadsheetRows, readGoogleSpreadsheet } from '../../services/sheetsService';
 import { createGooglePresentation, addSlidesToPresentation } from '../../services/slidesService';
 import { searchStockImage } from '../../services/imageSearchService';
 
@@ -819,6 +819,135 @@ export const googleCalendarListEventsSkill: Skill = {
       message: count === 0
         ? 'No upcoming calendar events found.'
         : `Found ${count} upcoming event(s) on your calendar.`,
+    };
+  },
+};
+
+export const googleDocsReadDocumentSkill: Skill = {
+  id: 'google.docs-read-document',
+  name: 'Read Google Doc',
+  description: 'Read the full text content of a Google Doc by ID or URL. Use this when the user references a doc, wants to summarise it, or needs its content for a downstream task.',
+  version: '1.0.0',
+  category: 'productivity',
+  requiresIntegration: ['google-workspace'],
+  triggerPhrases: ['Read my Google Doc', 'Summarise this document', 'What does this doc say'],
+  preferredModel: 'quick',
+  executionMode: 'delegated',
+  latencyClass: 'slow',
+  sideEffectLevel: 'none',
+  exposeInLiveSession: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      documentId: { type: 'string', description: 'Google Doc ID or full URL.' },
+    },
+    required: ['documentId'],
+  },
+  handler: async (ctx, args) => {
+    const result = await readGoogleDocument(ctx.workspaceId, String(args.documentId ?? ''));
+    return {
+      success: true,
+      output: result,
+      message: `Read "${result.title}" — ${result.text.length} characters of content.`,
+    };
+  },
+};
+
+export const googleSheetsReadSpreadsheetSkill: Skill = {
+  id: 'google.sheets-read-spreadsheet',
+  name: 'Read Google Sheet',
+  description: 'Read the rows and cells of a Google Spreadsheet by ID or URL. Returns all sheets with their data. Use when the user wants to analyse, summarise, or act on spreadsheet data.',
+  version: '1.0.0',
+  category: 'productivity',
+  requiresIntegration: ['google-workspace'],
+  triggerPhrases: ['Read my Google Sheet', 'Analyse this spreadsheet', 'What data is in this sheet'],
+  preferredModel: 'quick',
+  executionMode: 'delegated',
+  latencyClass: 'slow',
+  sideEffectLevel: 'none',
+  exposeInLiveSession: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      spreadsheetId: { type: 'string', description: 'Google Sheets ID or full URL.' },
+    },
+    required: ['spreadsheetId'],
+  },
+  handler: async (ctx, args) => {
+    const id = String(args.spreadsheetId ?? '').trim();
+    const urlMatch = id.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+    const resolvedId = urlMatch ? urlMatch[1] : id;
+    const result = await readGoogleSpreadsheet(ctx.workspaceId, resolvedId);
+    const totalRows = result.sheets.reduce((sum, s) => sum + s.rows.length, 0);
+    return {
+      success: true,
+      output: result,
+      message: `Read "${result.title}" — ${result.sheets.length} sheet(s), ${totalRows} total rows.`,
+    };
+  },
+};
+
+export const googleGmailReadMessageSkill: Skill = {
+  id: 'google.gmail-read-message',
+  name: 'Read Gmail Message',
+  description: 'Read the full content of a specific Gmail message by ID. Returns subject, sender, body text, and date. Use this after searching Gmail to get the actual email content for summarising, replying, or acting on.',
+  version: '1.0.0',
+  category: 'productivity',
+  requiresIntegration: ['google-workspace'],
+  triggerPhrases: ['Read this email', 'What does this email say', 'Open this Gmail message'],
+  preferredModel: 'quick',
+  executionMode: 'delegated',
+  latencyClass: 'slow',
+  sideEffectLevel: 'none',
+  exposeInLiveSession: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      messageId: { type: 'string', description: 'Gmail message ID (from search results).' },
+    },
+    required: ['messageId'],
+  },
+  handler: async (ctx, args) => {
+    const { readGmailMessage } = await import('../../services/gmailService');
+    const result = await readGmailMessage(ctx.workspaceId, String(args.messageId ?? ''));
+    return {
+      success: true,
+      output: result,
+      message: `Email from ${result.from} — Subject: "${result.subject}"`,
+    };
+  },
+};
+
+export const googleSlidesReadPresentationSkill: Skill = {
+  id: 'google.slides-read-presentation',
+  name: 'Read Google Slides',
+  description: 'Read the content of an existing Google Slides presentation by ID or URL. Returns all slide titles and body text. Use when the user references a deck, wants to summarise it, or needs its content for a downstream task.',
+  version: '1.0.0',
+  category: 'productivity',
+  requiresIntegration: ['google-workspace'],
+  triggerPhrases: ['Read my presentation', 'What does this deck say', 'Summarise these slides'],
+  preferredModel: 'quick',
+  executionMode: 'delegated',
+  latencyClass: 'slow',
+  sideEffectLevel: 'none',
+  exposeInLiveSession: true,
+  inputSchema: {
+    type: 'object',
+    properties: {
+      presentationId: { type: 'string', description: 'Google Slides presentation ID or full URL.' },
+    },
+    required: ['presentationId'],
+  },
+  handler: async (ctx, args) => {
+    const { readGooglePresentation } = await import('../../services/slidesService');
+    const id = String(args.presentationId ?? '').trim();
+    const urlMatch = id.match(/\/presentation\/d\/([a-zA-Z0-9_-]+)/);
+    const resolvedId = urlMatch ? urlMatch[1] : id;
+    const result = await readGooglePresentation(ctx.workspaceId, resolvedId);
+    return {
+      success: true,
+      output: result,
+      message: `Read "${result.title}" — ${result.slides.length} slide(s).`,
     };
   },
 };

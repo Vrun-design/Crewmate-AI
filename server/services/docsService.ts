@@ -138,6 +138,36 @@ function buildRichInsertRequests(
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
+export async function readGoogleDocument(workspaceId: string, documentId: string): Promise<{
+  id: string;
+  title: string;
+  text: string;
+  url: string;
+}> {
+  const doc = await googleWorkspaceApiRequest<{
+    documentId: string;
+    title: string;
+    body?: {
+      content?: Array<{
+        paragraph?: {
+          elements?: Array<{ textRun?: { content?: string } }>;
+        };
+      }>;
+    };
+  }>({
+    workspaceId,
+    moduleId: 'docs',
+    url: `https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}`,
+  });
+
+  const text = (doc.body?.content ?? [])
+    .flatMap((el) => el.paragraph?.elements ?? [])
+    .map((el) => el.textRun?.content ?? '')
+    .join('');
+
+  return { id: doc.documentId, title: doc.title, text: text.trim(), url: buildDocsUrl(doc.documentId) };
+}
+
 export async function createGoogleDocument(workspaceId: string, input: {
   title: string;
   content?: string;

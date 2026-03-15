@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Clock3 } from 'lucide-react';
-import { ActiveDelegatedTasksCard } from '../components/dashboard/ActiveDelegatedTasksCard';
 import { IntegrationsCard } from '../components/dashboard/IntegrationsCard';
 import { LiveSessionCard } from '../components/dashboard/LiveSessionCard';
 import { RecentActivityCard } from '../components/dashboard/RecentActivityCard';
@@ -134,7 +133,6 @@ export function Dashboard() {
         title="Recent Activity"
       >
         <div className="grid content-start gap-4">
-          <ActiveDelegatedTasksCard summary={data?.activeTaskSummary} />
           <RecentTasksCard tasks={data?.tasks ?? []} />
           <RecentActivityCard activities={data?.activities ?? []} />
           <IntegrationsCard integrations={data?.integrations ?? []} />

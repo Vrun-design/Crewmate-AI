@@ -565,15 +565,29 @@ export async function finalizeNotionOAuthCallback(input: { code: string; state: 
   return redirectUrl.toString();
 }
 
+async function autoDiscoverNotionParentPage(workspaceId: string): Promise<string> {
+  const { token } = getNotionConfig(workspaceId);
+  const res = await fetch(`${NOTION_API_BASE}/search`, {
+    method: 'POST',
+    headers: getNotionHeaders(token),
+    body: JSON.stringify({ filter: { value: 'page', property: 'object' }, page_size: 1 }),
+  });
+  const data = await res.json() as { results?: Array<{ id: string }> };
+  const pageId = data.results?.[0]?.id;
+  if (!pageId) throw new Error('Notion is connected but no pages are accessible to the integration. Share at least one page with Crewmate in Notion settings.');
+  // Persist so future calls are instant
+  const existing = getStoredIntegrationConfig(workspaceId, NOTION_INTEGRATION_ID);
+  saveStoredIntegrationConfig(workspaceId, NOTION_INTEGRATION_ID, { ...existing, defaultParentId: pageId, parentPageId: pageId });
+  return pageId;
+}
+
 export async function createNotionPage(workspaceId: string, input: CreateNotionPageInput): Promise<NotionPageResult> {
   const config = getNotionConfig(workspaceId);
   if (!isNotionConfigured(workspaceId)) {
     throw new Error('Notion is not connected. Connect Notion from the Integrations page first.');
   }
 
-  if (!config.parentPageId) {
-    throw new Error('Notion is connected, but no default destination is selected yet. Choose a default destination in Integrations.');
-  }
+  const parentPageId = config.parentPageId || await autoDiscoverNotionParentPage(workspaceId);
 
   const children = buildBlocksFromContent(input.content, {
     screenshotUrl: input.screenshotUrl,
@@ -583,7 +597,7 @@ export async function createNotionPage(workspaceId: string, input: CreateNotionP
     method: 'POST',
     body: JSON.stringify({
       parent: {
-        page_id: config.parentPageId,
+        page_id: parentPageId,
       } satisfies NotionParent,
       properties: {
         title: {
@@ -797,6 +811,52 @@ export async function createNotionDatabaseRecord(workspaceId: string, input: Cre
     id: payload.id,
     url: payload.url,
     title: input.title,
+  };
+}
+
+export async function readNotionPageContent(workspaceId: string, pageIdOrUrl: string): Promise<{
+  id: string;
+  title: string;
+  url: string;
+  text: string;
+}> {
+  const { token } = getNotionConfig(workspaceId);
+  const pageId = extractPageId(pageIdOrUrl);
+
+  const page = await fetch(`${NOTION_API_BASE}/pages/${pageId}`, {
+    headers: getNotionHeaders(token),
+  }).then((r) => r.json()) as { id: string; url: string; properties?: Record<string, unknown> };
+
+  let title = 'Untitled';
+  const props = page.properties as Record<string, { type: string; title?: Array<{ plain_text?: string }> }> | undefined;
+  if (props) {
+    for (const val of Object.values(props)) {
+      if (val.type === 'title' && val.title?.length) {
+        title = val.title.map((t) => t.plain_text ?? '').join('');
+        break;
+      }
+    }
+  }
+
+  // Fetch all blocks (up to 250)
+  const blocksRes = await fetch(`${NOTION_API_BASE}/blocks/${pageId}/children?page_size=100`, {
+    headers: getNotionHeaders(token),
+  }).then((r) => r.json()) as { results?: Array<Record<string, unknown>> };
+
+  function extractBlockText(block: Record<string, unknown>): string {
+    const type = block.type as string;
+    const blockData = block[type] as { rich_text?: Array<{ plain_text?: string }> } | undefined;
+    if (!blockData?.rich_text) return '';
+    return blockData.rich_text.map((rt) => rt.plain_text ?? '').join('');
+  }
+
+  const lines = (blocksRes.results ?? []).map((b) => extractBlockText(b)).filter(Boolean);
+
+  return {
+    id: page.id,
+    title,
+    url: page.url,
+    text: lines.join('\n').trim(),
   };
 }
 

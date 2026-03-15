@@ -96,6 +96,10 @@ export const firebaseAuthService = {
     const user = auth?.currentUser ?? null;
     return user ? user.getIdToken(forceRefresh) : '';
   },
+  getCurrentUser(): User | null {
+    const auth = getFirebaseAuth();
+    return auth?.currentUser ?? null;
+  },
   onIdTokenChanged(callback: (user: User | null) => void): (() => void) | null {
     const auth = getFirebaseAuth();
     return auth ? onIdTokenChanged(auth, callback) : null;

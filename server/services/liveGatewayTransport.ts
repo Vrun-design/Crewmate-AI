@@ -142,14 +142,22 @@ export function sendLiveMessage(sessionId: string, text: string): SessionRecord 
   return getLiveSessionSnapshot(sessionId, runtime);
 }
 
+const ALLOWED_VIDEO_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 export function sendLiveVideoFrame(sessionId: string, input: { mimeType: string; data: string }): void {
   const runtime = getRuntimeSession(sessionId);
   if (!runtime) {
     throw new Error('Live runtime not found. Start a Gemini session first.');
   }
 
-  runtime.lastFrameData = { mimeType: input.mimeType, data: input.data };
-  runtime.session.sendRealtimeInput({ video: input });
+  const mimeType = ALLOWED_VIDEO_MIME_TYPES.has(input.mimeType) ? input.mimeType : 'image/jpeg';
+  if (!input.data || input.data.length < 100) {
+    return; // Drop empty or obviously malformed frames silently
+  }
+
+  const frame = { mimeType, data: input.data };
+  runtime.lastFrameData = frame;
+  runtime.session.sendRealtimeInput({ video: frame });
 
   if (!runtime.hasVideoContext) {
     runtime.hasVideoContext = true;

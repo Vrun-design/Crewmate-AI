@@ -6,7 +6,16 @@
 
 ## System Overview
 
-Crewmate is a multimodal AI operator. It connects a real-time Gemini Live session (voice + screen) to a full backend orchestration layer, enabling natural spoken commands to trigger complex multi-step work across any connected tool or browser — all while reporting progress back in real-time.
+Crewmate is a multimodal AI remote employee. It connects a real-time Gemini Live session (voice + screen) to a full backend orchestration layer. Voice commands reach 14 specialist agents, read and write real documents, chain into multi-step pipelines, and report progress in real-time — all while remembering context from past sessions.
+
+**What's changed recently:**
+- Live sessions can now reach all 14 specialist agents via `live.delegate-to-agent`
+- Agents chain sequentially via `live.run-pipeline` with context passed between steps
+- Every agent run gets relevant memory injected before starting
+- Agents perform a self-critique pass before returning output
+- Full document reading: Google Docs, Sheets, Slides, Notion pages, Gmail bodies
+- Editable Soul: user name + custom personality injected into every agent and live prompt
+- Firebase OAuth race condition fixed — no more logout after Google Workspace connect
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -37,29 +46,32 @@ Crewmate is a multimodal AI operator. It connects a real-time Gemini Live sessio
 │  │       │                           (gemini-2.5-flash-     │   │
 │  │       │                            native-audio)         │   │
 │  │  promptBuilder                                           │   │
-│  │  (Memory + Integrations injected into every prompt)      │   │
+│  │  (Memory + Integrations + User Name + Soul injected)     │   │
 │  │       │                                                  │   │
 │  │  messageProcessor ── toolRunner                          │   │
 │  │                           │                             │   │
 │  │               ┌───────────┴────────────┐                │   │
 │  │               │  executionPolicy       │                │   │
-│  │               │  inline? delegated?    │                │   │
+│  │               │  inline / delegated /  │                │   │
+│  │               │  delegate-to-agent /   │                │   │
+│  │               │  run-pipeline          │                │   │
 │  │               └───────────┬────────────┘                │   │
 │  └───────────────────────────┼──────────────────────────────┘   │
 │                              │                                   │
-│          ┌───────────────────┼──────────────────┐               │
-│          │                   │                  │               │
-│          ▼                   ▼                  ▼               │
-│   ┌─────────────┐   ┌─────────────────┐  ┌──────────────────┐  │
-│   │   INLINE    │   │  ORCHESTRATOR   │  │  MEMORY LAYER    │  │
-│   │   SKILLS    │   │  Intent Router  │  │                  │  │
-│   │  (< 2s,     │   │  (gemini-pro)   │  │  memoryService   │  │
-│   │   safe)     │   │       │         │  │  embeddingService│  │
-│   └─────────────┘   │  14 Specialist  │  │  SQLite          │  │
-│                      │  Agents         │  │  (vector search) │  │
-│                      │       │         │  └──────────────────┘  │
-│                      │  52 Skills      │                        │
-│                      └────────┬────────┘                        │
+│     ┌────────────────────────┼─────────────────────┐            │
+│     │                        │                     │            │
+│     ▼                        ▼                     ▼            │
+│  ┌──────────┐   ┌────────────────────────┐  ┌──────────────┐   │
+│  │  INLINE  │   │     ORCHESTRATOR       │  │ PIPELINE     │   │
+│  │  SKILLS  │   │  Intent Router         │  │ ORCHESTRATOR │   │
+│  │  (< 2s)  │   │  (gemini-pro)          │  │ Sequential   │   │
+│  └──────────┘   │                        │  │ Agent Chain  │   │
+│                 │  Memory injected →     │  └──────────────┘   │
+│                 │  14 Specialist Agents  │         │           │
+│                 │  (+ self-critique)     │         │           │
+│                 │                        │         │           │
+│                 │  62 Skills             │←────────┘           │
+│                 └────────────┬───────────┘                     │
 │                               │                                  │
 │                               ▼                                  │
 │                    ┌──────────────────────┐                     │
@@ -127,8 +139,9 @@ flowchart TD
 
         subgraph ExecutionLayer["Execution Layer"]
             ORCH[Orchestrator\nIntent Router]
-            POLICY[Execution Policy\nInline · Delegated · Either]
-            REG[Skill Registry\n52 Skills]
+            PIPE[Pipeline Orchestrator\nSequential Agent Chaining]
+            POLICY[Execution Policy\nInline · Delegated · Agent · Pipeline]
+            REG[Skill Registry\n62 Skills]
         end
 
         subgraph AgentLayer["Agent Layer — 14 Specialists"]
@@ -158,10 +171,13 @@ flowchart TD
     LGW <-->|WebSocket| GEMINI
     LPB --> MemoryLayer
     LTR --> POLICY --> REG
-    LTR -->|delegated| ORCH
+    LTR -->|live.delegate-to-agent| ORCH
+    LTR -->|live.run-pipeline| PIPE
     ORCH --> AgentLayer
+    PIPE -->|sequential steps\ncontext forwarded| AgentLayer
+    AgentLayer -->|memory injected before run| MemoryLayer
     AgentLayer --> REG
-    REG -->|Notion, Slack, ClickUp\nGmail, Docs, Sheets\nBrowser, Terminal| ExtServices["🔌 External Services"]
+    REG -->|Notion, Slack, ClickUp\nGmail, Docs, Sheets, Slides\nBrowser, Terminal| ExtServices["🔌 External Services"]
     MEM --> EMB --> DB
     ORCH --> DB
     SSE -->|live_task_update\nstep · completed · failed| FE
@@ -204,6 +220,20 @@ sequenceDiagram
             Skills-->>TR: result
             TR-->>Gemini: tool_response
             Gemini-->>UI: continues speaking with result
+        else live.delegate-to-agent (complex task)
+            TR->>Orch: orchestrate(intent)
+            Orch->>Orch: retrieveRelevantMemories() → enrichedIntent
+            Orch->>Orch: routeIntent() → specialist agent
+            Note over Orch: Agent runs self-critique before returning
+            Orch-->>UI: SSE: task_created + streaming steps
+            TR-->>Gemini: tool_response {taskId, routeType}
+            Gemini-->>UI: "Running that in the background"
+        else live.run-pipeline (multi-step chain)
+            TR->>Orch: runPipeline([step1, step2, ...])
+            Note over Orch: Each step awaits previous output\nContext forwarded automatically
+            Orch-->>UI: SSE: steps per agent in chain
+            TR-->>Gemini: tool_response {stepCount}
+            Gemini-->>UI: "Pipeline of N steps started"
         else delegated skill (slow or has side-effects)
             TR->>Orch: delegateSkillExecution()
             Orch-->>UI: SSE: task_created + streaming steps
@@ -258,13 +288,14 @@ flowchart TD
     STORE --> EMB["embedAndStore\nasync · fire-and-forget"]
     EMB --> VEC["embedding column\ncosine similarity search"]
 
-    subgraph ReadPath["Read Path — injected into every Live prompt"]
-        RETRIEVE["retrieveRelevantMemories\ntopK=5"]
+    subgraph ReadPath["Read Path — injected into Live sessions AND every Agent run"]
+        RETRIEVE["retrieveRelevantMemories\ntopK=4-5"]
         VEC --> RETRIEVE
         RETRIEVE -->|"vector similarity + lexical fallback"| INJECT["Inject into System Prompt"]
     end
 
     INJECT --> LIVE["Gemini Live Session\nContext-aware from turn 1"]
+    INJECT --> AGENTS["Every Specialist Agent\nReceives past context before running\n(Research, Sales, Product, Content...)"]
 ```
 
 ---
@@ -305,17 +336,75 @@ flowchart LR
 
 ---
 
+## Agent Quality Architecture
+
+Every specialist agent now runs through a consistent quality pipeline:
+
+```
+1. MEMORY INJECTION
+   retrieveRelevantMemories(userId, intent, 4)
+   → Past work, preferences, company context prepended to the intent
+       ↓
+2. ROUTING
+   LLM classifies intent → picks specialist agent (Research, Sales, Product, etc.)
+       ↓
+3. AGENT EXECUTION
+   Agent runs multi-step reasoning with skills (search, read docs, write docs)
+       ↓
+4. SELF-CRITIQUE (built into every agent system prompt)
+   Before returning: "Does this fully answer the question? Are claims backed by data?
+   Is this immediately usable? Is anything obviously missing?" → improve if not.
+       ↓
+5. OUTPUT + SAVE
+   Result saved to Notion/ClickUp/Slack as appropriate
+   Result ingested into memory for future sessions
+```
+
+---
+
+## Document Reading Layer
+
+Crewmate can now read real content from all major document types:
+
+| Source | Skill | Returns |
+|---|---|---|
+| Google Docs | `google.docs-read-document` | Full plain text |
+| Google Sheets | `google.sheets-read-spreadsheet` | All sheets, rows/cells (up to 200 rows per sheet) |
+| Google Slides | `google.slides-read-presentation` | All slide titles + body text |
+| Gmail | `google.gmail-read-message` | Subject, from, to, date, full decoded body |
+| Notion | `notion.read-page` | All block content as plain text |
+
+This enables flows like: *"Read my Q3 strategy doc, then research our competitors, then write a PRD"* — the agent actually understands what's in the doc before acting.
+
+---
+
+## Agent Pipeline (Sequential Chaining)
+
+`live.run-pipeline` lets voice commands trigger a chain of agents where each step feeds into the next:
+
+```
+User: "Research our top 3 competitors, then write a battle card, then draft an outreach email"
+↓
+Pipeline step 1: Research Agent → competitor analysis
+Pipeline step 2: Sales Agent    → receives step 1 output as context → battle card
+Pipeline step 3: Sales Agent    → receives step 2 output as context → outreach email
+```
+
+Each step runs `orchestrate()` with the previous step's output appended. Steps time out at 5 minutes each. On failure, the pipeline stops and reports which step failed.
+
+---
+
 ## Tech Stack Summary
 
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, Vite, TypeScript, Tailwind CSS, Framer Motion |
 | Backend | Node.js, Express, TypeScript |
-| AI | Google Gemini Live API, Gemini Pro (routing/agents), Google GenAI SDK |
-| Database | SQLite (16 tables, vector embeddings column) |
-| Auth | Firebase Authentication (JWT) |
+| AI | Google Gemini Live API, Gemini Pro (routing/agents), Gemini Flash (inline/briefing), Google GenAI SDK |
+| Database | SQLite (19 tables, vector embeddings column) |
+| Auth | Firebase Authentication (JWT) + dev email-code login |
 | Browser Automation | Stagehand + Playwright + Chromium |
 | Hosting | Google Cloud Run (backend) · Firebase Hosting (frontend) |
-| Integrations | Google Workspace, Notion, Slack, ClickUp, GitHub |
+| Integrations | Google Workspace (full read+write), Notion, Slack (inc. DMs), ClickUp, GitHub |
 | Real-time | Server-Sent Events (SSE) for task streaming |
-| Memory | Vector similarity search (cosine) with lexical fallback |
+| Memory | Vector similarity search (cosine) with lexical fallback — injected into live sessions AND agent runs |

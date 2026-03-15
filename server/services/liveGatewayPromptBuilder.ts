@@ -40,7 +40,26 @@ const DEFAULT_SYSTEM_IDENTITY = `You are the user's live work partner inside thi
 ## Use Context Well
 - If screen sharing is on, use what you can already see instead of asking the user to repeat IDs, names, or links.
 - If past context matters, reference it naturally.
-- You can keep talking while work continues in the background — use that to reduce friction, not to narrate every internal step.`;
+- You can keep talking while work continues in the background — use that to reduce friction, not to narrate every internal step.
+
+## Tool Routing — Critical Decision
+You have two categories of tools available:
+
+**Direct skills** — call these for simple, atomic, single-step actions where all the data is known:
+- Listing emails, calendar events, Slack messages, Notion pages
+- Creating a folder, sending a message, posting to a channel
+- Capturing a screenshot, retrieving memory, cancelling a task
+
+**live_delegate-to-agent** — call THIS for anything that requires judgment, research, multiple steps, or professional-quality output:
+- Research tasks: "research competitors", "look up X", "find out about Y"
+- Writing tasks: "write a blog post", "draft an email", "create content"
+- Analysis tasks: "analyse my data", "create a report", "build a financial model"
+- Compound tasks: "research X and make a deck/sheet/doc"
+- Creation tasks that need quality: PRDs, marketing briefs, sales outreach, HR docs, legal review
+- Any task where a thoughtful human professional would spend >5 minutes
+
+When in doubt between direct skill and delegate: if the output needs to be good, delegate to an agent.
+The agent will route to the right specialist (Research, Content, Data, Sales, Marketing, HR, Legal, Finance, Product, Support, Social, DevOps, or UI Navigator) automatically.`;
 
 const GOOGLE_WORKSPACE_APPENDIX = `
 
@@ -63,7 +82,8 @@ const LIVE_FAST_APPENDIX = `
 - **If something is taking longer than expected:** give a brief heads-up. "This one's taking a moment…" Don't let silence stretch past 4 seconds without a word.
 
 ## Error Communication (Voice)
-- When a skill fails: speak the reason naturally. "Couldn't create the page — Notion isn't connected." Then offer the fix.
+- When a skill or background task fails: **always say so immediately and clearly**. Never go quiet. "That one failed — [reason]. Here's what we can do..." is the right move.
+- Never let a failure pass silently hoping the user doesn't notice. They always notice. Be upfront.
 - When you're reconnecting after a drop: say "Reconnecting…" or "Just a second—" naturally, not silence.
 - When you don't know something: "I'm not sure, but…" then your best answer. Never fabricate.
 
@@ -152,12 +172,12 @@ function buildRecentCompletedTaskContext(userId: string): string {
   }
 }
 
-function buildUserNameContext(userId: string): string {
+function buildUserNameContext(userId: string): { userName: string; customSoul: string } {
   try {
     const profile = getOnboardingProfile(userId);
-    return profile.agentName && profile.agentName !== 'Crewmate' ? profile.agentName : '';
+    return { userName: profile.userName ?? '', customSoul: profile.customSoul ?? '' };
   } catch {
-    return '';
+    return { userName: '', customSoul: '' };
   }
 }
 
@@ -199,10 +219,15 @@ export async function buildUserSystemInstruction(userId: string, options?: { liv
 
   const activeTaskContext = buildActiveTaskContext(userId);
   const recentTaskContext = buildRecentCompletedTaskContext(userId);
-  const userName = buildUserNameContext(userId);
+  const { userName, customSoul } = buildUserNameContext(userId);
   const sessionSummaries = buildRecentSessionSummariesContext(userId);
 
-  const userNameLine = userName ? `\n**User's name:** ${userName}` : '';
+  const userNameLine = userName
+    ? `\n**User's name:** ${userName} — address them by name naturally in conversation.`
+    : '';
+  const customSoulSection = customSoul
+    ? `\n\n## Personal Instructions from ${userName || 'the user'}\n${customSoul}`
+    : '';
   const recentTasksSection = recentTaskContext
     ? `\n\n**Recently completed tasks (for continuity):**\n${recentTaskContext}`
     : '';
@@ -210,7 +235,7 @@ export async function buildUserSystemInstruction(userId: string, options?: { liv
     ? `\n\n**Recent session history:**\n${sessionSummaries}`
     : '';
 
-  return `${DEFAULT_SYSTEM_IDENTITY}${buildSystemAppendix(options)}
+  return `${DEFAULT_SYSTEM_IDENTITY}${customSoulSection}${buildSystemAppendix(options)}
 
 ---
 

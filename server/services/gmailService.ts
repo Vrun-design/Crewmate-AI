@@ -91,3 +91,55 @@ export async function searchGmailMessages(workspaceId: string, query: string): P
 
   return payload.messages ?? [];
 }
+
+export async function readGmailMessage(workspaceId: string, messageId: string): Promise<{
+  id: string;
+  threadId: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  body: string;
+  snippet: string;
+}> {
+  const msg = await googleWorkspaceApiRequest<{
+    id: string;
+    threadId: string;
+    snippet?: string;
+    payload?: {
+      headers?: Array<{ name: string; value: string }>;
+      body?: { data?: string };
+      parts?: Array<{ mimeType: string; body?: { data?: string } }>;
+    };
+  }>({
+    workspaceId,
+    moduleId: 'gmail',
+    url: `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=full`,
+  });
+
+  const headers = msg.payload?.headers ?? [];
+  const getHeader = (name: string) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
+
+  function decodeBody(data?: string): string {
+    if (!data) return '';
+    return Buffer.from(data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  }
+
+  // Try direct body first, then parts
+  let body = decodeBody(msg.payload?.body?.data);
+  if (!body && msg.payload?.parts) {
+    const textPart = msg.payload.parts.find((p) => p.mimeType === 'text/plain');
+    body = decodeBody(textPart?.body?.data);
+  }
+
+  return {
+    id: msg.id,
+    threadId: msg.threadId,
+    subject: getHeader('subject'),
+    from: getHeader('from'),
+    to: getHeader('to'),
+    date: getHeader('date'),
+    body: body.trim(),
+    snippet: msg.snippet ?? '',
+  };
+}

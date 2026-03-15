@@ -10,6 +10,7 @@
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
@@ -57,10 +58,10 @@ export async function runSocialAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { platform?: 'twitter' | 'linkedin' | 'all' | 'calendar' | 'instagram' | 'founder'; tone?: string; saveToNotion?: boolean } = {},
-): Promise<{ posts: Record<string, string>; savedToNotion: boolean }> {
+    options: { platform?: 'twitter' | 'linkedin' | 'all' | 'calendar' | 'instagram' | 'founder'; tone?: string; saveToNotion?: boolean; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ posts: Record<string, string>; savedToNotion: boolean; workspaceUrl?: string }> {
     const ai = createGeminiClient();
-    const { platform = 'all', tone = 'authentic and direct', saveToNotion = true } = options;
+    const { platform = 'all', tone = 'authentic and direct', saveToNotion = true, outputTarget } = options;
 
     emitStep('thinking', `Planning ${platform} content strategy...`, { detail: intent.slice(0, 80) });
 
@@ -328,8 +329,9 @@ Write COMPLETE, PUBLICATION-READY content. No placeholders. Make the hook imposs
         }
     }
 
-    emitStep('done', `Social content complete — ${Object.keys(posts).filter(k => k !== 'all').length || 1} platform(s)${savedToNotion ? ' — saved to Notion' : ''}`, { success: true });
-    return { posts, savedToNotion };
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(content, intent, outputTarget, ctx, emitStep);
+    emitStep('done', `Social content complete — ${Object.keys(posts).filter(k => k !== 'all').length || 1} platform(s)${savedToNotion ? ' — saved to Notion' : ''}${workspaceUrl ? ' — exported' : ''}`, { success: true });
+    return { posts, savedToNotion, workspaceUrl };
 }
 
 export const socialAgentApp = express();

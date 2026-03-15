@@ -9,6 +9,7 @@ import type { LiveSession, MicrophoneStatus, ScreenShareStatus } from '../types/
 import type { LiveTaskCue } from '../types/liveTaskCue';
 import { liveSessionService } from '../services/liveSessionService';
 import { api } from '../lib/api';
+import { firebaseAuthService } from '../services/firebaseAuth';
 import type { AgentTask } from '../components/agents/types';
 
 interface LiveSessionContextValue {
@@ -151,6 +152,9 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   React.useEffect(() => {
     async function hydrate() {
       try {
+        // Skip during Firebase initialization — currentUser is null for ~200ms after page load.
+        // Calling the API now would use an expired localStorage token and trigger a logout.
+        if (firebaseAuthService.isConfigured() && !firebaseAuthService.getCurrentUser()) return;
         const tasks = await api.get<AgentTask[]>('/api/agents/tasks');
         const running = tasks?.find((t) => t.status === 'running' || t.status === 'queued');
         if (running) {
@@ -166,9 +170,6 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
   useLiveEvents({
     enabled: true,
     onLiveTaskUpdate: (event) => {
-      // Show cue for:
-      // - Events from the current live session (sessionId matches)
-      // - Events from app/background tasks (empty sessionId — not session-bound)
       const isCurrentSession = session?.id && event.sessionId === session.id;
       const isAppTask = !event.sessionId;
       if (!isCurrentSession && !isAppTask) return;
@@ -178,6 +179,17 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
         status: event.status,
         summary: event.summary ?? null,
       });
+
+      // Notify Gemini of terminal task outcomes so it can speak up proactively
+      // instead of going silent after a background task finishes or fails.
+      if (isSessionActive && (event.status === 'completed' || event.status === 'failed')) {
+        const taskLabel = event.title ?? 'Background task';
+        const notification =
+          event.status === 'completed'
+            ? `[SYSTEM: Background task completed — "${taskLabel}". Acknowledge this naturally and offer next steps.]`
+            : `[SYSTEM: Background task failed — "${taskLabel}". ${event.summary ? `Reason: ${event.summary}.` : ''} Tell the user what went wrong and what they can do about it.]`;
+        void sendMessage(notification, session?.id);
+      }
     },
   });
 

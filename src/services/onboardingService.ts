@@ -4,6 +4,8 @@ import { getUserFacingErrorMessage } from '../utils/errorHandling';
 export interface OnboardingProfile {
   agentName: string;
   voiceModel: string;
+  userName?: string;
+  customSoul?: string;
 }
 
 export const onboardingService = {

@@ -57,6 +57,13 @@ const MIGRATIONS: Migration[] = [
       addColumnIfMissing(db, 'screenshot_artifacts', 'revoked_at TEXT');
     },
   },
+  {
+    id: '003-soul-identity-columns',
+    apply: (db) => {
+      addColumnIfMissing(db, 'onboarding_profiles', `user_name TEXT NOT NULL DEFAULT ''`);
+      addColumnIfMissing(db, 'onboarding_profiles', `custom_soul TEXT NOT NULL DEFAULT ''`);
+    },
+  },
 ];
 
 export function runDatabaseMigrations(db: Database.Database): void {

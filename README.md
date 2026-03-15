@@ -4,7 +4,7 @@
 
 ![Crewmate Gang](public/Crewmate_gang.png)
 
-### *Your multimodal AI operator — sees your screen, hears your voice, acts on your behalf*
+### *Your multimodal AI remote employee — sees your screen, hears your voice, acts on your behalf*
 
 [![Built with Gemini](https://img.shields.io/badge/Built%20with-Gemini%20Live-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/gemini-api/docs/live)
 [![Google Cloud](https://img.shields.io/badge/Deployed%20on-Google%20Cloud-34A853?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com)
@@ -12,7 +12,7 @@
 
 **Category: Live Agents 🗣️ + UI Navigator ☸️**
 
-[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-52-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment) · [Full Architecture Diagrams](docs/ARCHITECTURE.md)
+[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-62-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment) · [Full Architecture Diagrams](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -20,14 +20,15 @@
 
 ## What is Crewmate?
 
-Crewmate is a next-generation **multimodal AI operator** that goes far beyond a chatbot. It is always listening, sees your screen in real-time, and executes complex multi-step work on your behalf — across your tools, browser, and workspace — while you stay in the flow.
+Crewmate is a **multimodal AI remote employee** — not a chatbot, not a copilot. It listens to your voice, sees your screen, and acts like a capable person working alongside you. It reads your emails, writes documents, researches competitors, files ClickUp tasks, posts to Slack, and briefs you every morning — all without you switching apps.
 
-**The core idea is simple:** stop switching between apps. Talk to Crewmate like you talk to a colleague. It routes your intent to the right agent, uses the right tools, and reports back — all in real-time.
+**The core idea:** talk to Crewmate the way you'd talk to a teammate. It routes your intent to the right specialist agent, reads and writes real documents, and reports back — all in real-time.
 
 ```
-"Summarize my open ClickUp tasks, draft a Notion doc, and screenshot this page for context."
+"Read my Google Doc on Q3 strategy, research our top 3 competitors, then write a PRD and save it."
 ↓
-Crewmate routes this across 3 skills, streams progress, and stores the result in memory.
+Crewmate reads the doc, runs the Research Agent, passes context to the Product Agent,
+saves the PRD to Notion, and tells you when it's done — while you keep talking.
 ```
 
 ### Built for the Gemini Live API
@@ -48,20 +49,24 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 |---|---|
 | **Gemini Live** | Real-time audio conversation with interruption support |
 | **Screen Context** | Screenshot captured and sent as multimodal context each turn |
-| **52 Skills** | Research, browser, productivity, comms, automation, code, live |
-| **Orchestrator** | Intent-routed A2A dispatch to specialist agents |
-| **Memory** | Vector-embedded session recall + knowledge base |
+| **62 Skills** | Research, browser, productivity, comms, automation, code, live — including full read/write for all Google Workspace types |
+| **Live → Agent Bridge** | Voice commands now reach all 14 specialist agents via `live.delegate-to-agent` |
+| **Agent Pipeline** | Chain agents sequentially — research → PRD → email — with context passed between each step |
+| **Document Reading** | Read full content of Google Docs, Sheets, Slides, and Notion pages — not just metadata |
+| **Memory-Aware Agents** | Every specialist agent receives relevant past context injected before running |
+| **Agent Self-Critique** | Agents silently review their own output before returning — quality checkpoint built-in |
+| **Morning Briefing** | One command pulls calendar, inbox, active tasks, and memory into a crisp daily brief |
+| **Orchestrator** | Intent-routed A2A dispatch to 14 specialist agents |
+| **Memory** | Vector-embedded session recall injected into both live sessions and every agent run |
 | **Tasks** | Real-time streamed background task execution with SSE |
-| **Task Cue Badge** | Live "Working on it" badge — survives page refresh, clears on completion/failure |
-| **Integrations** | Notion, Slack, ClickUp, Google Workspace, GitHub |
-| **Auth** | Firebase Auth (production) + dev magic-code login |
+| **Editable Soul** | User name + custom personality instructions — agents call you by name |
+| **Integrations** | Notion, Slack (inc. DMs), ClickUp, Google Workspace |
+| **Auth** | Firebase Auth (production) + dev magic-code login; OAuth race condition fixed |
 | **Audit Log** | Every skill run is recorded with timing, result, and origin |
 
 ---
 
 ## 🏗️ Architecture
-
-![Crewmate AI — System Architecture](public/architecture.png)
 
 > 📐 **Full architecture diagrams** (Mermaid flowcharts, sequence diagrams, memory flow, browser loop, execution policy): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 
@@ -96,16 +101,18 @@ flowchart TD
 
         subgraph ExecutionLayer["Execution Layer"]
             ORCH[Orchestrator\nIntent Router]
+            PIPE[Pipeline Orchestrator\nSequential Agent Chaining]
             POLICY[Execution Policy\nInline / Delegated / Either]
-            REG[Skill Registry\n52 Skills]
+            REG[Skill Registry\n62 Skills]
         end
 
-        subgraph AgentLayer["Agent Layer"]
+        subgraph AgentLayer["Agent Layer — 14 Specialists"]
             AG_RES[Research Agent]
             AG_PRD[Product Agent]
             AG_DAT[Data Agent]
             AG_SAL[Sales Agent]
             AG_UI[UI Navigator Agent]
+            AG_ETC[...9 more agents]
         end
 
         subgraph Memory["Memory Layer"]
@@ -128,10 +135,13 @@ flowchart TD
     LGW <-->|WebSocket| GEMINI
     LPB --> Memory
     LTR --> POLICY --> REG
-    LTR -->|delegated| ORCH
+    LTR -->|live.delegate-to-agent| ORCH
+    LTR -->|live.run-pipeline| PIPE
     ORCH --> AgentLayer
+    PIPE -->|sequential steps| AgentLayer
+    AgentLayer -->|memory injected before run| Memory
     AgentLayer --> REG
-    REG -->|Notion, Slack, ClickUp\nGmail, Calendar, Docs\nBrowser, Terminal| ExternalServices["🔌 External Services"]
+    REG -->|Notion, Slack, ClickUp\nGmail, Docs, Sheets, Slides\nBrowser, Terminal| ExternalServices["🔌 External Services"]
     ING --> MEM --> EMB --> DB
     ORCH --> DB
     SSE --> FE
@@ -152,17 +162,21 @@ flowchart LR
     ENTRY -->|"async intent"| ORCH["Orchestrator"]
     
     LIVE --> POLICY_L["Execution Policy\nCheck"]
-    
+
     POLICY_L -->|"inline\n(quick, safe)"| INLINE["Run Skill\nImmediately\n< 2s"]
-    POLICY_L -->|"delegated\n(slow, external)"| DELEGATE["Create Background Task\nSpeak Acknowledgement"]
+    POLICY_L -->|"live.delegate-to-agent"| AGENT_BRIDGE["Orchestrator\nRoutes to Specialist Agent"]
+    POLICY_L -->|"live.run-pipeline"| PIPELINE["Pipeline Orchestrator\nSequential Agent Chain"]
+    POLICY_L -->|"delegated skill\n(slow, external)"| DELEGATE["Create Background Task\nSpeak Acknowledgement"]
     POLICY_L -->|"no tool needed"| ANSWER["Speak Response\nNormally"]
-    
+
     ORCH --> ROUTE["LLM Intent Router\n(gemini-pro)"]
     ROUTE -->|"skill match"| SKILL_TASK["Run Delegated Skill"]
-    ROUTE -->|"complex workflow"| AGENT_TASK["Run Specialist Agent"]
-    
+    ROUTE -->|"complex workflow"| AGENT_TASK["Run Specialist Agent\n(memory injected + self-critique)"]
+
+    AGENT_BRIDGE --> AGENT_TASK
+    PIPELINE -->|"step 1 → step 2 → step N\ncontext passed between steps"| AGENT_TASK
     AGENT_TASK --> AGENT_SKILLS["Calls 1..N Skills\nSequentially"]
-    
+
     DELEGATE & SKILL_TASK & AGENT_SKILLS --> SSE["📡 Stream Steps\nto Tasks UI"]
     SSE --> MEMORY_WRITE["Write to Memory\n(session / knowledge / artifact)"]
 ```
@@ -182,14 +196,14 @@ flowchart TD
     STORE --> EMB["embedAndStore\nasync · fire-and-forget"]
     EMB --> VEC["embedding column\ncosine similarity search"]
     
-    subgraph ReadPath["Read Path — every Live prompt"]
+    subgraph ReadPath["Read Path — injected into Live sessions AND every Agent run"]
         RETRIEVE["retrieveRelevantMemories\ntopK=5"]
         VEC --> RETRIEVE
-        RETRIEVE -->|"vector similarity"| RANKER["Score + Rank"]
-        RANKER -->|"fallback: lexical"| INJECT["Inject into\nSystem Prompt"]
+        RETRIEVE -->|"vector similarity + lexical fallback"| INJECT["Inject into\nSystem Prompt"]
     end
-    
+
     INJECT --> LIVE_PROMPT["Gemini Live Session\nContext-Aware from Turn 1"]
+    INJECT --> AGENT_PROMPT["Every Specialist Agent\nReceives Past Context Before Running"]
 ```
 
 ### Live Session Sequence
@@ -224,7 +238,20 @@ sequenceDiagram
             Skills-->>TR: result
             TR-->>Gemini: tool_response
             Gemini-->>UI: continues speaking
-        else delegated skill (slow or risky)
+            else live.delegate-to-agent (complex task)
+            TR->>Orch: orchestrate(intent)
+            Orch->>Orch: retrieve relevant memories
+            Orch->>Orch: route to specialist agent
+            Orch-->>UI: SSE: task created + streaming steps
+            TR-->>Gemini: tool_response {taskId, routeType}
+            Gemini-->>UI: "Running that in the background"
+        else live.run-pipeline (multi-step chain)
+            TR->>Orch: runPipeline([step1, step2, step3])
+            Note over Orch: Each step awaits previous result\nContext passed forward automatically
+            Orch-->>UI: SSE: steps per agent
+            TR-->>Gemini: tool_response {stepCount}
+            Gemini-->>UI: "Pipeline of N steps started"
+        else delegated skill (slow or has side-effects)
             TR->>Orch: delegateSkillExecution(...)
             Orch-->>UI: SSE: task created + streaming steps
             TR-->>Gemini: tool_response {delegatedTaskId}
@@ -233,7 +260,7 @@ sequenceDiagram
     end
 
     GW->>GW: ingestLiveTurnMemory()
-    Note over GW: Every turn enriches memory
+    Note over GW: Every turn enriches memory for future context
 ```
 
 ---
@@ -302,23 +329,26 @@ All browser navigation is **voice-activated via Gemini Live** — say the task o
 
 ---
 
-## ⚡ Skills — 52 and Counting
+## ⚡ Skills — 62 and Counting
 
-Skills are the **single execution primitive** in Crewmate. Every action — from posting a Slack message to filling a web form — is a skill.
+Skills are the **single execution primitive** in Crewmate. Every action — from reading a Google Doc to chaining a 3-step agent pipeline — is a skill.
 
 | Category | Skills |
 |---|---|
 | **Research** | `web.search`, `web.summarize-url` |
-| **Communication** | `slack.post-message`, `slack.list-channels`, `slack.get-messages`, `slack.send-dm` |
+| **Communication** | `slack.post-message`, `slack.list-channels`, `slack.get-messages`, `slack.send-dm`, `slack.get-dms` |
 | **Automation** | `zapier.trigger`, `zapier.list` |
-| **Productivity — Notion** | `notion.create-page`, `notion.append-blocks`, `notion.append-screenshot`, `notion.create-database-record`, `notion.list-pages`, `notion.search-pages`, `notion.update-page` |
-| **Productivity — ClickUp** | `clickup.create-task`, `clickup.attach-screenshot`, `clickup.list-tasks` |
-| **Productivity — Google Workspace** | Gmail (draft/send/search), Docs (create/append), Sheets (create/append-rows), Slides (create/add-slides), Drive (search/create-folder), Calendar (create-event/list-events) |
+| **Productivity — Notion** | `notion.create-page`, `notion.append-blocks`, `notion.append-screenshot`, `notion.upload-image`, `notion.create-database-record`, `notion.list-pages`, `notion.search-pages`, `notion.update-page`, **`notion.read-page`** |
+| **Productivity — ClickUp** | `clickup.create-task`, `clickup.attach-screenshot`, `clickup.list-tasks`, **`clickup.get-task`** |
+| **Productivity — Google Workspace** | Gmail (draft / send / search / **read-message**), Docs (create / append / **read**), Sheets (create / append-rows / **read**), Slides (create / add-slides / **read**), Drive (search / create-folder), Calendar (create-event / list-events) |
 | **Productivity — Memory** | `memory.store`, `memory.retrieve`, `memory.list` |
 | **Productivity — Tasks** | `tasks.list-active`, `tasks.cancel`, `workspace.create-task` |
+| **Productivity — Live** | `live.capture-screenshot`, **`live.delegate-to-agent`**, **`live.run-pipeline`** |
+| **Productivity — Briefing** | **`productivity.morning-briefing`** |
 | **Browser Automation** | `browser.open-url`, `browser.extract`, `browser.extract-text`, `browser.fill-form`, `browser.click-element`, `browser.inspect-visible-ui`, `browser.press-key`, `browser.search-google`, `browser.scroll-page`, `browser.screenshot`, `browser.type-into`, `browser.ui-navigate` |
 | **Code & DevOps** | `terminal.run-command` (sandboxed) |
-| **Live** | `live.capture-screenshot` |
+
+**Bold** = newly added. Reader skills (`notion.read-page`, `google.docs-read-document`, `google.sheets-read-spreadsheet`, `google.slides-read-presentation`, `google.gmail-read-message`) mean agents can now consume real document content — not just create files.
 
 ### Skill Execution Policy
 
@@ -335,7 +365,11 @@ The runtime uses these to automatically decide whether to run a skill immediatel
 
 For complex multi-step workflows, Crewmate dispatches to **14 specialist agents**, each with a deep expert persona, multi-step research pipeline, and auto-integration with connected tools.
 
-Every agent follows the same pipeline: **Research → Strategy → Generate → Save (Notion/ClickUp/Slack)**.
+Every agent follows the same pipeline: **Research → Strategy → Generate → Self-Critique → Save (Notion/ClickUp/Slack)**.
+
+Every agent now also receives **relevant memory from past sessions** before it starts, so it has context on your company, your preferences, and previous work — not a blank slate.
+
+Agents can be triggered three ways: via the orchestrator (async tasks), via `live.delegate-to-agent` (voice command), or chained via `live.run-pipeline` (multi-step workflows where one agent's output feeds the next).
 
 | Agent | Expert Persona | Output Types | Auto-Integrations |
 |---|---|---|---|
@@ -368,7 +402,6 @@ All agents emit real-time step-by-step trace events streamed to the Tasks UI. Ag
 | **Slack** | OAuth 2.0 | Post messages, list channels |
 | **ClickUp** | OAuth 2.0 | Create tasks, attach screenshots, list tasks |
 | **Google Workspace** | OAuth 2.0 | Gmail, Calendar, Docs, Sheets, Slides, Drive |
-| **GitHub** | Personal Access Token | Issues, PRs, repositories |
 
 All integration credentials are encrypted at rest using AES encryption (`CREWMATE_ENCRYPTION_KEY`) before storage in SQLite.
 
@@ -683,16 +716,16 @@ crewmate/
 │   │   ├── executionPolicy.ts # Inline vs delegated routing
 │   │   ├── agents/            # Specialist agent definitions
 │   │   └── ...                # Integration services (Notion, Slack, etc.)
-│   ├── skills/                # 51 registered skills
+│   ├── skills/                # 62 registered skills
 │   │   ├── browser/           # Playwright-powered browser skills
-│   │   ├── communication/     # Slack
-│   │   ├── productivity/      # Notion, ClickUp, Google Workspace, Memory
+│   │   ├── communication/     # Slack (post, DMs, channels, read)
+│   │   ├── productivity/      # Notion, ClickUp, Google Workspace, Memory, Live, Briefing
 │   │   ├── research/          # Web search + URL summarization
 │   │   ├── code/              # Terminal execution
-│   │   ├── creative/          # Creative generation
 │   │   └── registry.ts        # Skill registry + runner
 │   ├── repositories/          # DB query layer
-│   ├── dbSchema.ts            # SQLite schema (16 tables)
+│   ├── dbSchema.ts            # SQLite schema (19 tables)
+│   ├── services/pipelineOrchestrator.ts  # Sequential agent chaining
 │   └── config.ts              # Centralized config with env vars
 │
 ├── src/                       # React + Vite frontend
@@ -723,7 +756,7 @@ Crewmate uses a **multi-model routing strategy** to balance quality, speed, and 
 | Role | Model | Used For |
 |---|---|---|
 | 🎙️ **Live audio** | `gemini-2.5-flash-native-audio-preview-12-2025` | Real-time bidirectional voice + screen sessions |
-| 🔬 **Research & agents** | `gemini-3.1-pro-preview` | All 13 specialist agents, deep research, multi-step reasoning |
+| 🔬 **Research & agents** | `gemini-3.1-pro-preview` | All 14 specialist agents, deep research, multi-step reasoning |
 | 🧠 **Orchestration** | `gemini-3.1-pro-preview` | Intent classification, A2A routing decisions |
 | ⚡ **Text & quick tasks** | `gemini-3.1-flash-lite-preview` | Inline skill calls, fast responses, confirmations |
 | 🎨 **Creative / images** | `gemini-3.1-flash-image-preview` | Image generation, creative content |

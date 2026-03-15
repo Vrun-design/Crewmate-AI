@@ -11,6 +11,7 @@
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
@@ -296,14 +297,16 @@ export async function runCommunicationsAgent(
         tone?: string;
         context?: string;
         send?: boolean;
+        outputTarget?: WorkspaceOutputTarget;
     } = {},
-): Promise<{ draft: string; sent: boolean; executionResult?: unknown }> {
+): Promise<{ draft: string; sent: boolean; executionResult?: unknown; workspaceUrl?: string }> {
     const {
         channel = 'email',
         to,
         tone = 'professional',
         context = '',
         send = false,
+        outputTarget,
     } = options;
     const ai = createGeminiClient();
 
@@ -392,8 +395,9 @@ Write the COMPLETE, READY-TO-SEND message. No [placeholder] text should remain w
         }
     }
 
-    emitStep('done', `${send && executionResult ? '✅ Message sent' : '✅ Draft ready'} — ${wordCount} words`, { success: true });
-    return { draft, sent: send && executionResult !== null, executionResult };
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(draft, intent, outputTarget, ctx, emitStep);
+    emitStep('done', `${send && executionResult ? '✅ Message sent' : '✅ Draft ready'} — ${wordCount} words${workspaceUrl ? ' — exported' : ''}`, { success: true });
+    return { draft, sent: send && executionResult !== null, executionResult, workspaceUrl };
 }
 
 export const communicationsAgentApp = express();

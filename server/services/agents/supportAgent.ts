@@ -10,6 +10,7 @@
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
@@ -53,10 +54,11 @@ export async function runSupportAgent(
         type?: 'response' | 'faq' | 'triage' | 'escalation' | 'playbook' | 'strategy';
         customerName?: string;
         urgency?: 'low' | 'medium' | 'high' | 'critical';
+        outputTarget?: WorkspaceOutputTarget;
     } = {},
-): Promise<{ output: string; priority?: string }> {
+): Promise<{ output: string; priority?: string; workspaceUrl?: string }> {
     const ai = createGeminiClient();
-    const { type = 'response', customerName, urgency = 'medium' } = options;
+    const { type = 'response', customerName, urgency = 'medium', outputTarget } = options;
 
     emitStep('thinking', 'Analyzing support request...', { detail: `${type} | urgency: ${urgency}` });
 
@@ -387,8 +389,9 @@ Write the COMPLETE, READY-TO-USE output. For responses and escalations: write ex
         }
     }
 
-    emitStep('done', `Support ${type} complete`, { success: true });
-    return { output, priority };
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(output, intent, outputTarget, ctx, emitStep);
+    emitStep('done', `Support ${type} complete${workspaceUrl ? ' — exported' : ''}`, { success: true });
+    return { output, priority, workspaceUrl };
 }
 
 export const supportAgentApp = express();

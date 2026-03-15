@@ -57,7 +57,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) {
       const hadToken = typeof window !== 'undefined' && Boolean(window.localStorage.getItem(AUTH_TOKEN_KEY));
-      if (hadToken) {
+      // Don't fire auth-expired during the ~200ms Firebase initialization window where
+      // currentUser is null even though the user is still logged in (e.g. after OAuth redirect).
+      const isFirebaseInitializing = firebaseAuthService.isConfigured() && !firebaseAuthService.getCurrentUser();
+      if (hadToken && !isFirebaseInitializing) {
         clearAuthSession();
         window.dispatchEvent(new CustomEvent('crewmate:auth-expired'));
       }

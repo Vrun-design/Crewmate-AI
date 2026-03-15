@@ -156,6 +156,29 @@ export async function finalizeClickUpOAuthCallback(input: { code: string; state:
   return redirectUrl.toString();
 }
 
+async function autoDiscoverClickUpListId(workspaceId: string, token: string): Promise<string> {
+  // teams → spaces → folders/lists — pick the first list found
+  const teamsRes = await fetch('https://api.clickup.com/api/v2/team', { headers: { Authorization: token } });
+  const teams = await teamsRes.json() as { teams?: Array<{ id: string }> };
+  const teamId = teams.teams?.[0]?.id;
+  if (!teamId) throw new Error('ClickUp is connected but no workspace was found.');
+
+  const spacesRes = await fetch(`https://api.clickup.com/api/v2/team/${teamId}/space?archived=false`, { headers: { Authorization: token } });
+  const spaces = await spacesRes.json() as { spaces?: Array<{ id: string }> };
+  const spaceId = spaces.spaces?.[0]?.id;
+  if (!spaceId) throw new Error('ClickUp is connected but no space was found in your workspace.');
+
+  const listsRes = await fetch(`https://api.clickup.com/api/v2/space/${spaceId}/list?archived=false`, { headers: { Authorization: token } });
+  const lists = await listsRes.json() as { lists?: Array<{ id: string; name: string }> };
+  const listId = lists.lists?.[0]?.id;
+  if (!listId) throw new Error('ClickUp is connected but no list was found. Create at least one list in ClickUp.');
+
+  // Persist so future calls are instant
+  const existing = getStoredIntegrationConfig(workspaceId, 'clickup');
+  saveStoredIntegrationConfig(workspaceId, 'clickup', { ...existing, defaultListId: listId });
+  return listId;
+}
+
 export async function createClickUpTask(workspaceId: string, input: CreateClickUpTaskInput): Promise<ClickUpTaskResult> {
   const config = getClickUpConfig(workspaceId);
   if (!isClickUpConfigured(workspaceId)) {
@@ -163,7 +186,7 @@ export async function createClickUpTask(workspaceId: string, input: CreateClickU
   }
 
   if (!config.listId) {
-    throw new Error('ClickUp is connected, but no default list is selected yet. Choose a default list in Integrations.');
+    config.listId = await autoDiscoverClickUpListId(workspaceId, config.token);
   }
 
   const response = await fetch(`https://api.clickup.com/api/v2/list/${config.listId}/task`, {

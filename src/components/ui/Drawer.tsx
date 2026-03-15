@@ -38,13 +38,13 @@ export function Drawer({ isOpen, onClose, title, children }: DrawerProps) {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 w-full max-w-md bg-background border-l border-border shadow-2xl z-[200] flex flex-col"
+            className="fixed inset-y-0 right-0 w-full max-w-md bg-[#0f0f11] border-l border-white/5 shadow-[0_0_60px_-15px_rgba(0,0,0,0.5)] z-[200] flex flex-col"
           >
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <div className="flex items-center justify-between p-4 border-b border-white/5">
+              <h2 className="text-lg font-semibold text-white/90">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-colors"
+                className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-full transition-colors"
               >
                 <X size={20} />
               </button>

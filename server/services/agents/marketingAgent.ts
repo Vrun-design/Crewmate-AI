@@ -11,6 +11,7 @@
 import { createGeminiClient } from '../geminiClient';
 import { serverConfig } from '../../config';
 import { runSkill } from '../../skills/registry';
+import { maybeSaveAgentOutputToWorkspace, type WorkspaceOutputTarget } from './agentWorkspaceOutput';
 import type { SkillRunContext } from '../../skills/types';
 import type { EmitStep } from '../../types/agentEvents';
 import express from 'express';
@@ -51,10 +52,10 @@ export async function runMarketingAgent(
     intent: string,
     ctx: SkillRunContext,
     emitStep: EmitStep,
-    options: { type?: 'campaign' | 'social' | 'ab_copy' | 'brief' | 'gtm' | 'icp' | 'positioning'; saveToNotion?: boolean } = {},
-): Promise<{ output: string; variants?: string[]; savedToNotion: boolean }> {
+    options: { type?: 'campaign' | 'social' | 'ab_copy' | 'brief' | 'gtm' | 'icp' | 'positioning'; saveToNotion?: boolean; outputTarget?: WorkspaceOutputTarget } = {},
+): Promise<{ output: string; variants?: string[]; savedToNotion: boolean; workspaceUrl?: string }> {
     const ai = createGeminiClient();
-    const { type = 'brief', saveToNotion = true } = options;
+    const { type = 'brief', saveToNotion = true, outputTarget } = options;
 
     emitStep('thinking', 'Analyzing marketing challenge...', { detail: `${type} for: ${intent.slice(0, 80)}` });
 
@@ -380,8 +381,9 @@ Write the COMPLETE, READY-TO-USE deliverable. Be specific, concrete, and immedia
         }
     }
 
-    emitStep('done', `Marketing ${type} complete${savedToNotion ? ' — saved to Notion' : ''}`, { success: true });
-    return { output, variants: variantsArr, savedToNotion };
+    const workspaceUrl = await maybeSaveAgentOutputToWorkspace(output, intent, outputTarget, ctx, emitStep);
+    emitStep('done', `Marketing ${type} complete${savedToNotion ? ' — saved to Notion' : ''}${workspaceUrl ? ' — exported' : ''}`, { success: true });
+    return { output, variants: variantsArr, savedToNotion, workspaceUrl };
 }
 
 export const marketingAgentApp = express();

@@ -34,6 +34,22 @@ vi.mock('../../services/integrationsService', () => ({
   },
 }));
 
+function renderModal(
+  overrides: Partial<React.ComponentProps<typeof GoogleWorkspaceOnboardingModal>> = {},
+): ReturnType<typeof render> {
+  return render(
+    <GoogleWorkspaceOnboardingModal
+      isOpen
+      hasOnboardingQuery={false}
+      oauthError={null}
+      wasJustConnected={false}
+      onClose={vi.fn()}
+      onClearOnboardingQuery={vi.fn()}
+      {...overrides}
+    />,
+  );
+}
+
 describe('GoogleWorkspaceOnboardingModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -41,16 +57,7 @@ describe('GoogleWorkspaceOnboardingModal', () => {
   });
 
   test('renders the Google Workspace onboarding modal content', () => {
-    render(
-      <GoogleWorkspaceOnboardingModal
-        isOpen
-        hasOnboardingQuery={false}
-        oauthError={null}
-        wasJustConnected={false}
-        onClose={vi.fn()}
-        onClearOnboardingQuery={vi.fn()}
-      />,
-    );
+    renderModal();
 
     expect(screen.getByRole('button', { name: 'Connect Google Workspace' })).toBeInTheDocument();
     expect(screen.getByText('Draft Gmail emails')).toBeInTheDocument();
@@ -60,18 +67,9 @@ describe('GoogleWorkspaceOnboardingModal', () => {
     const onClose = vi.fn();
     const onClearOnboardingQuery = vi.fn();
 
-    render(
-      <GoogleWorkspaceOnboardingModal
-        isOpen
-        hasOnboardingQuery={false}
-        oauthError={null}
-        wasJustConnected={false}
-        onClose={onClose}
-        onClearOnboardingQuery={onClearOnboardingQuery}
-      />,
-    );
+    renderModal({ onClose, onClearOnboardingQuery });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }));
+    fireEvent.click(screen.getByText('Skip this step for now'));
 
     expect(window.localStorage.getItem('crewmate_onboarding_complete')).toBe('true');
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -88,16 +86,7 @@ describe('GoogleWorkspaceOnboardingModal', () => {
       value: { ...originalLocation, assign: assignMock },
     });
 
-    render(
-      <GoogleWorkspaceOnboardingModal
-        isOpen
-        hasOnboardingQuery={false}
-        oauthError={null}
-        wasJustConnected={false}
-        onClose={vi.fn()}
-        onClearOnboardingQuery={vi.fn()}
-      />,
-    );
+    renderModal();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connect Google Workspace' }));
 
@@ -113,18 +102,9 @@ describe('GoogleWorkspaceOnboardingModal', () => {
   });
 
   test('shows a friendly oauth failure banner when Google Workspace connect is cancelled', () => {
-    render(
-      <GoogleWorkspaceOnboardingModal
-        isOpen
-        hasOnboardingQuery
-        oauthError="Consent cancelled"
-        wasJustConnected={false}
-        onClose={vi.fn()}
-        onClearOnboardingQuery={vi.fn()}
-      />,
-    );
+    renderModal({ hasOnboardingQuery: true, oauthError: 'Consent cancelled' });
 
-    expect(screen.getByText(/Google Workspace connection was not completed/i)).toBeInTheDocument();
+    expect(screen.getByText(/Connection not completed/i)).toBeInTheDocument();
     expect(screen.getByText(/Consent cancelled/i)).toBeInTheDocument();
   });
 });
