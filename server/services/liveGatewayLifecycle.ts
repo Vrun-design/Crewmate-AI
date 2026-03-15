@@ -21,11 +21,11 @@ import { insertActivity } from './activityService';
 import { broadcastEvent } from './eventService';
 
 const INITIAL_GREETING_PROMPT = [
-  'Greet the user.',
-  'Pick exactly one of these three options verbatim and say nothing else:',
+  'Greet the user with exactly one of these three phrases and absolutely nothing else — no recap, no summary, no mention of previous sessions or tasks:',
   '"Hey, what are we working on?" OR',
   '"I\'m here. What do you need?" OR',
   '"Alright, where should we start?"',
+  'Say only the chosen phrase. Stop immediately after it.',
 ].join(' ');
 
 const RECONNECT_GREETING_PROMPT = [

@@ -44,24 +44,33 @@ export const liveRunPipelineSkill: Skill = {
     properties: {
       steps: {
         type: 'array',
-        description: 'Ordered list of task intents to run sequentially. Each step receives the previous step\'s output as context.',
-        items: {
-          type: 'object',
-          description: 'A single pipeline step.',
-          properties: {
-            intent: { type: 'string', description: 'The task description for this step.' },
-          },
-          required: ['intent'],
-        },
+        description: 'Ordered list of task descriptions to run sequentially. Each item is a plain string describing one task. Example: ["Research top 3 competitors", "Write a PRD based on the research", "Draft an investor email"]',
+        items: { type: 'string', description: 'A single task description.' },
+      },
+      intent: {
+        type: 'string',
+        description: 'Fallback: the full compound task as a single string if steps are not provided separately.',
       },
     },
     required: ['steps'],
   },
   handler: async (ctx, args) => {
+    // Accept both string[] and {intent: string}[] for resilience
     const rawSteps = Array.isArray(args.steps) ? args.steps : [];
     const steps = rawSteps
-      .map((s) => ({ intent: typeof s?.intent === 'string' ? s.intent.trim() : '' }))
+      .map((s) => {
+        if (typeof s === 'string') return { intent: s.trim() };
+        if (s && typeof s === 'object' && typeof (s as Record<string, unknown>).intent === 'string') {
+          return { intent: ((s as Record<string, unknown>).intent as string).trim() };
+        }
+        return { intent: '' };
+      })
       .filter((s) => s.intent.length > 0);
+
+    // Fallback: if Gemini passed a plain intent instead of steps, treat it as one step
+    if (steps.length < 1 && typeof args.intent === 'string' && args.intent.trim()) {
+      steps.push({ intent: args.intent.trim() });
+    }
 
     if (steps.length < 1) {
       return { success: false, error: 'No valid steps provided to the pipeline.' };

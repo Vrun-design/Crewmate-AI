@@ -19,10 +19,30 @@ import { ingestAgentResult } from './memoryIngestor';
 import type { SkillRunContext } from '../skills/types';
 import { getSkill, runSkill } from '../skills/registry';
 import { getSkillRouteType, type RuntimeRouteType } from './executionPolicy';
+import { extractLinkedSessionId } from './channelTasking';
+import { sendLiveMessage } from './liveGatewayTransport';
 
 export { AGENT_MANIFESTS, cancelTask, createTask, getTask, listTasks, subscribeToTask };
 export { listActiveTasks };
 export type { AgentTask, AgentTaskStatus } from './orchestratorShared';
+
+/**
+ * If the task originated from a live session, inject a brief context update
+ * back into that session so Gemini is aware of the outcome without being prompted.
+ */
+function notifyLiveSessionOfTaskOutcome(task: AgentTask, outcome: 'completed' | 'failed', detail?: string): void {
+  const sessionId = extractLinkedSessionId(task.originType, task.originRef);
+  if (!sessionId) return;
+  try {
+    const label = task.intent?.slice(0, 80) ?? task.agentId ?? 'task';
+    const msg = outcome === 'failed'
+      ? `[System: Background task "${label}" just failed${detail ? ` — ${detail}` : ''}. Briefly acknowledge this to the user if they are present.]`
+      : `[System: Background task "${label}" just completed successfully. You may mention this briefly if relevant.]`;
+    sendLiveMessage(sessionId, msg);
+  } catch {
+    // Session may have ended — ignore
+  }
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -154,6 +174,7 @@ async function runDelegatedSkillTask(
         completedAt: new Date().toISOString(),
       }, steps);
       emitTerminalTaskEvent(task, 'failed', { result, error: errorMessage, steps });
+      notifyLiveSessionOfTaskOutcome(task, 'failed', errorMessage);
       return;
     }
 
@@ -164,6 +185,7 @@ async function runDelegatedSkillTask(
       completedAt: new Date().toISOString(),
     }, steps);
     emitTerminalTaskEvent(task, 'completed', { result, steps });
+    notifyLiveSessionOfTaskOutcome(task, 'completed');
   } catch (error) {
     if (isCancellationRequested(task.id)) {
       completeCancelledTask(task, getSteps(), 'Cancelled by user');
@@ -180,6 +202,7 @@ async function runDelegatedSkillTask(
       completedAt: new Date().toISOString(),
     }, steps);
     emitTerminalTaskEvent(task, 'failed', { error: errorMessage, steps });
+    notifyLiveSessionOfTaskOutcome(task, 'failed', errorMessage);
   }
 }
 
@@ -288,6 +311,7 @@ export async function orchestrate(
           completedAt,
         }, steps);
         emitTerminalTaskEvent(task, 'failed', { result, error: errorMessage, steps });
+        notifyLiveSessionOfTaskOutcome(task, 'failed', errorMessage);
 
         if (doneTask) {
           void notifyTaskComplete(ctx.userId, {
@@ -347,6 +371,7 @@ export async function orchestrate(
         completedAt,
       }, steps);
       emitTerminalTaskEvent(task, 'failed', { error: errorMessage, steps });
+      notifyLiveSessionOfTaskOutcome(task, 'failed', errorMessage);
       void notifyTaskComplete(ctx.userId, {
         ...task,
         status: 'failed',
