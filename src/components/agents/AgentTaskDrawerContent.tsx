@@ -8,6 +8,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { PropertyRow } from '../ui/PropertyRow';
 import { cn } from '../../utils/cn';
+import { getTaskArtifactLink } from '../../lib/taskArtifacts';
 
 type AgentTaskDrawerContentProps = {
   task: AgentTask;
@@ -27,42 +28,6 @@ function formatTaskTimestamp(timestamp: string): string {
     hour: 'numeric',
     minute: '2-digit',
   });
-}
-
-function getArtifactLink(result: unknown): { label: string; url: string; imageUrl?: string | null } | null {
-  if (!result || typeof result !== 'object') {
-    return null;
-  }
-
-  const record = result as Record<string, unknown>;
-  const output = (record.output && typeof record.output === 'object' && !Array.isArray(record.output))
-    ? record.output as Record<string, unknown>
-    : record;
-  const screenshot = output.screenshot && typeof output.screenshot === 'object' && !Array.isArray(output.screenshot)
-    ? output.screenshot as Record<string, unknown>
-    : null;
-  const url = typeof output.url === 'string'
-    ? output.url
-    : typeof output.publicUrl === 'string'
-      ? output.publicUrl
-      : typeof screenshot?.publicUrl === 'string'
-        ? screenshot.publicUrl
-        : null;
-  const title = typeof output.title === 'string' ? output.title : typeof output.name === 'string' ? output.name : null;
-
-  if (!url) {
-    return null;
-  }
-
-  return {
-    label: title ?? (typeof screenshot?.title === 'string' ? screenshot.title : 'Open document'),
-    url,
-    imageUrl: typeof output.publicUrl === 'string'
-      ? output.publicUrl
-      : typeof screenshot?.publicUrl === 'string'
-        ? screenshot.publicUrl
-        : null,
-  };
 }
 
 function getRunHistoryBadgeVariant(status: TaskRun['status']): 'success' | 'danger' | 'default' {
@@ -93,7 +58,7 @@ export function AgentTaskDrawerContent({ task, onCancel, isCancelling = false, o
   const skillLabel = getSkillLabel(task.delegatedSkillId);
   const statusMeta = getAgentTaskStatusMeta(task.status);
   const AgentIcon = getAgentIcon({ id: task.agentId, department: 'Default' });
-  const artifactLink = getArtifactLink(task.result);
+  const artifactLink = getTaskArtifactLink(task);
   const executionTitle = task.routeType === 'delegated_skill' ? 'Background Skill' : 'Agent Workflow';
   const metricLabel = task.routeType === 'delegated_skill' ? 'Skill' : 'Agent';
   const metricValue = task.routeType === 'delegated_skill' ? skillLabel : agentLabel;

@@ -50,6 +50,16 @@ export function AgentStepRow({ step, isLast }: AgentStepRowProps): React.JSX.Ele
             ) : null}
           </div>
         ) : null}
+        {step.url ? (
+          <a
+            href={step.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            Open ↗
+          </a>
+        ) : null}
       </div>
     </div>
   );

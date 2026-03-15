@@ -374,8 +374,11 @@ Write the COMPLETE, READY-TO-USE deliverable. Be specific, concrete, and immedia
                 title: `Marketing — ${type}: ${intent.slice(0, 70)}`,
                 content: output,
             });
-            savedToNotion = (notionRun.result as { success?: boolean }).success === true;
-            emitStep('skill_result', 'Saved to Notion', { skillId: 'notion.create-page', success: savedToNotion });
+            const notionResult = notionRun.result as { success?: boolean; output?: { url?: string; title?: string } };
+            savedToNotion = notionResult.success === true;
+            const notionPageUrl = notionResult.output?.url;
+            const notionLabel = notionResult.output?.title ? `"${notionResult.output.title}"` : 'page';
+            emitStep('skill_result', notionPageUrl ? `Saved to Notion — ${notionLabel}` : 'Saved to Notion', { skillId: 'notion.create-page', success: savedToNotion, url: notionPageUrl });
         } catch {
             emitStep('skill_result', 'Notion not connected — output ready', { skillId: 'notion.create-page', success: false });
         }

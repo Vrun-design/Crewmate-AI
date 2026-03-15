@@ -17,6 +17,7 @@ import { parseReplyTarget } from './channelTasking';
 import { serverConfig } from '../config';
 import { logServerError } from './runtimeLogger';
 import { announceLiveTaskUpdate } from './liveGatewayAnnouncements';
+import { getTaskArtifact } from './taskArtifacts';
 
 const SLACK_WEBHOOK_TIMEOUT_MS = 8_000;
 type LiveTaskUpdateStatus = 'running' | 'completed' | 'failed';
@@ -167,13 +168,25 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
     // 2. Always create in-app notification unless the user disabled it
     if (prefs.inAppEnabled) {
         try {
-            const inApp = buildTaskNotification(task);
+    const inApp = buildTaskNotification(task);
+    const artifact = getTaskArtifact(task.result, task.steps);
             createNotification(userId, {
                 title: inApp.title,
                 message: inApp.message,
                 type: inApp.type,
                 sourcePath: `/tasks?task=${task.taskId ?? task.id}`,
             });
+            console.log(JSON.stringify({
+                source: 'agentNotifier',
+                eventType: 'task.notification',
+                timestamp: new Date().toISOString(),
+                taskId: task.taskId ?? task.id,
+                taskRunId: task.id,
+                status: task.status,
+                artifactKind: artifact?.kind ?? null,
+                artifactSource: artifact?.source ?? null,
+                hasArtifactUrl: Boolean(artifact?.url),
+            }));
         } catch (err) {
             logServerError('agentNotifier:in-app', err, { userId, taskId: task.taskId ?? task.id });
         }
@@ -202,6 +215,7 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
     // Always broadcast completion via SSE so the Dashboard can show the notification,
     // regardless of whether the task originated from a live session or the app UI.
     const payload = buildTaskNotification(task);
+    const artifact = getTaskArtifact(task.result, task.steps);
     broadcastLiveTaskUpdate(
         userId,
         task,
@@ -211,8 +225,35 @@ export async function notifyTaskComplete(userId: string, task: AgentTask): Promi
     );
     if (replyTarget?.channel === 'live_session') {
         announceLiveTaskUpdate(replyTarget.sessionId, task, payload.message);
+        console.log(JSON.stringify({
+            source: 'agentNotifier',
+            eventType: 'task.live_announcement',
+            timestamp: new Date().toISOString(),
+            taskId: task.taskId ?? task.id,
+            taskRunId: task.id,
+            sessionId: replyTarget.sessionId,
+            status: task.status,
+            artifactKind: artifact?.kind ?? null,
+            artifactSource: artifact?.source ?? null,
+            hasArtifactUrl: Boolean(artifact?.url),
+            dispatched: true,
+        }));
         return;
     }
+
+    console.log(JSON.stringify({
+        source: 'agentNotifier',
+        eventType: 'task.live_announcement',
+        timestamp: new Date().toISOString(),
+        taskId: task.taskId ?? task.id,
+        taskRunId: task.id,
+        sessionId: null,
+        status: task.status,
+        artifactKind: artifact?.kind ?? null,
+        artifactSource: artifact?.source ?? null,
+        hasArtifactUrl: Boolean(artifact?.url),
+        dispatched: false,
+    }));
 
     if (prefs.slackWebhookUrl) {
         try {

@@ -20,6 +20,7 @@ import {
 import type { AgentStepEvent, AgentStepType, EmitStep } from '../types/agentEvents';
 import type { TaskRecord, TaskRunRecord } from '../types';
 import { extractLinkedSessionId } from './channelTasking';
+import { getTaskArtifact } from './taskArtifacts';
 
 export type AgentTaskStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -59,6 +60,15 @@ export interface RoutingDecision {
 }
 
 const taskListeners = new Map<string, Array<(event: string) => void>>();
+
+function logTaskEvent(eventType: string, payload: Record<string, unknown>): void {
+  console.log(JSON.stringify({
+    source: 'orchestrator',
+    eventType,
+    timestamp: new Date().toISOString(),
+    ...payload,
+  }));
+}
 
 export function subscribeToTask(taskId: string, listener: (event: string) => void): () => void {
   if (!taskListeners.has(taskId)) {
@@ -100,10 +110,27 @@ export function createStepEmitter(task: AgentTask): { emitStep: EmitStep; getSte
       success: options.success,
       screenshotUrl: options.screenshotUrl,
       currentUrl: options.currentUrl,
+      url: options.url,
     };
 
     step.stepIndex -= 1;
     steps.push(step);
+    logTaskEvent('task.step', {
+      taskId: task.workspaceTaskId ?? task.id,
+      taskRunId: task.id,
+      agentId: task.agentId,
+      routeType: task.routeType,
+      originType: task.originType ?? null,
+      delegatedSkillId: task.delegatedSkillId ?? null,
+      stepIndex: step.stepIndex,
+      stepType: type,
+      label,
+      detail: options.detail ?? null,
+      skillId: options.skillId ?? null,
+      durationMs: options.durationMs ?? null,
+      success: options.success ?? null,
+      currentUrl: options.currentUrl ?? null,
+    });
     emitTaskEvent(task.id, { type: 'step', step });
   };
 
@@ -149,51 +176,28 @@ function getWorkspaceToolLabel(
   return originType === 'live_session' ? 'Crewmate Live' : 'Crewmate';
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function getString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function unwrapResult(result: unknown): Record<string, unknown> | null {
-  const record = asRecord(result);
-  if (!record) {
-    return null;
-  }
-
-  return asRecord(record.output) ?? record;
-}
-
 function getWorkspaceTaskPatchFromResult(task: AgentTask, result: unknown): Partial<TaskRecord> {
-  const payload = unwrapResult(result);
+  const artifact = getTaskArtifact(result, task.steps);
   const tool = getWorkspaceToolLabel(task.routeType, task.delegatedSkillId, task.originType);
   const baseDescription = task.routeType === 'delegated_skill'
     ? `${formatSkillLabel(task.delegatedSkillId)} completed in the background.`
     : 'Background workflow completed.';
-
-  if (!payload) {
-    return { tool, description: baseDescription };
-  }
-
-  const screenshot = asRecord(payload.screenshot);
-  const url = getString(payload.url) ?? getString(payload.publicUrl) ?? getString(screenshot?.publicUrl);
-  const title = getString(payload.title) ?? getString(payload.name);
-  const message = getString(asRecord(result)?.message);
+  const message = (() => {
+    if (!result || typeof result !== 'object' || Array.isArray(result)) {
+      return null;
+    }
+    const record = result as Record<string, unknown>;
+    return typeof record.message === 'string' && record.message.trim() ? record.message.trim() : null;
+  })();
 
   return {
     tool,
-    url: url ?? undefined,
+    url: artifact?.url ?? undefined,
     description: message ?? baseDescription,
-    title: title && task.routeType === 'delegated_skill' && task.delegatedSkillId === 'notion.create-page'
-      ? title
+    title: artifact?.label && task.routeType === 'delegated_skill' && task.delegatedSkillId === 'notion.create-page'
+      ? artifact.label
       : undefined,
-    artifactCount: url ? 1 : undefined,
+    artifactCount: artifact?.url ? 1 : undefined,
   };
 }
 
@@ -278,10 +282,24 @@ export function createTask(
     url: `/tasks?task=${workspaceTask.id}`,
   });
 
-  return {
+  const task = {
     ...buildAgentTaskFromRun(taskRun, intent, ctx.userId, ctx.workspaceId),
     delegatedSkillArgs: options?.delegatedSkillArgs,
   };
+
+  logTaskEvent('task.created', {
+    taskId: task.workspaceTaskId ?? task.id,
+    taskRunId: task.id,
+    agentId: task.agentId,
+    routeType: task.routeType,
+    userId: task.userId,
+    workspaceId: task.workspaceId,
+    originType: task.originType ?? null,
+    delegatedSkillId: task.delegatedSkillId ?? null,
+    intent: task.intent,
+  });
+
+  return task;
 }
 
 export function getTask(id: string, userId?: string): AgentTask | null {
@@ -342,6 +360,20 @@ export function updateTask(id: string, patch: Partial<AgentTask>, steps?: AgentS
       ...resultPatch,
     });
   }
+
+  if (patch.status || patch.error || patch.completedAt || patch.result !== undefined) {
+    logTaskEvent('task.updated', {
+      taskId: task.taskId,
+      taskRunId: id,
+      agentId: task.agentId,
+      routeType: task.routeType,
+      status: patch.status ?? task.status,
+      error: patch.error ?? null,
+      completedAt: patch.completedAt ?? null,
+      hasResult: patch.result !== undefined,
+      totalSteps: steps?.length ?? task.steps?.length ?? 0,
+    });
+  }
 }
 
 export function isCancellationRequested(taskId: string): boolean {
@@ -364,6 +396,14 @@ export function completeCancelledTask(task: AgentTask, steps: AgentStepEvent[], 
     error: detail ?? 'Cancelled by user',
     steps,
     routeType: task.routeType,
+  });
+  logTaskEvent('task.cancelled', {
+    taskId: task.taskId ?? task.id,
+    taskRunId: task.id,
+    agentId: task.agentId,
+    routeType: task.routeType,
+    error: detail ?? 'Cancelled by user',
+    totalSteps: steps.length,
   });
 }
 
@@ -393,6 +433,14 @@ export function cancelTask(taskId: string, userId: string): AgentTask | null {
     error: 'Cancelled by user',
     steps,
     routeType: task.routeType,
+  });
+  logTaskEvent('task.cancelled', {
+    taskId: task.taskId ?? taskId,
+    taskRunId: taskId,
+    agentId: task.agentId,
+    routeType: task.routeType,
+    error: 'Cancelled by user',
+    totalSteps: steps.length,
   });
   return getTask(taskId, userId);
 }

@@ -180,16 +180,6 @@ export function LiveSessionProvider({ children }: { children: React.ReactNode })
         summary: event.summary ?? null,
       });
 
-      // Notify Gemini of terminal task outcomes so it can speak up proactively
-      // instead of going silent after a background task finishes or fails.
-      if (isSessionActive && (event.status === 'completed' || event.status === 'failed')) {
-        const taskLabel = event.title ?? 'Background task';
-        const notification =
-          event.status === 'completed'
-            ? `[SYSTEM: Background task completed — "${taskLabel}". Acknowledge this naturally and offer next steps.]`
-            : `[SYSTEM: Background task failed — "${taskLabel}". ${event.summary ? `Reason: ${event.summary}.` : ''} Tell the user what went wrong and what they can do about it.]`;
-        void sendMessage(notification, session?.id);
-      }
     },
   });
 

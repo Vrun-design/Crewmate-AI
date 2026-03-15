@@ -31,6 +31,8 @@ export interface AgentStepEvent {
     screenshotUrl?: string;
     /** Browser session: URL the browser was on when this step occurred */
     currentUrl?: string;
+    /** Output URL to surface to the user (e.g. Notion page, Google Doc) */
+    url?: string;
 }
 
 /** Function signature for the emitStep callback passed to all agents */
@@ -44,5 +46,6 @@ export type EmitStep = (
         success?: boolean;
         screenshotUrl?: string;
         currentUrl?: string;
+        url?: string;
     }
 ) => void;

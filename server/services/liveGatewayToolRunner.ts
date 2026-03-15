@@ -126,6 +126,15 @@ export async function executeLiveFunctionCalls(input: {
 
       const args = call.args ?? {};
       const skillId = call.name.replace(/_/g, '.');
+      console.log(JSON.stringify({
+        source: 'liveGatewayToolRunner',
+        eventType: 'live_tool.start',
+        timestamp: new Date().toISOString(),
+        sessionId: input.sessionId,
+        userId: input.userId,
+        toolName: call.name,
+        skillId,
+      }));
       const { getSkill, runSkill } = await import('../skills/registry');
       const skill = getSkill(skillId);
 
@@ -179,6 +188,17 @@ export async function executeLiveFunctionCalls(input: {
         insertActivity(`Executed ${call.name}`, 'Tool call executed successfully.', 'action', input.userId, { notify: false });
       }
 
+      console.log(JSON.stringify({
+        source: 'liveGatewayToolRunner',
+        eventType: delegatedTaskId ? 'live_tool.delegated' : 'live_tool.completed',
+        timestamp: new Date().toISOString(),
+        sessionId: input.sessionId,
+        userId: input.userId,
+        toolName: call.name,
+        skillId,
+        delegatedTaskId,
+      }));
+
       const notification = getNotificationPayload(call.name, skill.name, delegatedTaskId, output);
       if (notification) {
         createNotification(input.userId, {
@@ -196,6 +216,16 @@ export async function executeLiveFunctionCalls(input: {
       });
     } catch (error) {
       const messageText = getToolErrorMessage(error);
+      console.log(JSON.stringify({
+        source: 'liveGatewayToolRunner',
+        eventType: 'live_tool.failed',
+        timestamp: new Date().toISOString(),
+        sessionId: input.sessionId,
+        userId: input.userId,
+        toolName: call.name ?? null,
+        skillId: call.name ? call.name.replace(/_/g, '.') : null,
+        error: messageText,
+      }));
       logServerError('liveGatewayToolRunner:execute-call', error, {
         sessionId: input.sessionId,
         userId: input.userId,

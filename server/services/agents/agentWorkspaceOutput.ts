@@ -95,15 +95,26 @@ async function runWorkspaceCreateSkill({
   try {
     const startedAt = Date.now();
     const runRecord = await runSkill(target, ctx, args);
+    const succeeded = runRecord.result.success !== false;
+    if (!succeeded) {
+      const errMsg = (runRecord.result as { error?: string }).error ?? 'Unknown error';
+      emitStep('skill_result', `${getWorkspaceTargetLabel(target)} creation failed — ${errMsg}`, {
+        skillId: target,
+        durationMs: Date.now() - startedAt,
+        success: false,
+      });
+      return null;
+    }
     const url = extractUrl((runRecord.result as { output?: unknown }).output);
     emitStep('skill_result', successMessage(url), {
       skillId: target,
       durationMs: Date.now() - startedAt,
-      success: runRecord.result.success !== false,
+      success: true,
+      url,
     });
     return { url };
   } catch (error) {
-    emitStep('skill_result', `${getWorkspaceTargetLabel(target)} creation failed - ${error instanceof Error ? error.message : String(error)}`, {
+    emitStep('skill_result', `${getWorkspaceTargetLabel(target)} creation failed — ${error instanceof Error ? error.message : String(error)}`, {
       skillId: target,
       success: false,
     });

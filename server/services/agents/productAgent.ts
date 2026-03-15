@@ -436,8 +436,11 @@ Write the COMPLETE document. Be specific and concrete — fill in plausible spec
                 title: `Product — ${type.toUpperCase()}: ${intent.slice(0, 70)}`,
                 content: output,
             });
-            if (!ticketCreated) ticketCreated = (notionRun.result as { success?: boolean }).success === true;
-            emitStep('skill_result', 'Saved to Notion', { skillId: 'notion.create-page', durationMs: Date.now() - t0, success: true });
+            const notionResult = notionRun.result as { success?: boolean; output?: { url?: string; title?: string } };
+            if (!ticketCreated) ticketCreated = notionResult.success === true;
+            const notionPageUrl = notionResult.output?.url;
+            const notionLabel = notionResult.output?.title ? `"${notionResult.output.title}"` : 'page';
+            emitStep('skill_result', notionPageUrl ? `Saved to Notion — ${notionLabel}` : 'Saved to Notion', { skillId: 'notion.create-page', durationMs: Date.now() - t0, success: notionResult.success === true, url: notionPageUrl });
         } catch {
             emitStep('skill_result', 'Notion not connected', { skillId: 'notion.create-page', success: false });
         }

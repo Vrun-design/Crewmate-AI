@@ -385,11 +385,14 @@ Write the COMPLETE, READY-TO-SEND message. No [placeholder] text should remain w
         emitStep('saving', 'Saving to Notion...', { skillId: 'notion.create-page' });
         try {
             const t0 = Date.now();
-            await runSkill('notion.create-page', ctx, {
+            const notionRun = await runSkill('notion.create-page', ctx, {
                 title: `Comms — ${channel.replace('_', ' ').toUpperCase()}: ${intent.slice(0, 70)}`,
                 content: draft,
             });
-            emitStep('skill_result', 'Saved to Notion', { skillId: 'notion.create-page', durationMs: Date.now() - t0, success: true });
+            const notionResult = notionRun.result as { success?: boolean; output?: { url?: string; title?: string } };
+            const notionPageUrl = notionResult.output?.url;
+            const notionLabel = notionResult.output?.title ? `"${notionResult.output.title}"` : 'page';
+            emitStep('skill_result', notionPageUrl ? `Saved to Notion — ${notionLabel}` : 'Saved to Notion', { skillId: 'notion.create-page', durationMs: Date.now() - t0, success: notionResult.success === true, url: notionPageUrl });
         } catch {
             emitStep('skill_result', 'Notion not connected — output ready', { skillId: 'notion.create-page', success: false });
         }

@@ -445,17 +445,21 @@ ${totalSources > 0 ? `Sources:\n${formatSources(allSources.slice(0, 15))}` : 'No
         emitStep('saving', 'Saving research to Notion...', { skillId: 'notion.create-page' });
         try {
             const t0 = Date.now();
-            await runSkill('notion.create-page', ctx, {
+            const notionRun = await runSkill('notion.create-page', ctx, {
                 title: `Research: ${intent.slice(0, 90)}`,
-                content: `# Research: ${intent}\n\n${brief}\n\n---\n\n## Full Findings\n\n${findings}\n\n---\n\n## Sources\n\n${formatSources(allSources)}`,
+                content: `# Research: ${intent}\n\n${brief}${allSources.length > 0 ? `\n\n---\n\n## Sources\n\n${formatSources(allSources.slice(0, 20))}` : ''}`,
             });
-            emitStep('skill_result', 'Research saved to Notion', {
+            const notionResult = notionRun.result as { success?: boolean; output?: { url?: string; title?: string } };
+            const notionPageUrl = notionResult.output?.url;
+            const notionLabel = notionResult.output?.title ? `"${notionResult.output.title}"` : 'page';
+            emitStep('skill_result', notionPageUrl ? `Saved to Notion — ${notionLabel}` : 'Research saved to Notion', {
                 skillId: 'notion.create-page',
                 durationMs: Date.now() - t0,
-                success: true,
+                success: notionResult.success !== false,
+                url: notionPageUrl,
             });
         } catch {
-            emitStep('skill_result', 'Notion not connected — research ready in output', { skillId: 'notion.create-page', success: false });
+            emitStep('skill_result', 'Notion save failed — research ready in output', { skillId: 'notion.create-page', success: false });
         }
     }
 

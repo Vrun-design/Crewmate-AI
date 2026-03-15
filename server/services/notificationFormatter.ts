@@ -1,18 +1,17 @@
 import type { AgentStepEvent } from '../types/agentEvents';
 import type { AgentTask } from './orchestrator';
+import { getArtifactFromResult, getTaskArtifact } from './taskArtifacts';
 
 type NotificationVisualType = 'success' | 'info' | 'warning' | 'default';
-
-interface ArtifactDescriptor {
-  kind: 'notion' | 'clickup' | 'workspace' | 'generic';
-  label: string;
-  url?: string;
-}
 
 interface NotificationDraft {
   title: string;
   message: string;
   type: NotificationVisualType;
+}
+
+function getString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -23,25 +22,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function getString(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function getNumber(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function unwrapResult(result: unknown): Record<string, unknown> | null {
-  const record = asRecord(result);
-  if (!record) {
-    return null;
-  }
-
-  const nestedOutput = asRecord(record.output);
-  return nestedOutput ?? record;
-}
-
-function buildArtifactMessage(artifact: ArtifactDescriptor): string {
+function buildArtifactMessage(artifact: { label: string; url?: string }): string {
   if (artifact.url) {
     return `Created "${artifact.label}". Open here: ${artifact.url}`;
   }
@@ -49,67 +30,7 @@ function buildArtifactMessage(artifact: ArtifactDescriptor): string {
   return `Created "${artifact.label}".`;
 }
 
-function getArtifactFromResult(result: unknown): ArtifactDescriptor | null {
-  const payload = unwrapResult(result);
-  if (!payload) {
-    return null;
-  }
-
-  const url = getString(payload.url);
-  const title = getString(payload.title);
-  const name = getString(payload.name);
-  const task = asRecord(payload.task);
-
-  if (title && url?.includes('notion.so')) {
-    return { kind: 'notion', label: title, url };
-  }
-
-  if (name && url?.includes('clickup.com')) {
-    return { kind: 'clickup', label: name, url };
-  }
-
-  if (task) {
-    const taskTitle = getString(task.title);
-    if (taskTitle) {
-      return { kind: 'workspace', label: taskTitle };
-    }
-  }
-
-  if (title && url) {
-    return { kind: 'generic', label: title, url };
-  }
-
-  if (name && url) {
-    return { kind: 'generic', label: name, url };
-  }
-
-  return null;
-}
-
-function getArtifactFromSteps(steps: AgentStepEvent[] | undefined): ArtifactDescriptor | null {
-  if (!steps || steps.length === 0) {
-    return null;
-  }
-
-  const successfulNotionStep = [...steps].reverse().find((step) =>
-    step.type === 'skill_result' &&
-    step.skillId === 'notion.create-page' &&
-    step.success &&
-    getString(step.detail),
-  );
-
-  if (successfulNotionStep?.detail) {
-    return {
-      kind: 'notion',
-      label: 'Notion document',
-      url: successfulNotionStep.detail,
-    };
-  }
-
-  return null;
-}
-
-function buildArtifactTitle(kind: ArtifactDescriptor['kind']): string {
+function buildArtifactTitle(kind: 'notion' | 'clickup' | 'workspace' | 'generic'): string {
   switch (kind) {
     case 'notion':
       return 'Notion page created';
@@ -154,7 +75,7 @@ export function buildTaskNotification(task: AgentTask): NotificationDraft {
     };
   }
 
-  const artifact = getArtifactFromResult(task.result) ?? getArtifactFromSteps(task.steps);
+  const artifact = getTaskArtifact(task.result, task.steps as AgentStepEvent[] | undefined);
   if (artifact) {
     return {
       title: buildArtifactTitle(artifact.kind),

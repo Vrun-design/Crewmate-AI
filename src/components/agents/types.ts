@@ -11,6 +11,7 @@ export interface AgentStepEvent {
   skillId?: string;
   durationMs?: number;
   success?: boolean;
+  url?: string;
 }
 
 export interface AgentTask {

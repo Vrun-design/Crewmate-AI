@@ -314,6 +314,7 @@ Write COMPLETE, PUBLICATION-READY content. No placeholders. Make the hook imposs
     }
 
     let savedToNotion = false;
+    let notionPageUrl: string | undefined;
     if (saveToNotion) {
         emitStep('saving', 'Saving to Notion...', { skillId: 'notion.create-page' });
         try {
@@ -322,8 +323,11 @@ Write COMPLETE, PUBLICATION-READY content. No placeholders. Make the hook imposs
                 title: `Social — ${platform.toUpperCase()}: ${intent.slice(0, 70)}`,
                 content,
             });
-            savedToNotion = (notionRun.result as { success?: boolean }).success === true;
-            emitStep('skill_result', 'Saved to Notion', { skillId: 'notion.create-page', durationMs: Date.now() - t0, success: savedToNotion });
+            const notionResult = notionRun.result as { success?: boolean; output?: { url?: string; title?: string } };
+            savedToNotion = notionResult.success === true;
+            notionPageUrl = notionResult.output?.url;
+            const notionLabel = notionResult.output?.title ? `"${notionResult.output.title}"` : 'page';
+            emitStep('skill_result', notionPageUrl ? `Saved to Notion — ${notionLabel}` : 'Saved to Notion', { skillId: 'notion.create-page', durationMs: Date.now() - t0, success: savedToNotion, url: notionPageUrl });
         } catch {
             emitStep('skill_result', 'Notion not connected — output ready', { skillId: 'notion.create-page', success: false });
         }

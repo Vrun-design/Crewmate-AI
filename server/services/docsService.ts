@@ -183,18 +183,16 @@ export async function createGoogleDocument(workspaceId: string, input: {
     body: { title: input.title },
   });
 
-  if (input.content?.trim()) {
-    await appendToGoogleDocument(workspaceId, {
-      documentId: payload.documentId,
-      content: input.content,
-      images: input.images,
-    });
-  } else if (input.images?.length) {
-    await appendToGoogleDocument(workspaceId, {
-      documentId: payload.documentId,
-      content: '',
-      images: input.images,
-    });
+  try {
+    if (input.content?.trim() || input.images?.length) {
+      await appendToGoogleDocument(workspaceId, {
+        documentId: payload.documentId,
+        content: input.content ?? '',
+        images: input.images,
+      });
+    }
+  } catch (err) {
+    console.error(`[docsService] Failed to append content to doc ${payload.documentId}:`, err instanceof Error ? err.message : err);
   }
 
   const folderId = input.folderId || defaults.defaultDocsFolderId;
@@ -268,13 +266,16 @@ export async function appendToGoogleDocument(workspaceId: string, input: {
     }
   }
 
-  if (requests.length > 0) {
+  // Google Docs API batchUpdate: send requests in chunks of 50 to avoid payload limits
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < requests.length; i += CHUNK_SIZE) {
+    const chunk = requests.slice(i, i + CHUNK_SIZE);
     await googleWorkspaceApiRequest({
       workspaceId,
       moduleId: 'docs',
       url: `https://docs.googleapis.com/v1/documents/${encodeURIComponent(input.documentId)}:batchUpdate`,
       method: 'POST',
-      body: { requests },
+      body: { requests: chunk },
     });
   }
 

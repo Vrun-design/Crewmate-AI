@@ -589,10 +589,16 @@ export async function createNotionPage(workspaceId: string, input: CreateNotionP
 
   const parentPageId = config.parentPageId || await autoDiscoverNotionParentPage(workspaceId);
 
-  const children = buildBlocksFromContent(input.content, {
+  const allChildren = buildBlocksFromContent(input.content, {
     screenshotUrl: input.screenshotUrl,
     screenshotCaption: input.screenshotCaption,
   });
+
+  // Notion API allows max 100 children per request — split and append the rest
+  const NOTION_BLOCK_LIMIT = 100;
+  const firstBatch = allChildren.slice(0, NOTION_BLOCK_LIMIT);
+  const remaining = allChildren.slice(NOTION_BLOCK_LIMIT);
+
   const payload = await notionRequest<{ id: string; url: string }>(workspaceId, '/pages', {
     method: 'POST',
     body: JSON.stringify({
@@ -601,22 +607,25 @@ export async function createNotionPage(workspaceId: string, input: CreateNotionP
       } satisfies NotionParent,
       properties: {
         title: {
-          title: [
-            {
-              text: {
-                content: input.title,
-              },
-            },
-          ],
+          title: [{ text: { content: input.title } }],
         },
       },
-      ...(children.length > 0 ? { children } : {}),
+      ...(firstBatch.length > 0 ? { children: firstBatch } : {}),
       ...buildPageDecoration({
         iconEmoji: input.iconEmoji,
         coverUrl: input.coverUrl,
       }),
     }),
   });
+
+  // Append remaining blocks in batches of 100
+  for (let i = 0; i < remaining.length; i += NOTION_BLOCK_LIMIT) {
+    const chunk = remaining.slice(i, i + NOTION_BLOCK_LIMIT);
+    await notionRequest(workspaceId, `/blocks/${payload.id}/children`, {
+      method: 'PATCH',
+      body: JSON.stringify({ children: chunk }),
+    });
+  }
 
   return {
     id: payload.id,

@@ -84,9 +84,9 @@ function updateAgentTaskFromPayload(task: AgentTask, payload: AgentTaskStreamPay
     return {
       ...task,
       status: 'completed',
-      result: payload.result,
+      result: payload.result ?? task.result,
       steps: payload.steps ?? task.steps,
-      completedAt: new Date().toISOString(),
+      completedAt: task.completedAt ?? new Date().toISOString(),
     };
   }
 
@@ -94,8 +94,10 @@ function updateAgentTaskFromPayload(task: AgentTask, payload: AgentTaskStreamPay
     return {
       ...task,
       status: 'failed',
-      error: payload.error,
+      result: payload.result ?? task.result,
+      error: payload.error ?? task.error,
       steps: payload.steps ?? task.steps,
+      completedAt: task.completedAt ?? new Date().toISOString(),
     };
   }
 
@@ -185,17 +187,40 @@ export function Tasks(): React.JSX.Element {
     sseRef.current = connectAuthenticatedSseStream(`/api/agents/tasks/${taskId}/events`, {
       onEvent: (_event, dataRaw) => {
         const payload = JSON.parse(dataRaw) as AgentTaskStreamPayload;
+        let updatedTask: AgentTask | null = null;
 
-        setAgentTasks((prev) =>
-          prev.map((task) => (task.id === taskId ? updateAgentTaskFromPayload(task, payload) : task)),
-        );
+        setAgentTasks((prev) => prev.map((task) => {
+          if (task.id !== taskId) {
+            return task;
+          }
+
+          updatedTask = updateAgentTaskFromPayload(task, payload);
+          return updatedTask;
+        }));
+
+        if (updatedTask && selectedAgentTask?.id === taskId) {
+          setSelectedAgentTask(updatedTask);
+        }
 
         if (payload.type === 'completed' || payload.type === 'failed' || payload.type === 'cancelled') {
           closeTaskStream();
           const cueStatus = payload.type === 'completed' ? 'completed' : 'failed';
           const cueTitle = intent ? intent.slice(0, 80) : (payload.type === 'completed' ? 'Task completed' : 'Task failed');
           updateLiveTaskCue({ title: cueTitle, status: cueStatus, summary: null });
-          setTimeout(() => void loadAgentTasks(), 600);
+          setTimeout(() => {
+            void loadAgentTasks();
+            const taskDetailId = selectedTaskDetail?.id ?? selectedTask?.id;
+            if (!taskDetailId) {
+              return;
+            }
+
+            void workspaceService.getTask(taskDetailId).then((detail) => {
+              setSelectedTaskDetail(detail);
+              setSelectedTask(detail);
+            }).catch(() => {
+              // Keep the streamed state if canonical refresh fails.
+            });
+          }, 600);
         }
       },
       onError: () => {
@@ -203,7 +228,7 @@ export function Tasks(): React.JSX.Element {
         closeTaskStream();
       },
     });
-  }, [closeTaskStream, loadAgentTasks, updateLiveTaskCue]);
+  }, [closeTaskStream, loadAgentTasks, selectedAgentTask?.id, selectedTask?.id, selectedTaskDetail?.id, updateLiveTaskCue]);
 
   // Auto-subscribe to the most recent running task on page load so the
   // dashboard badge stays live without the user needing to open the drawer.
