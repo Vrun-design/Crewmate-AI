@@ -18,7 +18,7 @@ export const notionUpdatePageSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {

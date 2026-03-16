@@ -25,8 +25,8 @@ export const notionCreatePageSkill: Skill = {
     inputSchema: {
         type: 'object',
         properties: {
-            title: { type: 'string', description: 'Page title' },
-            content: { type: 'string', description: 'Page body content. Supports headings (#), bullets (-), numbered lists (1.), to-dos (- [ ]), quotes (>), code fences (```), bookmarks (URL lines), images (image URL lines), and inline links like [label](https://...).' },
+            title: { type: 'string', description: 'Page title — compose this yourself based on context. Never leave empty.' },
+            content: { type: 'string', description: 'Page body content — compose from context, conversation, or screen. Supports headings (#), bullets (-), numbered lists (1.), to-dos (- [ ]), quotes (>), code fences (```), bookmarks (URL lines), images (image URL lines), and inline links like [label](https://...). Never leave empty.' },
             iconEmoji: { type: 'string', description: 'Optional emoji icon for the page.' },
             coverUrl: { type: 'string', description: 'Optional external image URL for the page cover.' },
             imageQuery: { type: 'string', description: 'Optional stock-image query to use for the page cover and embedded image.' },
@@ -36,6 +36,11 @@ export const notionCreatePageSkill: Skill = {
         required: ['title', 'content'],
     },
     handler: async (ctx, args) => {
+        const title = String(args.title ?? '').trim() || ctx.taskTitle?.trim() || '';
+        if (!title) {
+            throw new Error('Page title is required to create a Notion page.');
+        }
+        args = { ...args, title };
         const imageQuery = typeof args.imageQuery === 'string' && args.imageQuery.trim()
             ? args.imageQuery
             : inferAutoImageQuery({

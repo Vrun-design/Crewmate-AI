@@ -10,7 +10,8 @@
 [![Google Cloud](https://img.shields.io/badge/Deployed%20on-Google%20Cloud-34A853?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com)
 [![Gemini Live Agent Challenge](https://img.shields.io/badge/Hackathon-Gemini%20Live%20Agent%20Challenge-FF6D00?style=for-the-badge)](https://devpost.com)
 
-**Category: Live Agents 🗣️**
+**Category: Live Agents 🗣️ (with cross-category coverage)**
+
 
 [Quick Start](#-quick-start) · [Architecture](#-architecture) · [Skills](#-skills-62-and-counting) · [Integrations](#-integrations) · [Deployment](#-deployment) · [Full Architecture Diagrams](docs/ARCHITECTURE.md)
 
@@ -49,7 +50,7 @@ Crewmate is architected around the **Gemini Live API** as its conversational con
 |---|---|
 | **Gemini Live** | Real-time audio conversation with interruption support |
 | **Screen Context** | Screenshot captured and sent as multimodal context each turn |
-| **62 Skills** | Research, browser, productivity, comms, automation, code, live — including full read/write for all Google Workspace types |
+| **60 Skills** | Research, browser, productivity, comms, code, live — including full read/write for all Google Workspace types |
 | **Live → Agent Bridge** | Voice commands now reach all 14 specialist agents via `live.delegate-to-agent` |
 | **Agent Pipeline** | Chain agents sequentially — research → PRD → email — with context passed between each step |
 | **Document Reading** | Read full content of Google Docs, Sheets, Slides, and Notion pages — not just metadata |
@@ -103,7 +104,7 @@ flowchart TD
             ORCH[Orchestrator\nIntent Router]
             PIPE[Pipeline Orchestrator\nSequential Agent Chaining]
             POLICY[Execution Policy\nInline / Delegated / Either]
-            REG[Skill Registry\n62 Skills]
+            REG[Skill Registry\n60 Skills]
         end
 
         subgraph AgentLayer["Agent Layer — 14 Specialists"]
@@ -169,7 +170,7 @@ flowchart LR
     POLICY_L -->|"delegated skill\n(slow, external)"| DELEGATE["Create Background Task\nSpeak Acknowledgement"]
     POLICY_L -->|"no tool needed"| ANSWER["Speak Response\nNormally"]
 
-    ORCH --> ROUTE["LLM Intent Router\n(gemini-pro)"]
+    ORCH --> ROUTE["LLM Intent Router\n(gemini-3.1-pro-preview)"]
     ROUTE -->|"skill match"| SKILL_TASK["Run Delegated Skill"]
     ROUTE -->|"complex workflow"| AGENT_TASK["Run Specialist Agent\n(memory injected + self-critique)"]
 
@@ -329,7 +330,7 @@ All browser navigation is **voice-activated via Gemini Live** — say the task o
 
 ---
 
-## ⚡ Skills — 62 and Counting
+## ⚡ Skills — 60 and Counting
 
 Skills are the **single execution primitive** in Crewmate. Every action — from reading a Google Doc to chaining a 3-step agent pipeline — is a skill.
 
@@ -337,7 +338,6 @@ Skills are the **single execution primitive** in Crewmate. Every action — from
 |---|---|
 | **Research** | `web.search`, `web.summarize-url` |
 | **Communication** | `slack.post-message`, `slack.list-channels`, `slack.get-messages`, `slack.send-dm`, `slack.get-dms` |
-| **Automation** | `zapier.trigger`, `zapier.list` |
 | **Productivity — Notion** | `notion.create-page`, `notion.append-blocks`, `notion.append-screenshot`, `notion.upload-image`, `notion.create-database-record`, `notion.list-pages`, `notion.search-pages`, `notion.update-page`, **`notion.read-page`** |
 | **Productivity — ClickUp** | `clickup.create-task`, `clickup.attach-screenshot`, `clickup.list-tasks`, **`clickup.get-task`** |
 | **Productivity — Google Workspace** | Gmail (draft / send / search / **read-message**), Docs (create / append / **read**), Sheets (create / append-rows / **read**), Slides (create / add-slides / **read**), Drive (search / create-folder), Calendar (create-event / list-events) |
@@ -445,7 +445,7 @@ schema_migrations       → Applied migration tracking
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/your-org/crewmate.git
+git clone <YOUR_REPO_URL>
 cd crewmate
 npm install
 ```
@@ -598,7 +598,7 @@ Crewmate is deployed on **Google Cloud** with a split-hosting architecture:
 | **Backend API** | Google Cloud Run | Node.js + Express container, auto-scaling, HTTPS |
 | **Auth** | Firebase Authentication | JWT verification on every API request |
 | **Live AI** | Gemini Live API (`gemini-2.5-flash-native-audio`) | Real-time audio + vision |
-| **Text / Routing** | Gemini Pro via Google GenAI SDK | Orchestration, agents, embeddings |
+| **Agents / Orchestration** | `gemini-3.1-pro-preview` via Google GenAI SDK | All 14 specialist agents, intent routing |
 | **Integrations** | Google Workspace APIs | Gmail, Calendar, Docs, Sheets, Slides, Drive |
 
 ### Deploy your own
@@ -687,18 +687,48 @@ For a full hosted deployment walkthrough, including Firebase Auth setup, backend
 
 ## 🧪 Testing
 
+### Reproducible Testing — For Judges
+
+The fastest way to verify the project works end-to-end:
+
 ```bash
-# Type-check (TypeScript)
-npm run lint
+# 1. Clone and install
+git clone <YOUR_REPO_URL>
+cd crewmate
+npm install
 
-# Run all unit tests
-npm run test
+# 2. Set minimum required env var
+echo "GOOGLE_API_KEY=your_gemini_api_key_here" > .env
 
-# Run smoke tests (production readiness checks)
-npm run test:smoke
+# 3. Boot the app
+npm run dev
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8787
+
+# 4. Run automated checks
+npm run lint          # TypeScript type-check
+npm run test          # Unit tests
+npm run test:smoke    # Smoke tests: startup, DB, service contracts
 ```
 
-Tests are in `*.test.ts` files alongside their source files. The smoke test suite validates startup config, DB connectivity, and key service contracts.
+On first run the SQLite database is auto-created at `data/crewmate.db`. No external DB setup required.
+
+To pre-populate with demo data:
+
+```bash
+npm run seed   # inserts sample tasks, memories, and activity log entries
+```
+
+**What you can verify with just a Gemini API key:**
+- Sign in via the built-in dev email-code flow (no Firebase needed)
+- Start a live voice session and speak a command
+- Delegate a task to the Research or Product agent
+- Watch real-time SSE task streaming in the Tasks tab
+- Check the Memory tab for auto-captured session memory
+
+### Automated Test Suite
+
+Tests live in `*.test.ts` files alongside source files. The smoke suite validates startup config, DB connectivity, and key service contracts.
 
 ---
 
@@ -756,12 +786,12 @@ Crewmate uses a **multi-model routing strategy** to balance quality, speed, and 
 | Role | Model | Used For |
 |---|---|---|
 | 🎙️ **Live audio** | `gemini-2.5-flash-native-audio-preview-12-2025` | Real-time bidirectional voice + screen sessions |
-| 🔬 **Research & agents** | `gemini-3.1-pro-preview` | All 14 specialist agents, deep research, multi-step reasoning |
+| 🔬 **Agents / research** | `gemini-3.1-pro-preview` | All 14 specialist agents, deep research, multi-step reasoning |
 | 🧠 **Orchestration** | `gemini-3.1-pro-preview` | Intent classification, A2A routing decisions |
-| ⚡ **Text & quick tasks** | `gemini-3.1-flash-lite-preview` | Inline skill calls, fast responses, confirmations |
+| ⚡ **Inline / quick tasks** | `gemini-3.1-flash-lite-preview` | Inline skill calls, confirmations, fast responses |
+| 🌐 **Browser automation** | `google/gemini-2.5-flash` | Stagehand Perceive→Reason→Act loop |
 | 🎨 **Creative / images** | `gemini-3.1-flash-image-preview` | Image generation, creative content |
-| 💬 **Lite / filler** | `gemini-3.1-flash-lite-preview` | Acknowledgements, simple Q&A |
-| 🔢 **Vector embeddings** | `gemini-embedding-2` | Semantic memory encoding — every session turn, agent result, skill output, and screenshot is embedded and stored for future retrieval |
+| 🔢 **Vector embeddings** | `gemini-embedding-2` | Semantic memory — every session turn, agent result, and screenshot embedded and stored |
 
 All models can be overridden via environment variables (`GEMINI_LIVE_MODEL`, `GEMINI_RESEARCH_MODEL`, etc.).
 

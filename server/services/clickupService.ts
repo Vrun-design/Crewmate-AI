@@ -20,12 +20,16 @@ interface ClickUpAttachmentResult {
 }
 
 function getClickUpConfig(workspaceId: string) {
-  const config = getStoredIntegrationConfig(workspaceId, 'clickup');
+  const stored = getStoredIntegrationConfig(workspaceId, 'clickup');
+  const envToken = serverConfig.clickupToken.trim();
+  const envListId = serverConfig.clickupListId.trim();
+  const token = envToken || stored.token || '';
+  const listId = envListId || stored.defaultListId || stored.listId || '';
   return {
-    token: config.token ?? '',
-    listId: config.defaultListId ?? config.listId ?? '',
-    workspaceName: config.workspaceName ?? '',
-    workspaceId: config.clickupWorkspaceId ?? '',
+    token,
+    listId,
+    workspaceName: stored.workspaceName ?? '',
+    workspaceId: stored.clickupWorkspaceId ?? '',
   };
 }
 
@@ -47,37 +51,53 @@ function requireClickUpOAuthConfig(): { clientId: string; clientSecret: string; 
 
 export function getClickUpConfigState(workspaceId: string): IntegrationConfigState {
   const config = getClickUpConfig(workspaceId);
+  const envTokenConfigured = Boolean(serverConfig.clickupToken.trim());
+  const envListConfigured = Boolean(serverConfig.clickupListId.trim());
+  const configuredVia = envTokenConfigured || envListConfigured
+    ? 'env'
+    : isClickUpConfigured(workspaceId)
+      ? 'vault'
+      : 'none';
+
   return {
     integrationId: 'clickup',
-    configuredVia: isClickUpConfigured(workspaceId) ? 'vault' : 'none',
+    configuredVia,
     fields: [
+      {
+        key: 'token',
+        label: 'ClickUp API token',
+        placeholder: envTokenConfigured ? 'Configured from environment' : 'pk_... or your ClickUp personal token',
+        secret: true,
+        helpText: envTokenConfigured
+          ? 'A ClickUp token is already configured from the server environment.'
+          : 'Paste the ClickUp personal API token you want Crewmate to use.',
+        configured: Boolean(config.token),
+      },
       {
         key: 'defaultListId',
         label: 'Default ClickUp list ID',
-        placeholder: 'Optional list ID',
+        placeholder: envListConfigured ? 'Configured from environment' : 'Optional list ID',
         secret: false,
-        helpText: 'Optional default list where Crewmate should create ClickUp tasks.',
+        helpText: envListConfigured
+          ? 'A default ClickUp list ID is already configured from the server environment.'
+          : 'Optional default list where Crewmate should create ClickUp tasks.',
         configured: Boolean(config.listId),
         value: config.listId,
       },
     ],
-    connection: {
-      status: isClickUpConfigured(workspaceId) ? 'connected' : 'disconnected',
-      accountLabel: config.workspaceName || undefined,
-      grantedScopes: ['tasks'],
-      grantedModules: isClickUpConfigured(workspaceId) ? ['tasks'] : [],
-      missingModules: [],
-      defaults: {
-        defaultListId: config.listId,
-      },
-    },
   };
 }
 
 export function saveClickUpDefaults(workspaceId: string, values: Record<string, string>): IntegrationConfigState {
   const current = getStoredIntegrationConfig(workspaceId, 'clickup');
   const next = { ...current };
+  const token = typeof values.token === 'string' ? values.token.trim() : '';
   const defaultListId = typeof values.defaultListId === 'string' ? values.defaultListId.trim() : '';
+  if (token) {
+    next.token = token;
+  } else if (!serverConfig.clickupToken.trim()) {
+    delete next.token;
+  }
   if (defaultListId) {
     next.defaultListId = defaultListId;
   } else {

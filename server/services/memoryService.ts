@@ -72,12 +72,12 @@ function compactSummary(text: string, maxLength: number): string {
   return `${normalized.slice(0, maxLength - 1).trim()}...`;
 }
 
-function getMemoryLabel(row: Pick<MemoryRow, 'kind' | 'title' | 'artifact_url'>): string {
+function getMemoryLabel(row: Pick<MemoryRow, 'kind' | 'title' | 'summary' | 'content_text' | 'artifact_url'>): string {
+  const body = row.summary || row.content_text || '';
   if (row.kind === 'artifact' && row.artifact_url) {
-    return `${row.title}: ${row.artifact_url}`;
+    return body ? `${row.title}: ${row.artifact_url}\n${body}` : `${row.title}: ${row.artifact_url}`;
   }
-
-  return row.title;
+  return body ? `${row.title}\n${body}` : row.title;
 }
 
 function rowToMemoryRecord(row: MemoryRow): MemoryRecord {
@@ -367,15 +367,10 @@ export async function retrieveRelevantMemories(
 
   try {
     const queryVector = await embedText(queryText);
-    const scored = embeddedRows.map((row) => {
-      const vector = JSON.parse(row.embedding!) as number[];
-      const body = [row.title, row.summary, row.content_text, row.artifact_url].filter(Boolean).join('\n');
-      return {
-        label: getMemoryLabel(row),
-        similarity: cosineSimilarity(queryVector, vector),
-        body,
-      };
-    });
+    const scored = embeddedRows.map((row) => ({
+      label: getMemoryLabel(row),
+      similarity: cosineSimilarity(queryVector, JSON.parse(row.embedding!) as number[]),
+    }));
 
     scored.sort((a, b) => b.similarity - a.similarity);
     return scored.slice(0, topK).map((row) => row.label);

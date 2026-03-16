@@ -101,8 +101,10 @@ export function registerLiveSessionRoutes(app: Express, requireAuth: RequireAuth
       const liveSession = await startGeminiLiveSession(baseSession.id);
       res.status(201).json(liveSession);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[live-session] Failed to start Gemini Live session:', msg, error instanceof Error ? error.stack : '');
       res.status(500).json({
-        message: error instanceof Error ? error.message : 'Unable to start Gemini Live session',
+        message: msg || 'Unable to start Gemini Live session',
       });
     }
   });

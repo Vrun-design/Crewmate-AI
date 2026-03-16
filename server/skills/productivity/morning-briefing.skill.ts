@@ -24,7 +24,7 @@ export const morningBriefingSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: { type: 'object', properties: {} },
   handler: async (ctx, _args) => {
     // ── 1. Gather data (partial failures are fine) ──────────────────────────

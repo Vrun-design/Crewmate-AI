@@ -532,16 +532,16 @@ export function MemoryBase(): React.JSX.Element {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-sm font-medium text-foreground">{createKind === 'artifact' ? 'Context' : 'Summary'}</label>
-              <span className={`text-xs ${summary.length > 400 ? 'text-amber-500' : 'text-muted-foreground'}`}>{summary.length}/500</span>
+              <span className={`text-xs ${summary.length > 5000 ? 'text-amber-500' : 'text-muted-foreground'}`}>{summary.length}/6000</span>
             </div>
             <textarea
               value={summary}
               onChange={(event) => setSummary(event.target.value)}
-              rows={5}
-              maxLength={500}
+              rows={8}
+              maxLength={6000}
               placeholder={createKind === 'artifact'
                 ? 'Why this artifact matters and how to find it.'
-                : 'Write the exact fact or decision you want Crewmate to recall permanently. Aim for 1–3 sentences.'}
+                : 'Write the context you want Crewmate to recall — facts, decisions, preferences, background. Up to ~1000 words.'}
               className="w-full resize-none rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>

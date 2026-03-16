@@ -99,15 +99,14 @@ const integrationDefinitions: IntegrationDefinition[] = [
     bgColor: 'bg-purple-500/10 border-purple-500/20',
     desc: 'Create structured tasks from bugs, requests, and spoken follow-ups.',
     docsUrl: 'https://developer.clickup.com/reference/createtask',
-    connectUrl: '/api/integrations/clickup/connect',
     capabilities: ['Create tasks', 'Track bugs', 'Capture follow-up work from live sessions'],
-    requiredKeys: [],
+    requiredKeys: ['token'],
     setupSteps: [
-      'Click Connect ClickUp and approve Crewmate in your ClickUp workspace.',
-      'After connecting, optionally choose a default destination list.',
-      'Now the agent can create and review ClickUp tasks without manual API keys.',
+      'Generate a personal API token from your ClickUp account settings.',
+      'Paste the token here and optionally set a default ClickUp list ID.',
+      'Now the agent can create and review ClickUp tasks without the OAuth flow.',
     ],
-    notes: 'OAuth replaces manual API token entry. A default list can be selected after connecting.',
+    notes: 'Use a ClickUp personal token plus an optional default list ID for the most stable demo setup.',
   },
 ];
 

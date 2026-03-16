@@ -66,6 +66,13 @@ export function getSkillRouteType(skill: Skill, context: RuntimeRequestContext):
     return 'delegated_skill';
   }
 
+  // An explicitly-declared inline skill must run inline regardless of sideEffectLevel.
+  // This matters for bridge skills like live.delegate-to-agent that have high side-effects
+  // but must execute synchronously so Gemini receives their output before continuing.
+  if (policy.executionMode === 'inline') {
+    return 'inline_skill';
+  }
+
   if (policy.executionMode === 'delegated' || policy.latencyClass === 'slow' || policy.sideEffectLevel === 'high') {
     return 'delegated_skill';
   }

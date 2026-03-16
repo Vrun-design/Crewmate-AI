@@ -10,7 +10,22 @@ import type {
 const integrationFieldDefinitions: Record<string, IntegrationConfigFieldDefinition[]> = {
   slack: [],
   notion: [],
-  clickup: [],
+  clickup: [
+    {
+      key: 'token',
+      label: 'ClickUp API token',
+      placeholder: 'pk_... or your ClickUp personal token',
+      secret: true,
+      helpText: 'Paste the ClickUp personal token Crewmate should use.',
+    },
+    {
+      key: 'defaultListId',
+      label: 'Default ClickUp list ID',
+      placeholder: 'Optional list ID',
+      secret: false,
+      helpText: 'Optional default list where Crewmate should create ClickUp tasks.',
+    },
+  ],
   'google-workspace': [],
 };
 

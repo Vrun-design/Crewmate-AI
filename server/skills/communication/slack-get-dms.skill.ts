@@ -19,7 +19,7 @@ export const slackGetDmsSkill: Skill = {
   executionMode: 'either',
   latencyClass: 'quick',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {

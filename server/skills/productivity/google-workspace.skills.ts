@@ -188,7 +188,7 @@ export const googleGmailDraftEmailSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -201,12 +201,16 @@ export const googleGmailDraftEmailSkill: Skill = {
     required: ['to', 'subject', 'bodyText'],
   },
   handler: async (ctx, args) => {
+    const subject = String(args.subject ?? '').trim() || ctx.taskTitle?.trim() || '';
+    const bodyText = String(args.bodyText ?? '').trim();
+    if (!subject) throw new Error('Email subject is required.');
+    if (!bodyText) throw new Error('Email body is required.');
     const result = await createGmailDraft(ctx.workspaceId, {
       to: parseStringArray(args.to),
       cc: parseStringArray(args.cc),
       bcc: parseStringArray(args.bcc),
-      subject: String(args.subject ?? ''),
-      bodyText: String(args.bodyText ?? ''),
+      subject,
+      bodyText,
     });
     return {
       success: true,
@@ -228,7 +232,7 @@ export const googleGmailSendEmailSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -243,17 +247,21 @@ export const googleGmailSendEmailSkill: Skill = {
   },
   handler: async (ctx, args) => {
     requireExplicitApproval(args, 'Sending Gmail email');
+    const subject = String(args.subject ?? '').trim() || ctx.taskTitle?.trim() || '';
+    const bodyText = String(args.bodyText ?? '').trim();
+    if (!subject) throw new Error('Email subject is required.');
+    if (!bodyText) throw new Error('Email body is required.');
     const result = await sendGmailMessage(ctx.workspaceId, {
       to: parseStringArray(args.to),
       cc: parseStringArray(args.cc),
       bcc: parseStringArray(args.bcc),
-      subject: String(args.subject ?? ''),
-      bodyText: String(args.bodyText ?? ''),
+      subject,
+      bodyText,
     });
     return {
       success: true,
       output: result,
-      message: `✅ Email sent via Gmail — "${String(args.subject ?? '')}" to ${parseStringArray(args.to).join(', ')}.`,
+      message: `✅ Email sent via Gmail — "${subject}" to ${parseStringArray(args.to).join(', ')}.`,
     };
   },
 };
@@ -270,7 +278,7 @@ export const googleGmailSearchSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'low',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -331,7 +339,8 @@ export const googleDocsCreateDocumentSkill: Skill = {
     required: ['title'],
   },
   handler: async (ctx, args) => {
-    const title = String(args.title ?? '');
+    const title = String(args.title ?? '').trim() || ctx.taskTitle?.trim() || '';
+    if (!title) throw new Error('Document title is required.');
     const imageQuery = typeof args.imageQuery === 'string' && args.imageQuery.trim()
       ? args.imageQuery
       : inferAutoImageQuery({
@@ -376,7 +385,7 @@ export const googleDocsAppendContentSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -429,7 +438,7 @@ export const googleSheetsCreateSpreadsheetSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -449,7 +458,8 @@ export const googleSheetsCreateSpreadsheetSkill: Skill = {
   },
   handler: async (ctx, args) => {
     const rows = parseRows(args.rows);
-    const title = String(args.title ?? '');
+    const title = String(args.title ?? '').trim() || ctx.taskTitle?.trim() || '';
+    if (!title) throw new Error('Spreadsheet title is required.');
     const emptyNote = buildEmptyCreateNote(rows.length, 'row', 'google.sheets-append-rows');
     const result = await createGoogleSpreadsheet(ctx.workspaceId, {
       title,
@@ -483,7 +493,7 @@ export const googleSheetsAppendRowsSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -579,7 +589,8 @@ export const googleSlidesCreatePresentationSkill: Skill = {
         content: slide.body,
       }),
     })));
-    const title = String(args.title ?? '');
+    const title = String(args.title ?? '').trim() || ctx.taskTitle?.trim() || '';
+    if (!title) throw new Error('Presentation title is required.');
     const emptyNote = buildEmptyCreateNote(slides.length, 'slide', 'google.slides-add-slides');
     const result = await createGooglePresentation(ctx.workspaceId, {
       title,
@@ -613,7 +624,7 @@ export const googleSlidesAddSlidesSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -687,7 +698,7 @@ export const googleDriveSearchFilesSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'low',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -717,7 +728,7 @@ export const googleDriveCreateFolderSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -752,7 +763,7 @@ export const googleCalendarCreateEventSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'high',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -768,11 +779,16 @@ export const googleCalendarCreateEventSkill: Skill = {
   },
   handler: async (ctx, args) => {
     requireExplicitApproval(args, 'Creating a Google Calendar event');
+    const summary = String(args.summary ?? '').trim() || ctx.taskTitle?.trim() || '';
+    const start = String(args.start ?? '').trim();
+    const end = String(args.end ?? '').trim();
+    if (!summary) throw new Error('Event title (summary) is required.');
+    if (!start || !end) throw new Error('Event start and end times are required.');
     const result = await createCalendarEvent(ctx.workspaceId, {
-      summary: String(args.summary ?? ''),
+      summary,
       description: typeof args.description === 'string' ? args.description : undefined,
-      start: String(args.start ?? ''),
-      end: String(args.end ?? ''),
+      start,
+      end,
       attendees: parseStringArray(args.attendees),
       calendarId: typeof args.calendarId === 'string' ? args.calendarId : undefined,
     });
@@ -797,7 +813,7 @@ export const googleCalendarListEventsSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'low',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -835,7 +851,7 @@ export const googleDocsReadDocumentSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -865,7 +881,7 @@ export const googleSheetsReadSpreadsheetSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -899,7 +915,7 @@ export const googleGmailReadMessageSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {
@@ -930,7 +946,7 @@ export const googleSlidesReadPresentationSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {

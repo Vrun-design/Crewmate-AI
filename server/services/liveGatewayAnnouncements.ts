@@ -63,7 +63,7 @@ function buildLiveTaskAnnouncementPrompt(task: AgentTask, summary: string | null
   }
 
   return buildAnnouncementPrompt(
-    'A background task you started for the user has completed. Say that it is done, mention the task briefly, and include the key result if it is useful.',
+    'A background task you started for the user has finished. Give a very brief one-sentence heads-up — mention the task name and say it is done. Do not summarise the result unless it fits in 5 words.',
     taskTitle,
     'Result',
     detail,

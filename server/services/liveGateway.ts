@@ -1,6 +1,5 @@
-import { updateSessionStatus } from '../repositories/sessionRepository';
+import { updateSessionStatus, getSessionUserId, getSession } from '../repositories/sessionRepository';
 import { insertActivity } from './activityService';
-import { getSessionUserId } from '../repositories/sessionRepository';
 import type { SessionRecord } from '../types';
 import { sendInitialGreeting } from './liveGatewayLifecycle';
 import {
@@ -26,7 +25,14 @@ export async function startGeminiLiveSession(sessionId: string): Promise<Session
   updateSessionStatus(sessionId, 'live', null);
   insertActivity('Gemini Live connected', 'The dashboard is now backed by a real Gemini Live session.', 'observation');
 
-  return sendInitialGreeting(runtime);
+  // Fire greeting without blocking session startup — if greeting fails the session is still live
+  void sendInitialGreeting(runtime).catch((err) => {
+    console.warn('[live-session] Initial greeting failed (non-fatal):', err instanceof Error ? err.message : err);
+  });
+
+  const session = getSession(sessionId);
+  if (!session) throw new Error('Session record missing after connect.');
+  return session;
 }
 export {
   sendLiveMessage,

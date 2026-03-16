@@ -1,0 +1,315 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 760" width="1300" height="760" font-family="Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif">
+  <defs>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#ffffff" stroke-width="0.4" opacity="0.02"/>
+    </pattern>
+    <marker id="arrowOrange" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#e95420"/>
+    </marker>
+    <marker id="arrowDim" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#333333"/>
+    </marker>
+    <filter id="cardShadow" x="-5%" y="-5%" width="115%" height="125%">
+      <feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+    <filter id="logoGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- ── Background ── -->
+  <rect width="1300" height="760" fill="#000000"/>
+  <rect width="1300" height="760" fill="url(#grid)"/>
+
+  <!-- ══════════════════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════════════════ -->
+  <!-- Logo badge -->
+  <circle cx="44" cy="34" r="22" fill="#e95420" filter="url(#logoGlow)"/>
+  <g transform="translate(30.5, 18.2) scale(1.97)">
+    <path d="M6.71091 0.339212C6.70011 0.257442 6.66491 0.181072 6.61021 0.121182C6.55561 0.0613016 6.48441 0.0210213 6.40711 0.00620134C6.32741 -0.00925866 6.24551 0.0043914 6.17491 0.0448714C6.10441 0.0853514 6.04961 0.150202 6.01961 0.228592L4.58123 3.84343C4.55517 3.90924 4.54665 3.98145 4.55657 4.05241C4.56648 4.12336 4.59446 4.19043 4.63754 4.24649C4.71726 4.35089 4.85779 4.42408 5.01321 4.38129L6.91551 3.85769L7.16571 5.57689C7.17641 5.65866 7.21161 5.73504 7.26631 5.79492C7.32091 5.8548 7.39211 5.89508 7.46951 5.9099C7.54911 5.92536 7.63101 5.91171 7.70161 5.87123C7.77211 5.83075 7.82701 5.7659 7.85701 5.68752L9.29501 2.07275C9.32111 2.00694 9.32961 1.93473 9.31971 1.86377C9.30981 1.79282 9.28181 1.72575 9.23871 1.66969C9.19501 1.61135 9.13611 1.56751 9.06931 1.54355C9.00261 1.5196 8.93091 1.51659 8.86301 1.53489L6.96071 2.0585L6.71091 0.339212Z" fill="white"/>
+    <path d="M12.8347 6.99662C11.8563 4.72065 9.6131 3.13232 7 3.13232C4.38693 3.13232 2.14375 4.72065 1.16534 6.99662C0.51307 7.05292 0 7.60382 0 8.27932V10.8528C0 11.5283 0.51307 12.0792 1.16534 12.1355C2.14375 14.4115 4.38693 15.9998 7 15.9998C9.6131 15.9998 11.8563 14.4115 12.8347 12.1355C13.4869 12.0792 14 11.5283 14 10.8528V8.27932C14 7.60382 13.4869 7.05292 12.8347 6.99662ZM11.4545 8.92272V9.56612C11.4545 11.6972 9.7443 13.4263 7.6364 13.4263H6.3636C4.25568 13.4263 2.54545 11.6972 2.54545 9.56612V8.92272C2.54545 7.85712 3.40057 6.99262 4.45455 6.99262H9.5455C10.5994 6.99262 11.4545 7.85712 11.4545 8.92272Z" fill="white"/>
+    <path d="M7.34149 8.28909C7.34939 8.23499 7.33789 8.18009 7.30869 8.13229C7.27949 8.08449 7.23399 8.04629 7.17899 8.02319C7.12229 7.99939 7.05829 7.99369 6.99749 8.00709C6.93679 8.02059 6.88299 8.05229 6.84529 8.09709L5.06149 10.151C5.02909 10.1884 5.00859 10.233 5.00219 10.28C4.99574 10.327 5.00359 10.3747 5.02489 10.418C5.06419 10.4987 5.15519 10.57 5.27999 10.57H6.80729L6.65869 11.7109C6.65079 11.765 6.66229 11.8199 6.69149 11.8677C6.72069 11.9155 6.76619 11.9537 6.82129 11.9768C6.87789 12.0006 6.94189 12.0063 7.00269 11.9929C7.06339 11.9794 7.11719 11.9477 7.15499 11.9029L8.93849 9.84899C8.97089 9.81159 8.99139 9.76699 8.99779 9.71999C9.00429 9.67299 8.99639 9.62529 8.97509 9.58199C8.95369 9.53709 8.91819 9.49869 8.87289 9.47169C8.82749 9.44469 8.77439 9.43019 8.71999 9.42999H7.19269L7.34149 8.28909Z" fill="white"/>
+  </g>
+  <!-- Wordmark -->
+  <text x="76" y="30" font-size="19" font-weight="700" fill="#ededed" letter-spacing="-0.3">Crewmate</text>
+  <text x="76" y="48" font-size="11" fill="#525252" letter-spacing="0.2">System Architecture</text>
+  <!-- Right meta -->
+  <text x="1260" y="28" text-anchor="end" font-size="10" fill="#3d3d3d" letter-spacing="1.5" font-weight="600">GEMINI LIVE AGENT CHALLENGE</text>
+  <text x="1260" y="46" text-anchor="end" font-size="10" fill="#2e2e2e">Gemini Live API · 14 Agents · 60 Skills · Google Cloud</text>
+  <!-- Header divider -->
+  <line x1="0" y1="64" x2="1300" y2="64" stroke="#1a1a1a" stroke-width="1"/>
+  <rect x="0" y="64" width="260" height="1.5" fill="#e95420" opacity="0.5"/>
+
+  <!-- ══════════════════════════════════════════════════
+       SECTION LABEL — LIVE LAYER
+  ══════════════════════════════════════════════════ -->
+  <text x="40" y="90" font-size="9.5" font-weight="600" fill="#e95420" letter-spacing="2.5">LIVE LAYER</text>
+
+  <!-- ══════════════════════════════════════════════════
+       USER CARD  (x=40, y=100, w=155, h=170)
+  ══════════════════════════════════════════════════ -->
+  <rect x="40" y="100" width="155" height="170" rx="12" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1" filter="url(#cardShadow)"/>
+  <!-- header strip -->
+  <rect x="40" y="100" width="155" height="34" rx="12" fill="#111111"/>
+  <rect x="40" y="122" width="155" height="12" fill="#111111"/>
+  <!-- left accent -->
+  <rect x="40" y="100" width="3" height="170" rx="1.5" fill="#e95420"/>
+  <text x="58" y="122" font-size="10.5" font-weight="600" fill="#ededed">User</text>
+  <!-- icon -->
+  <circle cx="117" cy="172" r="28" fill="#0f0f0f" stroke="#1e1e1e" stroke-width="1"/>
+  <text x="117" y="180" text-anchor="middle" font-size="22">🧑‍💻</text>
+  <!-- labels -->
+  <text x="117" y="224" text-anchor="middle" font-size="9.5" fill="#525252">Voice · Screen</text>
+  <text x="117" y="240" text-anchor="middle" font-size="9.5" fill="#525252">Text · Share</text>
+
+  <!-- Arrow: User → Gateway -->
+  <line x1="195" y1="183" x2="232" y2="183" stroke="#e95420" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+  <text x="213" y="176" text-anchor="middle" font-size="9" fill="#e95420" opacity="0.6">voice</text>
+  <!-- Return arrow (audio) -->
+  <line x1="232" y1="196" x2="195" y2="196" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowDim)"/>
+
+  <!-- ══════════════════════════════════════════════════
+       GEMINI LIVE GATEWAY  (x=240, y=100, w=290, h=195)
+  ══════════════════════════════════════════════════ -->
+  <rect x="240" y="100" width="290" height="195" rx="12" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="240" y="100" width="290" height="34" rx="12" fill="#111111"/>
+  <rect x="240" y="122" width="290" height="12" fill="#111111"/>
+  <rect x="240" y="100" width="3" height="195" rx="1.5" fill="#e95420"/>
+  <text x="258" y="122" font-size="10.5" font-weight="600" fill="#ededed">Gemini Live Gateway</text>
+  <!-- Google badge -->
+  <rect x="496" y="108" width="26" height="16" rx="4" fill="#4285f4" opacity="0.15"/>
+  <text x="509" y="120" text-anchor="middle" font-size="10" font-weight="700" fill="#4285f4">G</text>
+  <!-- Items -->
+  <text x="258" y="154" font-size="10.5" fill="#ededed">⚡  gemini-2.5-flash-native-audio</text>
+  <text x="258" y="173" font-size="10" fill="#6b6b6b">🎙  Bidirectional audio stream</text>
+  <text x="258" y="191" font-size="10" fill="#6b6b6b">👁  Screen vision (multimodal)</text>
+  <text x="258" y="209" font-size="10" fill="#6b6b6b">🔀  Intent detection · dispatch</text>
+  <text x="258" y="227" font-size="10" fill="#6b6b6b">🔄  Auto-reconnect on session drop</text>
+  <!-- footer note -->
+  <line x1="258" y1="243" x2="518" y2="243" stroke="#1e1e1e" stroke-width="1"/>
+  <text x="258" y="258" font-size="9" fill="#333333">Cloud Run · Firebase Auth · WebSocket</text>
+
+  <!-- Arrow: Gateway → Orchestrator -->
+  <line x1="530" y1="183" x2="566" y2="183" stroke="#e95420" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+  <text x="548" y="176" text-anchor="middle" font-size="9" fill="#e95420" opacity="0.6">dispatch</text>
+  <line x1="566" y1="196" x2="530" y2="196" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowDim)"/>
+  <text x="548" y="212" text-anchor="middle" font-size="9" fill="#2e2e2e">status</text>
+
+  <!-- ══════════════════════════════════════════════════
+       ORCHESTRATOR  (x=574, y=100, w=240, h=195)
+  ══════════════════════════════════════════════════ -->
+  <rect x="574" y="100" width="240" height="195" rx="12" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="574" y="100" width="240" height="34" rx="12" fill="#111111"/>
+  <rect x="574" y="122" width="240" height="12" fill="#111111"/>
+  <rect x="574" y="100" width="3" height="195" rx="1.5" fill="#e95420"/>
+  <text x="592" y="122" font-size="10.5" font-weight="600" fill="#ededed">Orchestrator</text>
+  <!-- Items -->
+  <text x="592" y="154" font-size="10.5" fill="#ededed">🧠  gemini-2.0-flash (routing)</text>
+  <text x="592" y="173" font-size="10" fill="#6b6b6b">🗺  Intent → agent routing</text>
+  <text x="592" y="191" font-size="10" fill="#6b6b6b">⚙️  60 skills registry</text>
+  <text x="592" y="209" font-size="10" fill="#6b6b6b">🔗  Pipeline chaining</text>
+  <text x="592" y="227" font-size="10" fill="#6b6b6b">📡  SSE broadcast to UI</text>
+  <line x1="592" y1="243" x2="802" y2="243" stroke="#1e1e1e" stroke-width="1"/>
+  <text x="592" y="258" font-size="9" fill="#333333">SQLite · 19 tables · A2A discoverable</text>
+
+  <!-- Arrow: Orchestrator → Memory -->
+  <line x1="814" y1="183" x2="850" y2="183" stroke="#e95420" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+  <text x="832" y="176" text-anchor="middle" font-size="9" fill="#e95420" opacity="0.6">write</text>
+  <line x1="850" y1="196" x2="814" y2="196" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowDim)"/>
+  <text x="832" y="212" text-anchor="middle" font-size="9" fill="#2e2e2e">inject</text>
+
+  <!-- ══════════════════════════════════════════════════
+       MEMORY LAYER  (x=858, y=100, w=242, h=195)
+  ══════════════════════════════════════════════════ -->
+  <rect x="858" y="100" width="242" height="195" rx="12" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1" filter="url(#cardShadow)"/>
+  <rect x="858" y="100" width="242" height="34" rx="12" fill="#111111"/>
+  <rect x="858" y="122" width="242" height="12" fill="#111111"/>
+  <rect x="858" y="100" width="3" height="195" rx="1.5" fill="#e95420"/>
+  <text x="876" y="122" font-size="10.5" font-weight="600" fill="#ededed">Memory Layer</text>
+  <!-- Items -->
+  <text x="876" y="154" font-size="10.5" fill="#ededed">🔢  Gemini Embedding 2</text>
+  <text x="876" y="173" font-size="10" fill="#6b6b6b">🗄  SQLite vector store</text>
+  <text x="876" y="191" font-size="10" fill="#6b6b6b">🔍  Cosine similarity search</text>
+  <text x="876" y="209" font-size="10" fill="#6b6b6b">📚  Session summaries</text>
+  <text x="876" y="227" font-size="10" fill="#6b6b6b">⚡  Injected at session start</text>
+  <line x1="876" y1="243" x2="1088" y2="243" stroke="#1e1e1e" stroke-width="1"/>
+  <text x="876" y="258" font-size="9" fill="#333333">Cross-session context · Auto-summarized</text>
+
+  <!-- Memory ↔ Frontend label (right side) -->
+  <text x="1130" y="122" font-size="9.5" font-weight="600" fill="#525252" letter-spacing="1">FRONTEND</text>
+  <rect x="1120" y="100" width="160" height="195" rx="12" fill="#080808" stroke="#181818" stroke-width="1"/>
+  <rect x="1120" y="100" width="160" height="34" rx="12" fill="#0f0f0f"/>
+  <rect x="1120" y="122" width="160" height="12" fill="#0f0f0f"/>
+  <text x="1138" y="122" font-size="10.5" font-weight="600" fill="#6b6b6b">Frontend</text>
+  <text x="1138" y="154" font-size="10" fill="#3d3d3d">⚛️  React 19 + Vite</text>
+  <text x="1138" y="172" font-size="10" fill="#3d3d3d">🎨  Tailwind CSS</text>
+  <text x="1138" y="190" font-size="10" fill="#3d3d3d">📦  Zustand state</text>
+  <text x="1138" y="208" font-size="10" fill="#3d3d3d">🔴  Live session UI</text>
+  <text x="1138" y="226" font-size="10" fill="#3d3d3d">📊  SSE task stream</text>
+  <line x1="1138" y1="243" x2="1268" y2="243" stroke="#181818" stroke-width="1"/>
+  <text x="1138" y="258" font-size="9" fill="#282828">Firebase Hosting · CDN</text>
+
+  <!-- ══════════════════════════════════════════════════
+       CONNECTOR: Orchestrator → Agent layer
+  ══════════════════════════════════════════════════ -->
+  <line x1="694" y1="295" x2="694" y2="325" stroke="#e95420" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+
+  <!-- ══════════════════════════════════════════════════
+       SECTION LABEL — AGENTS
+  ══════════════════════════════════════════════════ -->
+  <text x="40" y="347" font-size="9.5" font-weight="600" fill="#e95420" letter-spacing="2.5">14 SPECIALIST AGENTS</text>
+  <text x="1260" y="347" text-anchor="end" font-size="9" fill="#2a2a2a">Memory injected before each run · Self-critique · Auto-saves</text>
+
+  <!-- ══════════════════════════════════════════════════
+       AGENT CARDS  (y=358, h=130)
+       6 cards at w=175, gap=19. Positions: 40,234,428,622,816,1010. Badge: 1204
+  ══════════════════════════════════════════════════ -->
+
+  <!-- Agent 1: Research -->
+  <rect x="40" y="358" width="175" height="128" rx="10" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1"/>
+  <rect x="40" y="358" width="175" height="4" rx="2" fill="#e95420"/>
+  <text x="52" y="380" font-size="10.5" font-weight="600" fill="#ededed">🔬 Research</text>
+  <text x="52" y="399" font-size="9.5" fill="#525252">Web search + scrape</text>
+  <text x="52" y="415" font-size="9.5" fill="#525252">Multi-source validation</text>
+  <text x="52" y="431" font-size="9.5" fill="#525252">Executive briefs</text>
+  <text x="52" y="447" font-size="9.5" fill="#525252">Deep research reports</text>
+  <line x1="52" y1="461" x2="203" y2="461" stroke="#161616" stroke-width="1"/>
+  <text x="52" y="474" font-size="8.5" fill="#2e2e2e">→ Notion</text>
+
+  <!-- Agent 2: Product -->
+  <rect x="234" y="358" width="175" height="128" rx="10" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1"/>
+  <rect x="234" y="358" width="175" height="4" rx="2" fill="#e95420"/>
+  <text x="246" y="380" font-size="10.5" font-weight="600" fill="#ededed">🗂️ Product</text>
+  <text x="246" y="399" font-size="9.5" fill="#525252">PRDs with RICE scoring</text>
+  <text x="246" y="415" font-size="9.5" fill="#525252">Feature specs + API contracts</text>
+  <text x="246" y="431" font-size="9.5" fill="#525252">Sprint plans</text>
+  <text x="246" y="447" font-size="9.5" fill="#525252">Competitive analysis</text>
+  <line x1="246" y1="461" x2="397" y2="461" stroke="#161616" stroke-width="1"/>
+  <text x="246" y="474" font-size="8.5" fill="#2e2e2e">→ ClickUp + Notion</text>
+
+  <!-- Agent 3: Content -->
+  <rect x="428" y="358" width="175" height="128" rx="10" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1"/>
+  <rect x="428" y="358" width="175" height="4" rx="2" fill="#e95420"/>
+  <text x="440" y="380" font-size="10.5" font-weight="600" fill="#ededed">✍️ Content</text>
+  <text x="440" y="399" font-size="9.5" fill="#525252">Blog · LinkedIn · Twitter</text>
+  <text x="440" y="415" font-size="9.5" fill="#525252">Video scripts</text>
+  <text x="440" y="431" font-size="9.5" fill="#525252">Email sequences</text>
+  <text x="440" y="447" font-size="9.5" fill="#525252">Whitepapers + PRDs</text>
+  <line x1="440" y1="461" x2="591" y2="461" stroke="#161616" stroke-width="1"/>
+  <text x="440" y="474" font-size="8.5" fill="#2e2e2e">→ Notion · Google Docs</text>
+
+  <!-- Agent 4: Comms -->
+  <rect x="622" y="358" width="175" height="128" rx="10" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1"/>
+  <rect x="622" y="358" width="175" height="4" rx="2" fill="#e95420"/>
+  <text x="634" y="380" font-size="10.5" font-weight="600" fill="#ededed">📧 Comms</text>
+  <text x="634" y="399" font-size="9.5" fill="#525252">Executive emails</text>
+  <text x="634" y="415" font-size="9.5" fill="#525252">Press releases</text>
+  <text x="634" y="431" font-size="9.5" fill="#525252">Crisis communications</text>
+  <text x="634" y="447" font-size="9.5" fill="#525252">Slack announcements</text>
+  <line x1="634" y1="461" x2="785" y2="461" stroke="#161616" stroke-width="1"/>
+  <text x="634" y="474" font-size="8.5" fill="#2e2e2e">→ Slack + Notion</text>
+
+  <!-- Agent 5: UI Navigator -->
+  <rect x="816" y="358" width="175" height="128" rx="10" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1"/>
+  <rect x="816" y="358" width="175" height="4" rx="2" fill="#e95420"/>
+  <text x="828" y="380" font-size="10.5" font-weight="600" fill="#ededed">🌐 UI Navigator</text>
+  <text x="828" y="399" font-size="9.5" fill="#525252">Autonomous browser ops</text>
+  <text x="828" y="415" font-size="9.5" fill="#525252">Form filling + scraping</text>
+  <text x="828" y="431" font-size="9.5" fill="#525252">30-step Perceive→Act</text>
+  <text x="828" y="447" font-size="9.5" fill="#525252">Cookie + modal dismiss</text>
+  <line x1="828" y1="461" x2="979" y2="461" stroke="#161616" stroke-width="1"/>
+  <text x="828" y="474" font-size="8.5" fill="#2e2e2e">→ Stagehand + Playwright</text>
+
+  <!-- Agent 6: DevOps -->
+  <rect x="1010" y="358" width="175" height="128" rx="10" fill="#0a0a0a" stroke="#1e1e1e" stroke-width="1"/>
+  <rect x="1010" y="358" width="175" height="4" rx="2" fill="#e95420"/>
+  <text x="1022" y="380" font-size="10.5" font-weight="600" fill="#ededed">⚙️ DevOps</text>
+  <text x="1022" y="399" font-size="9.5" fill="#525252">Code review + audit</text>
+  <text x="1022" y="415" font-size="9.5" fill="#525252">CI/CD GitHub Actions</text>
+  <text x="1022" y="431" font-size="9.5" fill="#525252">Architecture design</text>
+  <text x="1022" y="447" font-size="9.5" fill="#525252">Security audit (CVSS)</text>
+  <line x1="1022" y1="461" x2="1173" y2="461" stroke="#161616" stroke-width="1"/>
+  <text x="1022" y="474" font-size="8.5" fill="#2e2e2e">→ Terminal + Notion</text>
+
+  <!-- +8 More badge -->
+  <rect x="1204" y="358" width="76" height="128" rx="10" fill="#080808" stroke="#181818" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="1242" y="415" text-anchor="middle" font-size="24" font-weight="300" fill="#2a2a2a">+</text>
+  <text x="1242" y="443" text-anchor="middle" font-size="22" font-weight="700" fill="#333333">8</text>
+  <text x="1242" y="462" text-anchor="middle" font-size="9" fill="#2a2a2a">more</text>
+
+  <!-- ══════════════════════════════════════════════════
+       DIVIDER + INTEGRATIONS LABEL
+  ══════════════════════════════════════════════════ -->
+  <line x1="40" y1="512" x2="1260" y2="512" stroke="#141414" stroke-width="1"/>
+  <text x="40" y="534" font-size="9.5" font-weight="600" fill="#e95420" letter-spacing="2.5">INTEGRATIONS</text>
+
+  <!-- ══════════════════════════════════════════════════
+       INTEGRATION PILLS  (y=545, h=34)
+  ══════════════════════════════════════════════════ -->
+  <!-- Notion -->
+  <rect x="40" y="545" width="138" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="56" y="567" font-size="10.5" fill="#525252">📝  Notion</text>
+
+  <!-- Slack -->
+  <rect x="190" y="545" width="138" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="206" y="567" font-size="10.5" fill="#525252">💬  Slack</text>
+
+  <!-- ClickUp -->
+  <rect x="340" y="545" width="138" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="356" y="567" font-size="10.5" fill="#525252">📋  ClickUp</text>
+
+  <!-- Google Workspace -->
+  <rect x="490" y="545" width="178" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="506" y="567" font-size="10.5" fill="#525252">☁️  Google Workspace</text>
+
+  <!-- Gmail -->
+  <rect x="680" y="545" width="138" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="696" y="567" font-size="10.5" fill="#525252">📧  Gmail</text>
+
+  <!-- Stagehand Browser -->
+  <rect x="830" y="545" width="172" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="846" y="567" font-size="10.5" fill="#525252">🌐  Stagehand Browser</text>
+
+  <!-- Terminal -->
+  <rect x="1014" y="545" width="138" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="1030" y="567" font-size="10.5" fill="#525252">💻  Terminal</text>
+
+  <!-- GitHub -->
+  <rect x="1164" y="545" width="100" height="34" rx="8" fill="#0d0d0d" stroke="#1a1a1a" stroke-width="1"/>
+  <text x="1180" y="567" font-size="10.5" fill="#525252">🐙  GitHub</text>
+
+  <!-- ══════════════════════════════════════════════════
+       GOOGLE CLOUD FOOTER
+  ══════════════════════════════════════════════════ -->
+  <line x1="40" y1="606" x2="1260" y2="606" stroke="#141414" stroke-width="1"/>
+  <text x="40" y="627" font-size="9" font-weight="600" fill="#3d3d3d" letter-spacing="2">POWERED BY GOOGLE CLOUD</text>
+
+  <!-- GCP chips -->
+  <rect x="40" y="638" width="144" height="28" rx="7" fill="#080808" stroke="#181818" stroke-width="1"/>
+  <text x="52" y="657" font-size="9.5" fill="#3d3d3d">☁️  Cloud Run</text>
+
+  <rect x="196" y="638" width="184" height="28" rx="7" fill="#080808" stroke="#181818" stroke-width="1"/>
+  <text x="208" y="657" font-size="9.5" fill="#3d3d3d">🔥  Firebase Auth + Hosting</text>
+
+  <rect x="392" y="638" width="170" height="28" rx="7" fill="#080808" stroke="#181818" stroke-width="1"/>
+  <text x="404" y="657" font-size="9.5" fill="#3d3d3d">⚡  Gemini Live API</text>
+
+  <rect x="574" y="638" width="192" height="28" rx="7" fill="#080808" stroke="#181818" stroke-width="1"/>
+  <text x="586" y="657" font-size="9.5" fill="#3d3d3d">🔢  Gemini Embedding 2</text>
+
+  <rect x="778" y="638" width="204" height="28" rx="7" fill="#080808" stroke="#181818" stroke-width="1"/>
+  <text x="790" y="657" font-size="9.5" fill="#3d3d3d">🔑  Google Workspace APIs</text>
+
+  <rect x="994" y="638" width="214" height="28" rx="7" fill="#080808" stroke="#181818" stroke-width="1"/>
+  <text x="1006" y="657" font-size="9.5" fill="#3d3d3d">📦  @google/genai SDK v1.44</text>
+
+  <!-- ══════════════════════════════════════════════════
+       BOTTOM BAR
+  ══════════════════════════════════════════════════ -->
+  <line x1="0" y1="694" x2="1300" y2="694" stroke="#141414" stroke-width="1"/>
+  <rect x="1040" y="694" width="260" height="1.5" fill="#e95420" opacity="0.35"/>
+  <text x="40" y="718" font-size="9" fill="#2a2a2a">Voice → Live Session → Orchestrator → 14 Agents → 9 Integrations · All in the background, while you keep talking.</text>
+  <text x="1260" y="718" text-anchor="end" font-size="9" fill="#2a2a2a">Gemini Live Agent Challenge 2025</text>
+</svg>

@@ -122,14 +122,24 @@ function emitTerminalTaskEvent(task: AgentTask, type: 'completed' | 'failed', pa
     artifactSource: artifact?.source ?? null,
     hasArtifactUrl: Boolean(artifact?.url),
   }));
-  emitTaskEvent(task.id, {
+
+  const event = {
     type,
     taskId: task.workspaceTaskId,
     taskRunId: task.id,
     routeType: task.routeType,
     ...payload,
     totalSteps: payload.steps.length,
-  });
+  };
+
+  // Emit on the run ID (primary) so per-run SSE streams receive the event.
+  emitTaskEvent(task.id, event);
+
+  // Also emit on the workspace task ID so pipeline subscribers (which subscribe by
+  // workspace task ID returned from orchestrate()) receive completion/failure events.
+  if (task.workspaceTaskId && task.workspaceTaskId !== task.id) {
+    emitTaskEvent(task.workspaceTaskId, event);
+  }
 }
 
 async function runDelegatedSkillTask(

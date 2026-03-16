@@ -18,7 +18,7 @@ export const notionSearchPagesSkill: Skill = {
   executionMode: 'either',
   latencyClass: 'quick',
   sideEffectLevel: 'low',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {

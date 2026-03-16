@@ -13,7 +13,7 @@ export const notionReadPageSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   inputSchema: {
     type: 'object',
     properties: {

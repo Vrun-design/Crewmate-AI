@@ -175,7 +175,7 @@ export const zapierListSkill: Skill = {
     executionMode: 'inline',
     latencyClass: 'quick',
     sideEffectLevel: 'none',
-    exposeInLiveSession: true,
+    exposeInLiveSession: false,
     inputSchema: {
         type: 'object',
         properties: {},

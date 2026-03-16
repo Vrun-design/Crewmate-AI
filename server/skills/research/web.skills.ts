@@ -438,7 +438,7 @@ export const webSearchSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: false,
+  exposeInLiveSession: true,
   usageExamples: [
     'Research and summarize the top AI tools this week',
     'Find the latest competitive analysis for Notion vs ClickUp',
@@ -528,7 +528,7 @@ export const webSummarizeUrlSkill: Skill = {
   executionMode: 'delegated',
   latencyClass: 'slow',
   sideEffectLevel: 'none',
-  exposeInLiveSession: true,
+  exposeInLiveSession: false,
   usageExamples: [
     'Summarize this article for me',
     'Read this documentation page and extract the key points',

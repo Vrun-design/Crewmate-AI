@@ -53,10 +53,23 @@ function upsertUser(email: string, identity?: { authProvider?: string; authSubje
         identity.emailVerified ? 1 : 0,
         email,
       );
-      return mapAuthUser(email)!;
     }
 
-    return existing;
+    // Workspace may be missing if the DB was partially reset — recreate it.
+    if (!existing.workspaceId) {
+      const workspaceId = `WS-${existing.id.slice(-8)}`;
+      const now = new Date().toISOString();
+      db.transaction(() => {
+        db.prepare(`INSERT OR IGNORE INTO workspaces (id, name, created_at) VALUES (?, ?, ?)`).run(
+          workspaceId, `${existing.name}'s Workspace`, now,
+        );
+        db.prepare(`INSERT OR IGNORE INTO workspace_members (workspace_id, user_id, role, joined_at) VALUES (?, ?, 'owner', ?)`).run(
+          workspaceId, existing.id, now,
+        );
+      })();
+    }
+
+    return mapAuthUser(email)!;
   }
 
   const user = {

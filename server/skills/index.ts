@@ -149,12 +149,12 @@ const RAW_SKILLS = [
   browserUiNavigateSkill,
 ];
 
-const ALL_SKILLS = RAW_SKILLS.map((skill) => hydrateSkillManifest(skill));
-
-for (const skill of ALL_SKILLS) {
+for (const skill of RAW_SKILLS) {
   registerSkill(skill);
 }
 
-console.log(`[Skills] Registered ${ALL_SKILLS.length} skills`);
+const ALL_SKILLS = RAW_SKILLS.map((skill) => hydrateSkillManifest(skill));
+
+console.log(`[Skills] Registered ${RAW_SKILLS.length} skills`);
 
 export { ALL_SKILLS };

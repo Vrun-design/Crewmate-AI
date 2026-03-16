@@ -85,7 +85,7 @@ export function buildTaskNotification(task: AgentTask): NotificationDraft {
   }
 
   const payload = asRecord(task.result);
-  const summary = getString(payload?.summary);
+  const summary = getString(payload?.summary) ?? getString(payload?.message);
 
   return {
     title: 'Task complete',

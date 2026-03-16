@@ -122,6 +122,10 @@ export function useMicrophoneCapture({
   }, [onAudioChunk]);
 
   const stopMicrophone = useCallback(async () => {
+    if (!streamRef.current && !audioContextRef.current && flushTimerRef.current === null) {
+      return;
+    }
+
     const currentSessionId = sessionId;
 
     if (flushTimerRef.current !== null) {

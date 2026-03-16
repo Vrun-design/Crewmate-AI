@@ -9,6 +9,7 @@ import { getSkillRouteType } from './executionPolicy';
 import { delegateSkillExecution } from './orchestrator';
 import { buildReplyTarget } from './channelTasking';
 import { logServerError } from './runtimeLogger';
+import { getSkill, runSkill } from '../skills/registry';
 
 function getToolErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown tool execution error';
@@ -75,6 +76,12 @@ function getNotificationPayload(
 function buildErrorSpokenResponse(errorMessage: string, skillId?: string): string {
   const lower = errorMessage.toLowerCase();
 
+  // Explicit approval required (e.g. Gmail send, Calendar create)
+  if (lower.includes('requires explicit approval')) {
+    const action = errorMessage.split(' requires explicit approval')[0].trim();
+    return `Just to confirm — should I go ahead and ${action.toLowerCase()}? Say yes and I'll do it.`;
+  }
+
   // Integration not connected
   if (lower.includes('not connected') || lower.includes('no token') || lower.includes('unauthorized') || lower.includes('401')) {
     const integrationName = skillId?.split('.')?.[0] ?? 'that integration';
@@ -106,7 +113,7 @@ function buildErrorSpokenResponse(errorMessage: string, skillId?: string): strin
     return `I tried to run that but couldn't find the right tool. That capability might not be set up yet.`;
   }
 
-  // Generic fallback — still better than raw error text
+  // Generic fallback
   return `That didn't work — something went wrong on my end. The error was: ${errorMessage.slice(0, 120)}. Want to try again?`;
 }
 
@@ -135,41 +142,36 @@ export async function executeLiveFunctionCalls(input: {
         toolName: call.name,
         skillId,
       }));
-      const { getSkill, runSkill } = await import('../skills/registry');
       const skill = getSkill(skillId);
 
       if (!skill) {
         throw new Error(`Unknown live skill: ${skillId}`);
       }
 
+      const skillCtx = { userId: input.userId, workspaceId, sessionId: input.sessionId };
       let output: unknown;
       let delegatedTaskId: string | null = null;
+
       if (getSkillRouteType(skill, 'live') === 'delegated_skill') {
-        const delegated = await delegateSkillExecution(
-          skillId,
-          { userId: input.userId, workspaceId, sessionId: input.sessionId },
-          args,
-          {
-            intent: `Live delegation: ${skill.name}`,
-            originType: 'live_session',
-            originRef: buildReplyTarget('live_session', { sessionId: input.sessionId }) ?? input.sessionId,
-          },
-        );
+        const originRef = buildReplyTarget('live_session', { sessionId: input.sessionId }) ?? input.sessionId;
+        // Use the skill's own name as the task title so the Tasks panel is meaningful
+        const taskIntent = typeof args.intent === 'string' && args.intent.trim()
+          ? args.intent.trim()
+          : skill.name;
+        const delegated = await delegateSkillExecution(skillId, skillCtx, args, {
+          intent: taskIntent,
+          originType: 'live_session',
+          originRef,
+        });
         delegatedTaskId = delegated.taskId;
         output = {
           spoken_response: getDelegationMessage(skill.name),
           delegatedTaskId: delegated.taskId,
           status: 'delegated',
         };
-        insertActivity(
-          `Delegated ${skill.name}`,
-          'Started background work from the live session.',
-          'action',
-          input.userId,
-          { notify: false },
-        );
+        insertActivity(`Delegated ${skill.name}`, 'Started background work from the live session.', 'action', input.userId, { notify: false });
       } else {
-        const runRecord = await runSkill(skillId, { userId: input.userId, workspaceId, sessionId: input.sessionId }, args);
+        const runRecord = await runSkill(skillId, skillCtx, args);
         if (runRecord.result.success === false) {
           throw new Error(getSkillFailureMessage(runRecord.result));
         }

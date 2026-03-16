@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowRight, CalendarDays, CheckCircle2, FileText, FolderOpen, Mail, Presentation, Sheet, Sparkles, X } from 'lucide-react';
+import { ArrowRight, CalendarDays, CheckCircle2, FileText, FolderOpen, Mail, Presentation, Sheet, X } from 'lucide-react';
 import { useIntegrations } from '../../hooks/useIntegrations';
 import { integrationsService } from '../../services/integrationsService';
 import { onboardingFlowService } from '../../services/onboardingFlowService';
@@ -159,9 +159,9 @@ export function GoogleWorkspaceOnboardingModal({
             transition={{ duration: 0.4, type: 'spring', bounce: 0.25 }}
             className="fixed inset-0 z-[181] flex items-center justify-center p-4 sm:p-6"
           >
-            <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-border/50 bg-background/80 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] backdrop-blur-xl">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/10 pointer-events-none" />
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+            <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[#ff6a2a]/20 bg-background/85 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.32)] backdrop-blur-xl">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,106,42,0.18),_transparent_34%),radial-gradient(circle_at_bottom,_rgba(255,87,34,0.14),_transparent_30%)] pointer-events-none" />
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#ff8a3d] via-[#ff6a2a] to-[#ff4f18]" />
 
               <button
                 type="button"
@@ -173,8 +173,12 @@ export function GoogleWorkspaceOnboardingModal({
               </button>
 
               <div className="relative px-8 pt-12 pb-10 text-center sm:px-12 sm:pt-16">
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 outline outline-8 outline-blue-500/10 shadow-xl shadow-blue-500/25">
-                  <Sparkles className="h-8 w-8 text-white" />
+                <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-[linear-gradient(180deg,rgba(255,132,72,0.22),rgba(255,90,28,0.14))] shadow-[0_18px_48px_rgba(255,98,34,0.22)] ring-1 ring-[#ff7a3c]/25 backdrop-blur-sm">
+                  <img
+                    src="/Crewmate_logo.svg"
+                    alt="Crewmate"
+                    className="h-12 w-12 drop-shadow-[0_8px_20px_rgba(255,106,42,0.35)]"
+                  />
                 </div>
 
                 <h1 className="mb-3 text-3xl font-bold tracking-tight text-foreground sm:text-4xl text-balance">
@@ -186,7 +190,7 @@ export function GoogleWorkspaceOnboardingModal({
 
                 <div className="mt-10 mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {GOOGLE_CAPABILITIES.map(({ label, icon: Icon }) => (
-                    <div key={label} className="flex flex-col items-center gap-2 rounded-2xl border border-border/40 bg-secondary/50 p-4 text-center transition-colors hover:bg-secondary/80">
+                    <div key={label} className="flex flex-col items-center gap-2 rounded-2xl border border-border/40 bg-secondary/50 p-4 text-center transition-colors hover:border-[#ff6a2a]/25 hover:bg-secondary/80">
                       <div className="rounded-xl bg-background p-2.5 text-foreground shadow-sm ring-1 ring-border/50">
                         <Icon size={18} />
                       </div>

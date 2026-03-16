@@ -22,16 +22,24 @@ export const clickupCreateTaskSkill: Skill = {
     inputSchema: {
         type: 'object',
         properties: {
-            name: { type: 'string', description: 'Task title' },
-            description: { type: 'string', description: 'Detailed task description' },
+            name: { type: 'string', description: 'Task title — you must compose this yourself based on context. Never leave empty.' },
+            description: { type: 'string', description: 'Detailed task description — compose from context, conversation, or screen content.' },
             screenshotArtifactId: { type: 'string', description: 'Optional screenshot artifact ID to attach to the ClickUp task after creation.' },
         },
         required: ['name'],
     },
     handler: async (ctx, args) => {
+        const description = String(args.description ?? '').trim();
+        const name = String(args.name ?? '').trim()
+            || description.split('\n')[0].slice(0, 100).trim()
+            || ctx.taskTitle?.replace(/^create clickup task:?\s*/i, '').trim()
+            || '';
+        if (!name) {
+            throw new Error('Task name is required to create a ClickUp task.');
+        }
         const result = await createClickUpTask(ctx.workspaceId, {
-            name: String(args.name ?? ''),
-            description: String(args.description ?? ''),
+            name,
+            description,
         });
 
         let attachmentUrl: string | undefined;

@@ -87,7 +87,10 @@ export function subscribeToTask(taskId: string, listener: (event: string) => voi
 
 export function emitTaskEvent(taskId: string, event: object): void {
   const payload = `data: ${JSON.stringify(event)}\n\n`;
-  for (const listener of taskListeners.get(taskId) ?? []) {
+  // Snapshot the listener list — a listener may unsubscribe itself during iteration
+  // (e.g. pipelineOrchestrator's waitForTask) which would otherwise corrupt the for-of iterator.
+  const listeners = [...(taskListeners.get(taskId) ?? [])];
+  for (const listener of listeners) {
     listener(payload);
   }
 }
@@ -100,7 +103,7 @@ export function createStepEmitter(task: AgentTask): { emitStep: EmitStep; getSte
     const step: AgentStepEvent = {
       taskId: task.workspaceTaskId ?? task.id,
       taskRunId: task.id,
-      stepIndex: stepIndex += 1,
+      stepIndex: stepIndex++,
       type,
       timestamp: new Date().toISOString(),
       label,
@@ -113,7 +116,6 @@ export function createStepEmitter(task: AgentTask): { emitStep: EmitStep; getSte
       url: options.url,
     };
 
-    step.stepIndex -= 1;
     steps.push(step);
     logTaskEvent('task.step', {
       taskId: task.workspaceTaskId ?? task.id,
@@ -463,7 +465,12 @@ export async function routeIntent(intent: string, userId: string): Promise<Routi
   }
 
   const ai = createGeminiClient();
-  const skills = listSkillsForUser(userId).map((skill) => formatSkillForRouting(skill)).join('\n\n');
+  // Exclude live-session bridge skills — they require an active live session and sessionId,
+  // so they cannot be called from the async orchestrator context.
+  const skills = listSkillsForUser(userId)
+    .filter((skill) => !skill.id.startsWith('live.'))
+    .map((skill) => formatSkillForRouting(skill))
+    .join('\n\n');
   const response = await ai.models.generateContent({
     model: serverConfig.geminiOrchestrationModel,
     contents: `You are an intent router for a 14-agent AI workforce. Route the user's intent to the most appropriate agent or direct skill.
@@ -505,9 +512,19 @@ For skillArgs: extract the most obvious args from the intent. For google.sheets-
     const parsed = JSON.parse(text) as RoutingDecision;
     if (parsed.agent === 'skill' && parsed.skillId) {
       const skill = getSkill(parsed.skillId);
+      if (!skill) {
+        // Router hallucinated a skill that doesn't exist — fall through to research agent
+        return {
+          routeType: 'delegated_agent',
+          agent: 'research',
+          confidence: 0.5,
+          reasoning: `Skill "${parsed.skillId}" not found — fallback to research agent`,
+        };
+      }
+
       return {
         ...parsed,
-        routeType: skill ? getSkillRouteType(skill, 'async') : 'delegated_skill',
+        routeType: getSkillRouteType(skill, 'async'),
       };
     }
 

@@ -104,7 +104,8 @@ export async function connectGeminiSession(
           return;
         }
 
-        const errorMessage = event?.error instanceof Error ? event.error.message : 'Gemini Live connection error.';
+        const errorMessage = event?.error instanceof Error ? event.error.message : String(event?.error ?? 'Gemini Live connection error.');
+        console.error('[gemini-live] onerror:', errorMessage, JSON.stringify(event));
         if (current.canResume && current.sessionResumptionHandle && !current.isReconnecting) {
           void reconnectGeminiLiveSession(sessionId, `transport_error:${errorMessage}`);
           return;
@@ -115,7 +116,8 @@ export async function connectGeminiSession(
           clearPendingTurn(current);
         }
       },
-      onclose: () => {
+      onclose: (event?: { code?: number; reason?: string }) => {
+        console.error('[gemini-live] onclose:', JSON.stringify(event ?? {}));
         const current = getRuntimeSession(sessionId);
         if (!current || current.connectionId !== connectionId) {
           return;

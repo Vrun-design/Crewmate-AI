@@ -18,6 +18,10 @@ function getOAuthButtonLabel(integrationName: string, isConnected: boolean): str
   return isConnected ? `Reconnect ${integrationName}` : `Connect ${integrationName}`;
 }
 
+function getDisconnectButtonLabel(integrationName: string, isOAuth: boolean): string {
+  return isOAuth ? `Disconnect ${integrationName}` : 'Remove Saved Connection';
+}
+
 export function IntegrationDrawerContent({
   integration,
   onClose,
@@ -281,10 +285,10 @@ export function IntegrationDrawerContent({
                 Open Official Docs
               </a>
             ) : null}
-            {config?.configuredVia === 'vault' && !isOAuth ? (
+            {config?.configuredVia === 'vault' ? (
               <Button variant="danger" className="w-full" onClick={() => void handleDisconnect()} disabled={isSaving}>
                 <Trash2 size={16} className="mr-2" />
-                Remove Saved Connection
+                {getDisconnectButtonLabel(integration.name, isOAuth)}
               </Button>
             ) : null}
             <Button variant="secondary" className="w-full" onClick={onClose}>

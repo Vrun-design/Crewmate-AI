@@ -22,14 +22,17 @@ export const slackSendDmSkill: Skill = {
   inputSchema: {
     type: 'object',
     properties: {
-      text: { type: 'string', description: 'The message to send.' },
+      text: { type: 'string', description: 'The full message text to send. You must compose this yourself based on context — e.g. include the Notion link, task name, or summary being shared. Never leave this empty.' },
       recipientId: { type: 'string', description: 'Slack user ID (starts with U). Use if you know the exact user ID.' },
       recipientName: { type: 'string', description: 'Slack display name or @handle (e.g. "john.smith" or "@sarah"). Will be resolved to user ID automatically.' },
     },
     required: ['text'],
   },
   handler: async (ctx, args) => {
-    const text = String(args.text ?? '');
+    const text = String(args.text ?? '').trim() || ctx.taskTitle?.trim() || '';
+    if (!text) {
+      throw new Error('Message text is required to send a Slack DM.');
+    }
     let recipientId = typeof args.recipientId === 'string' ? args.recipientId.trim() : '';
 
     if (!recipientId && typeof args.recipientName === 'string' && args.recipientName.trim()) {

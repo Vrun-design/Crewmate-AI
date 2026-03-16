@@ -168,10 +168,14 @@ export function sendLiveVideoFrame(sessionId: string, input: { mimeType: string;
 export function sendLiveAudioChunk(sessionId: string, input: { mimeType: string; data: string }): void {
   const runtime = getRuntimeSession(sessionId);
   if (!runtime) {
-    throw new Error('Live runtime not found. Start a Gemini session first.');
+    return;
   }
 
-  runtime.session.sendRealtimeInput({ audio: input });
+  try {
+    runtime.session.sendRealtimeInput({ audio: input });
+  } catch {
+    return;
+  }
 
   if (!runtime.hasAudioContext) {
     runtime.hasAudioContext = true;
@@ -182,10 +186,15 @@ export function sendLiveAudioChunk(sessionId: string, input: { mimeType: string;
 export function endLiveAudioInput(sessionId: string): void {
   const runtime = getRuntimeSession(sessionId);
   if (!runtime) {
-    throw new Error('Live runtime not found. Start a Gemini session first.');
+    // Session already cleaned up — treat as a no-op
+    return;
   }
 
-  runtime.session.sendRealtimeInput({ audioStreamEnd: true });
+  try {
+    runtime.session.sendRealtimeInput({ audioStreamEnd: true });
+  } catch {
+    // Session socket already closed — ignore, nothing to end
+  }
 }
 
 export function getLiveAudioChunks(sessionId: string, afterChunkId = 0): AudioChunkRecord[] {

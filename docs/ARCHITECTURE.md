@@ -64,13 +64,13 @@ Crewmate is a multimodal AI remote employee. It connects a real-time Gemini Live
 │  ┌──────────┐   ┌────────────────────────┐  ┌──────────────┐   │
 │  │  INLINE  │   │     ORCHESTRATOR       │  │ PIPELINE     │   │
 │  │  SKILLS  │   │  Intent Router         │  │ ORCHESTRATOR │   │
-│  │  (< 2s)  │   │  (gemini-pro)          │  │ Sequential   │   │
+│  │  (< 2s)  │   │  (gemini-3.1-pro)      │  │ Sequential   │   │
 │  └──────────┘   │                        │  │ Agent Chain  │   │
 │                 │  Memory injected →     │  └──────────────┘   │
 │                 │  14 Specialist Agents  │         │           │
 │                 │  (+ self-critique)     │         │           │
 │                 │                        │         │           │
-│                 │  62 Skills             │←────────┘           │
+│                 │  60 Skills             │←────────┘           │
 │                 └────────────┬───────────┘                     │
 │                               │                                  │
 │                               ▼                                  │
@@ -141,7 +141,7 @@ flowchart TD
             ORCH[Orchestrator\nIntent Router]
             PIPE[Pipeline Orchestrator\nSequential Agent Chaining]
             POLICY[Execution Policy\nInline · Delegated · Agent · Pipeline]
-            REG[Skill Registry\n62 Skills]
+            REG[Skill Registry\n60 Skills]
         end
 
         subgraph AgentLayer["Agent Layer — 14 Specialists"]
@@ -398,9 +398,9 @@ Each step runs `orchestrate()` with the previous step's output appended. Steps t
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, TypeScript, Tailwind CSS, Framer Motion |
+| Frontend | React 19, Vite, TypeScript, Tailwind CSS, Motion (v12) |
 | Backend | Node.js, Express, TypeScript |
-| AI | Google Gemini Live API, Gemini Pro (routing/agents), Gemini Flash (inline/briefing), Google GenAI SDK |
+| AI | Gemini 2.5 Flash Live (audio/vision), `gemini-3.1-pro-preview` (agents/orchestration), `gemini-3.1-flash-lite-preview` (inline/quick), `gemini-embedding-2` (memory), @google/genai SDK |
 | Database | SQLite (19 tables, vector embeddings column) |
 | Auth | Firebase Authentication (JWT) + dev email-code login |
 | Browser Automation | Stagehand + Playwright + Chromium |
