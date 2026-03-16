@@ -17,6 +17,16 @@ Crewmate is a multimodal AI remote employee. It connects a real-time Gemini Live
 - Editable Soul: user name + custom personality injected into every agent and live prompt
 - Firebase OAuth race condition fixed — no more logout after Google Workspace connect
 
+
+
+![Crewmate Dev Diagram](../public/Document_diag.png)
+
+
+
+![Crewmate Dev Diagram](../public/DIAGRAM_2.png)
+
+
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                          USER                                   │
