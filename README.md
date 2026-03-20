@@ -693,7 +693,7 @@ The fastest way to verify the project works end-to-end:
 
 ```bash
 # 1. Clone and install
-git clone <YOUR_REPO_URL>
+git clone https://github.com/Vrun-design/Crewmate-AI.git
 cd crewmate
 npm install
 
