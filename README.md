@@ -445,7 +445,7 @@ schema_migrations       → Applied migration tracking
 ### 1. Clone & Install
 
 ```bash
-git clone <YOUR_REPO_URL>
+git clone https://github.com/Vrun-design/Crewmate-AI.git
 cd crewmate
 npm install
 ```
